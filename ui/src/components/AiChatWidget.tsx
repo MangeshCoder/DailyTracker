@@ -2,9 +2,19 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Message, MessageHistory, SuggestedAction } from "../types/chat";
 import { aiChatApi } from "../services/api";
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Quick-Prompt Categories
-// ─────────────────────────────────────────────────────────────────────────────
+interface ContextSummary {
+  isCheckedIn: boolean;
+  checkInTime: string | null;
+  isCheckedOut: boolean;
+  checkOutTime: string | null;
+  totalWorkMinutes: number;
+  tasksCount: number;
+  completedTasksCount: number;
+  isOnBreak: boolean;
+  activeBreakType: string | null;
+  dayStatus: string;
+}
+
 const PROMPT_CATEGORIES = [
   {
     category: "⚡ Smart Actions",
@@ -16,12 +26,12 @@ const PROMPT_CATEGORIES = [
     ],
   },
   {
-    category: "📊 Data & Status",
+    category: "📊 Live Day Analysis",
     prompts: [
-      { label: "📋 Today's tasks", text: "What tasks did I log today?" },
-      { label: "⏱ Work hours", text: "How many hours have I logged today?" },
-      { label: "🏖 Leave balance", text: "What is my annual leave balance?" },
-      { label: "📈 Productivity check", text: "Give me an analytics summary of my week" },
+      { label: "📋 What tasks did I log?", text: "What tasks did I log today and their statuses?" },
+      { label: "⏱ How long have I worked?", text: "How many hours have I worked today so far?" },
+      { label: "📅 Any meetings today?", text: "Do I have any meetings or 1-on-1s scheduled today?" },
+      { label: "🏖 Check leave status", text: "What are my recent leave and WFH requests?" },
     ],
   },
 ];
@@ -29,7 +39,8 @@ const PROMPT_CATEGORIES = [
 const INITIAL_MESSAGE: Message = {
   id: "init",
   role: "assistant",
-  content: "Hi! 👋 I'm your upgraded **Daily Tracker Copilot**.\n\nI can **execute real actions** for you (create tasks, clock in/out, apply WFH, draft EODs) and analyze your productivity. How can I help you right now?",
+  content:
+    "Hi! 👋 I'm your **Daily Tracker Copilot**.\n\nI have **live access to your day** (attendance, tasks, breaks, meetings & leaves). Ask me anything about your schedule or have me execute actions for you!",
   timestamp: new Date(),
 };
 
@@ -37,9 +48,13 @@ const AssistantMessage = ({ content }: { content: string }) => {
   const renderInline = (text: string) => {
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
     return parts.map((part, i) =>
-      part.startsWith("**") && part.endsWith("**")
-        ? <strong key={i} className="text-white font-semibold">{part.slice(2, -2)}</strong>
-        : <span key={i}>{part}</span>
+      part.startsWith("**") && part.endsWith("**") ? (
+        <strong key={i} className="text-white font-semibold">
+          {part.slice(2, -2)}
+        </strong>
+      ) : (
+        <span key={i}>{part}</span>
+      )
     );
   };
 
@@ -48,7 +63,6 @@ const AssistantMessage = ({ content }: { content: string }) => {
       {content.split("\n").map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1" />;
-
         if (trimmed.startsWith("• ") || trimmed.startsWith("- ")) {
           return (
             <div key={idx} className="flex items-start gap-2">
@@ -133,6 +147,7 @@ const ChatBubble = ({
   onExecuteAction: (act: SuggestedAction) => void;
 }) => {
   const isUser = msg.role === "user";
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} items-end gap-2`}>
       {!isUser && (
@@ -169,25 +184,41 @@ const ChatBubble = ({
   );
 };
 
-const AiChatWidget = () => {
+export const AiChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [contextSummary, setContextSummary] = useState<ContextSummary | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const showQuickPrompts = messages.length === 1 && messages[0].id === "init" && !isLoading;
+  const fetchSummary = async () => {
+    try {
+      const res = await aiChatApi.getContextSummary();
+      if (res.data.success) {
+        setContextSummary(res.data.summary);
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSummary();
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  useEffect(() => {
-    if (isOpen) inputRef.current?.focus();
-  }, [isOpen]);
+  const showQuickPrompts = messages.length === 1 && messages[0].id === "init" && !isLoading;
 
   const handleSend = async (overrideText?: string) => {
     const trimmed = (overrideText ?? input).trim();
@@ -241,13 +272,13 @@ const AiChatWidget = () => {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, confirmMsg]);
+        fetchSummary(); // Refresh live status
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to execute action.");
     }
   };
 
-  // Web Speech API voice input
   const toggleVoiceInput = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -298,88 +329,109 @@ const AiChatWidget = () => {
   return (
     <>
       {/* ── Floating toggle button ── */}
-      <button
-        onClick={() => setIsOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 border border-blue-400/30"
-        aria-label="Toggle AI Assistant"
-      >
-        {isOpen ? (
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <div className="relative">
-            <span className="text-xl">🤖</span>
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-pulse" />
-          </div>
-        )}
-      </button>
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="relative group p-3.5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl hover:shadow-blue-500/25 transition-all duration-300 hover:scale-105 active:scale-95"
+          aria-label="Toggle AI Copilot"
+        >
+          {isOpen ? (
+            <span className="text-xl">✕</span>
+          ) : (
+            <>
+              <span className="text-2xl">🤖</span>
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
+              </span>
+            </>
+          )}
+        </button>
+      </div>
 
-      {/* ── Chat panel ── */}
+      {/* ── Chat Modal Window ── */}
       {isOpen && (
-        <div className="fixed bottom-24 right-4 sm:right-6 z-50 w-[92vw] sm:w-[420px] h-[600px] max-h-[80vh] bg-slate-900 rounded-2xl shadow-2xl flex flex-col border border-slate-700 overflow-hidden">
+        <div className="fixed bottom-24 right-6 z-50 w-96 sm:w-[420px] max-h-[620px] h-[580px] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 flex items-center gap-3 flex-shrink-0">
-            <div className="w-9 h-9 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-lg shrink-0 shadow">
-              🤖
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-semibold text-sm text-white">Daily Tracker Copilot</p>
-                <span className="text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded-full font-medium">Pro</span>
+          <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-base">
+                🤖
               </div>
-              <p className="text-xs text-blue-100">Live data + Action execution</p>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Daily Tracker Copilot</h3>
+                <p className="text-[11px] text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live Context Connected
+                </p>
+              </div>
             </div>
-            <button
-              onClick={handleClear}
-              title="Clear chat"
-              className="text-blue-200 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Error banner */}
-          {error && (
-            <div className="bg-red-950/80 border-b border-red-800/40 px-3 py-2 flex items-center gap-2 flex-shrink-0 text-red-300 text-xs">
-              <span>⚠️ {error}</span>
-              <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-200">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleClear}
+                title="Clear conversation"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition text-xs"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition text-sm"
+              >
                 ✕
               </button>
             </div>
-          )}
+          </div>
 
-          {/* Messages container */}
-          <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-3.5 bg-slate-950">
-            {messages.map((msg) => (
-              <ChatBubble key={msg.id} msg={msg} onExecuteAction={handleExecuteAction} />
+          {/* ── Real-Time Context Sync Pill Banner ── */}
+          <div className="px-3.5 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-300">
+            <div className="flex items-center gap-1.5 truncate">
+              {contextSummary?.isCheckedIn ? (
+                <span className="text-emerald-400 font-medium">
+                  🟢 In: {contextSummary.checkInTime}
+                </span>
+              ) : (
+                <span className="text-amber-400 font-medium">⚪ Not Checked In</span>
+              )}
+              <span>•</span>
+              <span>📋 {contextSummary?.tasksCount ?? 0} tasks</span>
+              {contextSummary?.isOnBreak && (
+                <>
+                  <span>•</span>
+                  <span className="text-amber-300">☕ On Break</span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={fetchSummary}
+              title="Refresh live context"
+              className="text-slate-400 hover:text-blue-400 transition"
+            >
+              ↻
+            </button>
+          </div>
+
+          {/* Messages Body */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-900/60">
+            {messages.map((m) => (
+              <ChatBubble key={m.id} msg={m} onExecuteAction={handleExecuteAction} />
             ))}
 
-            {/* Categorized Quick Prompts */}
+            {isLoading && <TypingIndicator />}
+
+            {/* Quick Prompts */}
             {showQuickPrompts && (
-              <div className="pt-2 space-y-3">
+              <div className="mt-3 space-y-3 pt-2">
                 {PROMPT_CATEGORIES.map((cat) => (
                   <div key={cat.category}>
-                    <p className="text-slate-500 font-medium text-[11px] uppercase tracking-wider mb-1.5 px-0.5">
-                      {cat.category}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {cat.prompts.map((qp) => (
+                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5 px-0.5">{cat.category}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {cat.prompts.map((p) => (
                         <button
-                          key={qp.text}
-                          onClick={() => handleSend(qp.text)}
-                          className="text-xs px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700
-                                     text-slate-300 hover:bg-slate-800 hover:text-white hover:border-blue-500/50
-                                     active:scale-95 transition-all duration-150 text-left"
+                          key={p.label}
+                          onClick={() => handleSend(p.text)}
+                          className="text-left px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-blue-600/20 border border-slate-700/80 hover:border-blue-500/50 text-[11px] text-slate-300 hover:text-white transition group"
                         >
-                          {qp.label}
+                          <span className="line-clamp-1">{p.label}</span>
                         </button>
                       ))}
                     </div>
@@ -388,47 +440,53 @@ const AiChatWidget = () => {
               </div>
             )}
 
-            {isLoading && <TypingIndicator />}
+            {error && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex justify-between items-center">
+                <span>{error}</span>
+                <button onClick={() => setError(null)} className="text-rose-400 hover:text-white">✕</button>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input bar */}
-          <div className="px-3 py-3 border-t border-slate-800 flex gap-2 items-center bg-slate-900 flex-shrink-0">
-            <button
-              onClick={toggleVoiceInput}
-              title={isListening ? "Listening... click to stop" : "Voice input"}
-              className={`p-2 rounded-xl transition-all ${
-                isListening
-                  ? "bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse"
-                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-              }`}
-            >
-              🎤
-            </button>
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder='e.g. "Create task: Design landing page" or "Draft my EOD"'
-              disabled={isLoading}
-              className="flex-1 text-sm bg-slate-800 border border-slate-700 text-white rounded-xl px-3.5 py-2
-                         outline-none placeholder:text-slate-500
-                         focus:border-blue-500 focus:ring-1 focus:ring-blue-500
-                         disabled:opacity-40 disabled:cursor-not-allowed transition"
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={isLoading || !input.trim()}
-              className="w-10 h-10 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600
-                         text-white rounded-xl flex items-center justify-center transition-colors shrink-0 shadow"
-              aria-label="Send"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+          {/* Input Footer */}
+          <div className="p-3 bg-slate-800/80 border-t border-slate-700/80">
+            <div className="relative flex items-center">
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask about tasks, check-in, leaves..."
+                disabled={isLoading}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-20 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition disabled:opacity-50"
+              />
+              <div className="absolute right-1.5 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={toggleVoiceInput}
+                  disabled={isLoading}
+                  className={`p-1.5 rounded-lg text-xs transition ${
+                    isListening
+                      ? "bg-rose-500/20 text-rose-400 animate-pulse border border-rose-500/40"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}
+                  title="Voice input"
+                >
+                  🎙️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSend()}
+                  disabled={isLoading || !input.trim()}
+                  className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs disabled:opacity-40 disabled:hover:bg-blue-600 transition"
+                >
+                  ➤
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -65,6 +65,26 @@ namespace DailyTrackerAPI.Controllers.Communication
         }
 
         [Authorize]
+        [HttpGet("context-summary")]
+        public async Task<IActionResult> GetContextSummary()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { success = false, message = "Invalid user token." });
+
+            try
+            {
+                var summary = await _aiService.GetUserContextSummaryAsync(userId);
+                return Ok(new { success = true, summary });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get AI user context summary");
+                return StatusCode(500, new { success = false, message = "Failed to fetch context summary." });
+            }
+        }
+
+        [Authorize]
         [HttpPost("execute-action")]
         public async Task<IActionResult> ExecuteAction([FromBody] ExecuteActionRequest request)
         {

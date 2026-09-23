@@ -1,5 +1,8 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Models.Communication;
+using DailyTrackerAPI.Models.Tasks;
+using DailyTrackerAPI.Models.Attendance;
+using DailyTrackerAPI.Models.HR;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +13,7 @@ namespace DailyTrackerAPI.Services.AI
     public interface IAiService
     {
         Task<ChatResponse> GetChatResponseAsync(string userMessage, List<MessageHistory> history, int userId);
+        Task<object> GetUserContextSummaryAsync(int userId);
     }
 
     public class GeminiService : IAiService
@@ -18,7 +22,7 @@ namespace DailyTrackerAPI.Services.AI
         private readonly IConfiguration _configuration;
         private readonly AppDbContext _db;
         private readonly ILogger<GeminiService> _logger;
-        private const string MODEL = "gemini-3.6-flash"; // or "gemini-2.5-flash" / "gemini-3.6-flash"
+        private const string MODEL = "gemini-2.5-flash"; // Fast & accurate model
 
         public GeminiService(
             HttpClient httpClient,
@@ -32,16 +36,39 @@ namespace DailyTrackerAPI.Services.AI
             _logger = logger;
         }
 
+        public async Task<object> GetUserContextSummaryAsync(int userId)
+        {
+            var today = DateTime.UtcNow.Date;
+            var dailyLog = await _db.DailyLogs
+                .Include(d => d.TaskLogs)
+                .Include(d => d.BreakLogs)
+                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+
+            var activeBreak = dailyLog?.BreakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
+
+            return new
+            {
+                isCheckedIn = dailyLog?.CheckInTime != null,
+                checkInTime = dailyLog?.CheckInTime?.ToString("hh:mm tt"),
+                isCheckedOut = dailyLog?.CheckOutTime != null,
+                checkOutTime = dailyLog?.CheckOutTime?.ToString("hh:mm tt"),
+                totalWorkMinutes = dailyLog?.TotalWorkMinutes ?? 0,
+                tasksCount = dailyLog?.TaskLogs.Count ?? 0,
+                completedTasksCount = dailyLog?.TaskLogs.Count(t => t.Status == "Completed") ?? 0,
+                isOnBreak = activeBreak != null,
+                activeBreakType = activeBreak?.BreakType,
+                dayStatus = dailyLog?.DayStatus ?? "Not Started"
+            };
+        }
+
         public async Task<ChatResponse> GetChatResponseAsync(
             string userMessage,
             List<MessageHistory> history,
             int userId)
         {
-            // 1. Always detect client actions first (Never fails)
             var actions = DetectClientActions(userMessage, userId);
-
-            // 2. Fetch API Key
             var apiKey = _configuration["Gemini:ApiKey"] ?? _configuration["GeminiApiKey"];
+
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 return new ChatResponse
@@ -52,7 +79,6 @@ namespace DailyTrackerAPI.Services.AI
                 };
             }
 
-            // 3. Build live user context safely
             string userContext = "User context unavailable.";
             try
             {
@@ -63,14 +89,12 @@ namespace DailyTrackerAPI.Services.AI
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to build user context, proceeding without it.");
+                _logger.LogWarning(ex, "Failed to build user context, proceeding with basic context.");
             }
 
-            // 4. Call Gemini API
             try
             {
                 var url = $"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={apiKey}";
-
                 var recentHistory = history.TakeLast(8).ToList();
                 var contents = new List<object>();
 
@@ -91,17 +115,18 @@ namespace DailyTrackerAPI.Services.AI
 
                 var systemPrompt = $"""
                     You are a smart, professional AI Copilot built into the Daily Tracker EMS application.
-                    You help employees manage and understand their work day.
-                    
+                    You help employees manage and understand their work day with real-time operational accuracy.
+
                     RULES:
                     - Be concise, structured, and helpful. Use bullet points when listing items.
                     - Format dates as "Mon DD" and times as "hh:mm AM/PM".
-                    - NEVER invent or guess data — only use what is in the live context below.
+                    - ALWAYS refer to the live user context below when answering questions about tasks, work hours, check-in status, leaves, or meetings.
+                    - NEVER invent or guess data — only use what is in the live context below. If data is not recorded, clearly state that.
                     - If asked to create a task, check in/out, or apply for WFH, acknowledge that an action card is prepared for them to confirm.
-                    - Today is {DateTime.Now:dddd, MMMM dd yyyy}. Current time: {DateTime.Now:hh:mm tt}.
-                    
+                    - Today is {DateTime.Now:dddd, MMMM dd yyyy}. Current server time: {DateTime.Now:hh:mm tt}.
+
                     ══════════════════════════════════════════════════════════
-                      LIVE USER DATA
+                      LIVE USER CONTEXT & RECENT ACTIVITY
                     ══════════════════════════════════════════════════════════
                     {userContext}
                     ══════════════════════════════════════════════════════════
@@ -111,7 +136,7 @@ namespace DailyTrackerAPI.Services.AI
                 {
                     system_instruction = new { parts = new[] { new { text = systemPrompt } } },
                     contents,
-                    generationConfig = new { maxOutputTokens = 800, temperature = 0.7 }
+                    generationConfig = new { maxOutputTokens = 1000, temperature = 0.5 }
                 };
 
                 var json = JsonSerializer.Serialize(requestBody);
@@ -123,7 +148,6 @@ namespace DailyTrackerAPI.Services.AI
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogError("Gemini API error {Status}: {Body}", response.StatusCode, body);
-                    // Graceful fallback if Google returns 400/403/404/429
                     return new ChatResponse
                     {
                         Reply = GenerateSmartFallback(userMessage, actions),
@@ -154,7 +178,6 @@ namespace DailyTrackerAPI.Services.AI
                 _logger.LogError(ex, "Gemini call failed with exception");
             }
 
-            // Fallback if network or Gemini API fails
             return new ChatResponse
             {
                 Reply = GenerateSmartFallback(userMessage, actions),
@@ -173,7 +196,6 @@ namespace DailyTrackerAPI.Services.AI
             {
                 var match = Regex.Match(text, @"(?:task|log|add)\s+[""']?([^""'\n]+?)[""']?(?:\s+(?:for|in|with|priority|minutes|hours)|$)", RegexOptions.IgnoreCase);
                 var title = match.Success ? match.Groups[1].Value.Trim() : "New Task from AI Copilot";
-
                 var priority = lower.Contains("high") ? "High" : lower.Contains("low") ? "Low" : "Medium";
                 var minutes = lower.Contains("2 hour") ? 120 : lower.Contains("1 hour") ? 60 : 30;
 
@@ -254,8 +276,9 @@ namespace DailyTrackerAPI.Services.AI
         private async Task<string> BuildUserContextAsync(int userId)
         {
             var sb = new StringBuilder();
-            var today = DateTime.Today;
+            var today = DateTime.UtcNow.Date;
 
+            // 1. User Profile
             var user = await _db.Users
                 .Where(u => u.Id == userId)
                 .Select(u => new { u.FullName, u.Email, u.Role, u.Department })
@@ -263,7 +286,101 @@ namespace DailyTrackerAPI.Services.AI
 
             if (user != null)
             {
-                sb.AppendLine($"USER: {user.FullName} | Role: {user.Role} | Dept: {user.Department} | Email: {user.Email}");
+                sb.AppendLine($"EMPLOYEE PROFILE: {user.FullName} | Role: {user.Role} | Dept: {user.Department} | Email: {user.Email}");
+            }
+
+            // 2. Today's Attendance & Presence
+            var dailyLog = await _db.DailyLogs
+                .Include(d => d.TaskLogs)
+                .Include(d => d.BreakLogs)
+                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+
+            if (dailyLog != null)
+            {
+                var checkIn = dailyLog.CheckInTime.HasValue ? dailyLog.CheckInTime.Value.ToString("hh:mm tt") : "Not Checked In";
+                var checkOut = dailyLog.CheckOutTime.HasValue ? dailyLog.CheckOutTime.Value.ToString("hh:mm tt") : "Not Checked Out";
+                sb.AppendLine($"TODAY'S ATTENDANCE: CheckIn: {checkIn} | CheckOut: {checkOut} | WorkMinutes: {dailyLog.TotalWorkMinutes} min | Status: {dailyLog.DayStatus}");
+
+                // Active & Past Breaks
+                var activeBreak = dailyLog.BreakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
+                if (activeBreak != null)
+                {
+                    sb.AppendLine($"CURRENT BREAK: Active ({activeBreak.BreakType}) since {activeBreak.StartTime:hh:mm tt}");
+                }
+                else
+                {
+                    var totalBreak = dailyLog.BreakLogs.Sum(b => b.DurationMinutes);
+                    sb.AppendLine($"BREAKS: No active break. Total breaks today: {dailyLog.BreakLogs.Count} ({totalBreak} min total)");
+                }
+
+                // Today's Tasks
+                if (dailyLog.TaskLogs.Any())
+                {
+                    sb.AppendLine($"TODAY'S LOGGED TASKS ({dailyLog.TaskLogs.Count}):");
+                    foreach (var t in dailyLog.TaskLogs)
+                    {
+                        sb.AppendLine($" - [Task #{t.Id}] \"{t.TaskTitle}\" | Status: {t.Status} | Priority: {t.Priority} | TimeSpent: {t.TimeSpentMinutes} min");
+                    }
+                }
+                else
+                {
+                    sb.AppendLine("TODAY'S TASKS: No tasks logged yet today.");
+                }
+            }
+            else
+            {
+                sb.AppendLine("TODAY'S ATTENDANCE: No attendance record for today (Employee hasn't checked in yet).");
+            }
+
+            // 3. Today's Scheduled Meetings (uses OrganisedByUserId from Meeting.cs)
+            var todayStart = today;
+            var todayEnd = today.AddDays(1);
+            var meetings = await _db.Meetings
+                .Include(m => m.Attendees)
+                .Where(m => (m.OrganisedByUserId == userId || m.Attendees.Any(a => a.UserId == userId))
+                         && m.ScheduledAt >= todayStart && m.ScheduledAt < todayEnd)
+                .OrderBy(m => m.ScheduledAt)
+                .Select(m => new { m.Title, m.ScheduledAt, m.DurationMinutes, m.MeetingType, m.Location })
+                .ToListAsync();
+
+            if (meetings.Any())
+            {
+                sb.AppendLine($"TODAY'S MEETINGS ({meetings.Count}):");
+                foreach (var m in meetings)
+                {
+                    sb.AppendLine($" - \"{m.Title}\" at {m.ScheduledAt:hh:mm tt} ({m.DurationMinutes} min) [{m.MeetingType}] @ {m.Location ?? "Online"}");
+                }
+            }
+            else
+            {
+                sb.AppendLine("TODAY'S MEETINGS: None scheduled for today.");
+            }
+
+            // 4. Recent Leave Status
+            var recentLeaves = await _db.LeaveRequests
+                .Where(l => l.UserId == userId)
+                .OrderByDescending(l => l.AppliedAt)
+                .Take(2)
+                .Select(l => new { l.LeaveType, l.FromDate, l.ToDate, l.Status, l.Reason })
+                .ToListAsync();
+
+            if (recentLeaves.Any())
+            {
+                sb.AppendLine("RECENT LEAVE REQUESTS:");
+                foreach (var l in recentLeaves)
+                {
+                    sb.AppendLine($" - {l.LeaveType} ({l.FromDate:MMM dd} to {l.ToDate:MMM dd}) - Status: {l.Status}");
+                }
+            }
+
+            // 5. Manager Snapshot (if user has Manager or Admin role)
+            if (user != null && (user.Role == "Admin" || user.Role == "Manager"))
+            {
+                var teamPresent = await _db.DailyLogs.CountAsync(l => l.LogDate == today && l.CheckInTime != null);
+                var pendingLeaves = await _db.LeaveRequests.CountAsync(l => l.Status == "Pending");
+                var pendingWFH = await _db.WFHRequests.CountAsync(w => w.Status == "Pending");
+
+                sb.AppendLine($"MANAGER/ADMIN SUMMARY: Total employees checked in today: {teamPresent} | Pending Leave Requests: {pendingLeaves} | Pending WFH Requests: {pendingWFH}");
             }
 
             return sb.ToString();
