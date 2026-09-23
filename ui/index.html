@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- ── Viewport: critical for mobile ─────────────────────────────────────
+         width=device-width  → use actual screen width, not 980px desktop default
+         initial-scale=1.0   → don't zoom out on load
+         viewport-fit=cover  → content goes under iPhone notch/Dynamic Island  -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── PWA / Theme ──────────────────────────────────────────────────────── -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Employee Management System — attendance, leave, tasks and more" />
+
+    <!-- ── Favicon ──────────────────────────────────────────────────────────── -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+
+    <!-- ── iOS / Safari PWA meta tags ───────────────────────────────────────
+         Without these, iOS Safari will open the app in a browser tab.
+         With them, it opens full-screen with no browser chrome.            -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EMS" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- ── Prevent phone number auto-detection ──────────────────────────────── -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ── Fonts ────────────────────────────────────────────────────────────── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>Daily Tracker EMS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

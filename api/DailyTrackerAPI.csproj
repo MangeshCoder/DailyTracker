@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>DailyTrackerAPI</RootNamespace>
+	  <UserSecretsId>c02bc512-40bf-40c1-9caf-a2b8518fe876</UserSecretsId>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+		<PackageReference Include="DocumentFormat.OpenXml" Version="3.4.1" />
+
+		<!-- JWT -->
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
+
+		<!-- EF Core -->
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.3" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.3">
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3">
+			<PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+
+		<!-- SignalR (remove old 1.2.9) -->
+		<!--<PackageReference Include="Microsoft.AspNetCore.SignalR" Version="10.0.3" />-->
+
+		<!-- Redis -->
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.3" />
+
+		<!-- Health Checks -->
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.3" />
+		<PackageReference Include="Otp.NET" Version="1.4.1" />
+		<PackageReference Include="QRCoder" Version="1.7.0" />
+
+		<!-- Swagger -->
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+	</ItemGroup>
+
+</Project>
