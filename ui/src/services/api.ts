@@ -138,6 +138,22 @@ export const aiChatApi = {
       type,
       payload,
     }),
+  getContextSummary: () =>
+    api.get<{
+      success: boolean;
+      summary: {
+        isCheckedIn: boolean;
+        checkInTime: string | null;
+        isCheckedOut: boolean;
+        checkOutTime: string | null;
+        totalWorkMinutes: number;
+        tasksCount: number;
+        completedTasksCount: number;
+        isOnBreak: boolean;
+        activeBreakType: string | null;
+        dayStatus: string;
+      };
+    }>('/aichat/context-summary'),
 };
 
 // ─── Daily Log ────────────────────────────────────────────────────────────────
