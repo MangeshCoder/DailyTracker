@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { eodApi } from '../services/api';
+import { eodApi, aiChatApi  } from '../services/api';
 import { CreateEODReportDto, EODReport } from '../types';
 import { useToast } from '../context/ToastContext';
 import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
@@ -93,17 +93,86 @@ export const EODReportPage = () => {
       timeZone: "Asia/Kolkata",
     });
   };
+  const handleClearForm = () => {
+      setForm({
+        whatWasDone: '',
+        blockers: '',
+        planForTomorrow: '',
+        learnings: '',
+        moodRating: 'Good',
+      });
+      toast.info('Form fields cleared.');
+    };
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Check if session storage has an AI draft passed from AiChatWidget
+  useEffect(() => {
+    const savedDraft = sessionStorage.getItem('pending_eod_draft');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        setForm((prev) => ({
+          ...prev,
+          whatWasDone: parsed.whatWasDone || prev.whatWasDone,
+          blockers: parsed.blockers || prev.blockers,
+          planForTomorrow: parsed.planForTomorrow || prev.planForTomorrow,
+          learnings: parsed.learnings || prev.learnings,
+          moodRating: parsed.moodRating || prev.moodRating,
+        }));
+        toast.success('✨ AI EOD Draft applied to form!');
+        sessionStorage.removeItem('pending_eod_draft');
+      } catch {
+        // Ignore
+      }
+    }
+  }, [toast]);
+
+  const handleAiGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const res = await aiChatApi.getEodDraft();
+      if (res.data.success && res.data.draft) {
+        setForm((prev) => ({
+          ...prev,
+          whatWasDone: res.data.draft.whatWasDone || prev.whatWasDone,
+          blockers: res.data.draft.blockers || prev.blockers,
+          planForTomorrow: res.data.draft.planForTomorrow || prev.planForTomorrow,
+          learnings: res.data.draft.learnings || prev.learnings,
+          moodRating: res.data.draft.moodRating || prev.moodRating,
+        }));
+        toast.success('✨ Form filled with today’s accomplishments and tasks!');
+      } else {
+        toast.error(res.data.message || 'Could not generate draft. Please ensure you are checked in.');
+      }
+    } catch {
+      toast.error('Failed to generate AI EOD draft.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">📝 End of Day Report</h1>
-        <p className="text-slate-400 text-sm mt-2">
-          Reflect on your day and plan for tomorrow — takes 2 minutes
-        </p>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">📝 End of Day Report</h1>
+          <p className="text-slate-400 text-sm mt-2">
+            Reflect on your day and plan for tomorrow — takes 2 minutes
+          </p>
+        </div>
+        {!isReviewed && (
+          <button
+            type="button"
+            onClick={handleAiGenerate}
+            disabled={isGenerating}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            <span>✨</span>
+            <span>{isGenerating ? 'Generating Draft...' : 'Auto-Generate with AI'}</span>
+          </button>     
+        )}
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Form - Left */}
         <div className="lg:col-span-2 space-y-6">
@@ -139,6 +208,14 @@ export const EODReportPage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Accomplishments */}
+                  <button
+                  type="button"
+                  onClick={handleClearForm}
+                  className="text-xs text-slate-400 hover:text-amber-400 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-amber-500/50 transition"
+                  title="Clear all inputs"
+                >
+                  🧹 Clear Form
+                </button>
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
               <label className="block text-sm font-semibold text-white mb-3">
                 ✅ What did you accomplish today? <span className="text-red-400">*</span>

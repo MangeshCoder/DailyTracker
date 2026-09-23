@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eodApi,presenceApi,kudosApi } from '../services/api';
 import { UserPresence } from '../types';
@@ -42,16 +42,40 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
     enabled: open, // Only fetch when modal is open
   });
 
-  // Pre-fill form if editing existing report
-  if (existingReport && form.whatWasDone === '') {
+// Reset or pre-fill form when modal opens
+  useEffect(() => {
+    if (open) {
+      if (existingReport) {
+        setForm({
+          whatWasDone: existingReport.whatWasDone || '',
+          blockers: existingReport.blockers || '',
+          planForTomorrow: existingReport.planForTomorrow || '',
+          learnings: existingReport.learnings || '',
+          moodRating: existingReport.moodRating || 'Good',
+        });
+      } else {
+        // Clear all fields on first open
+        setForm({
+          whatWasDone: '',
+          blockers: '',
+          planForTomorrow: '',
+          learnings: '',
+          moodRating: 'Good',
+        });
+      }
+    }
+  }, [open, existingReport]);
+
+  const handleClearForm = () => {
     setForm({
-      whatWasDone: existingReport.whatWasDone,
-      blockers: existingReport.blockers || '',
-      planForTomorrow: existingReport.planForTomorrow || '',
-      learnings: existingReport.learnings || '',
-      moodRating: existingReport.moodRating || 'Good',
+      whatWasDone: '',
+      blockers: '',
+      planForTomorrow: '',
+      learnings: '',
+      moodRating: 'Good',
     });
-  }
+    toast.info('Form fields cleared.');
+  };
 
   // Submit EOD Report mutation
   const submitMutation = useMutation({
@@ -117,7 +141,7 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
-        {/* Header */}
+{/* Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 to-slate-800">
           <div>
             <h3 className="text-white font-semibold text-lg">📝 End of Day Report</h3>
@@ -127,12 +151,22 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
                 : 'Wrap up your day — takes 2 minutes'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="text-xs text-slate-400 hover:text-amber-400 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-amber-500/50 transition"
+              title="Clear all inputs"
+            >
+              🧹 Clear Form
+            </button>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Body - Scrollable */}
