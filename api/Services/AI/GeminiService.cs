@@ -14,6 +14,7 @@ namespace DailyTrackerAPI.Services.AI
     {
         Task<ChatResponse> GetChatResponseAsync(string userMessage, List<MessageHistory> history, int userId);
         Task<object> GetUserContextSummaryAsync(int userId);
+        Task<object> GenerateEodDraftAsync(int userId);
     }
 
     public class GeminiService : IAiService
@@ -58,6 +59,95 @@ namespace DailyTrackerAPI.Services.AI
                 isOnBreak = activeBreak != null,
                 activeBreakType = activeBreak?.BreakType,
                 dayStatus = dailyLog?.DayStatus ?? "Not Started"
+            };
+        }
+
+        public async Task<object> GenerateEodDraftAsync(int userId)
+        {
+            var today = DateTime.UtcNow.Date;
+            var dailyLog = await _db.DailyLogs
+                .Include(d => d.TaskLogs)
+                .Include(d => d.BreakLogs)
+                .Include(d => d.SupportLogs).ThenInclude(s => s.SupportedDeveloper)
+                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+
+            if (dailyLog == null || dailyLog.CheckInTime == null)
+            {
+                return new
+                {
+                    success = false,
+                    message = "You have not checked in for today yet."
+                };
+            }
+
+            var elapsed = (int)(DateTime.UtcNow - dailyLog.CheckInTime.Value).TotalMinutes;
+            var breakMins = dailyLog.BreakLogs.Where(b => !b.IsActive && b.EndTime != null).Sum(b => b.DurationMinutes);
+            var netMins = Math.Max(0, elapsed - breakMins);
+            var hours = netMins / 60;
+            var mins = netMins % 60;
+
+            var completedTasks = dailyLog.TaskLogs.Where(t => t.Status == "Completed").ToList();
+            var inProgressTasks = dailyLog.TaskLogs.Where(t => t.Status != "Completed").ToList();
+
+            // Build Accomplishments
+            var accomplishedSb = new StringBuilder();
+            accomplishedSb.AppendLine($"• Total Work Hours: {hours}h {mins}m (Checked in at {dailyLog.CheckInTime.Value:hh:mm tt})");
+            if (completedTasks.Any())
+            {
+                foreach (var t in completedTasks)
+                {
+                    accomplishedSb.AppendLine($"• Completed: {t.TaskTitle} ({t.TimeSpentMinutes}m)");
+                }
+            }
+            else
+            {
+                accomplishedSb.AppendLine("• Worked on today's scheduled operational items.");
+            }
+
+            if (dailyLog.SupportLogs.Any())
+            {
+                foreach (var s in dailyLog.SupportLogs)
+                {
+                    accomplishedSb.AppendLine($"• Assisted {s.SupportedDeveloper?.FullName ?? "team member"} ({s.TimeSpentMinutes}m)");
+                }
+            }
+
+            // Build Tomorrow's Plan from in-progress tasks
+            var planSb = new StringBuilder();
+            if (inProgressTasks.Any())
+            {
+                foreach (var t in inProgressTasks)
+                {
+                    planSb.AppendLine($"• Continue working on: {t.TaskTitle}");
+                }
+            }
+            else
+            {
+                planSb.AppendLine("• Review sprint backlog and pick up upcoming milestone tickets.");
+            }
+
+            // Determine suggested mood rating
+            var mood = "Good";
+            if (completedTasks.Count >= 3 || (dailyLog.TaskLogs.Any() && completedTasks.Count == dailyLog.TaskLogs.Count))
+            {
+                mood = "Great";
+            }
+            else if (netMins >= 480 && completedTasks.Count == 0)
+            {
+                mood = "Tired";
+            }
+
+            return new
+            {
+                success = true,
+                draft = new
+                {
+                    whatWasDone = accomplishedSb.ToString().TrimEnd(),
+                    blockers = "",
+                    planForTomorrow = planSb.ToString().TrimEnd(),
+                    learnings = completedTasks.Any() ? "Made good progress on sprint milestones." : "",
+                    moodRating = mood
+                }
             };
         }
 

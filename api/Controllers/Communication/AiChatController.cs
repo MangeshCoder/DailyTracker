@@ -368,5 +368,25 @@ namespace DailyTrackerAPI.Controllers.Communication
                 return StatusCode(500, new { success = false, message = $"Action execution failed: {ex.Message}" });
             }
         }
+
+        [Authorize]
+        [HttpGet("eod-draft")]
+        public async Task<IActionResult> GetEodDraft()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { success = false, message = "Invalid user token." });
+
+            try
+            {
+                var result = await _aiService.GenerateEodDraftAsync(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate AI EOD draft");
+                return StatusCode(500, new { success = false, message = "Failed to generate EOD draft." });
+            }
+        }
     }
 }

@@ -16,7 +16,7 @@ import { ManagerWFHDashboard } from './pages/ManagerWFHDashboard';
 import { EmailAction } from './pages/EmailAction';
 import { WFHEmailActionPage } from './pages/WFHEmailActionPage';
 import { AssignRole } from './pages/AssignRole';
-import AiChatWidget from './components/AiChatWidget';
+import { AiChatWidget } from './components/AiChatWidget';
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAZY PAGE IMPORTS (Feature 15: Code splitting)
 // ═══════════════════════════════════════════════════════════════════════════════

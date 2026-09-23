@@ -128,22 +128,36 @@ const ActionCard = ({
   };
 
   // If this is a navigation action (e.g. Open Task Form, Open EOD Page)
-  if (action.type === "NAVIGATE") {
+if (action.type === "NAVIGATE") {
+    const handleNavClick = async () => {
+      if (action.payload?.path === "/eod-reports") {
+        try {
+          const res = await aiChatApi.getEodDraft();
+          if (res.data.success && res.data.draft) {
+            sessionStorage.setItem("pending_eod_draft", JSON.stringify(res.data.draft));
+          }
+        } catch {
+          // Proceed anyway
+        }
+      }
+      onNavigate(action.payload?.path || "/tasks");
+    };
+
     return (
       <div className="mt-2.5 p-3 rounded-xl bg-slate-900/95 border border-indigo-500/40 shadow-md">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg">📋</span>
+            <span className="text-lg">📝</span>
             <div>
               <p className="text-xs font-semibold text-white">{action.title}</p>
-              <p className="text-[11px] text-slate-400">Opens official form directly</p>
+              <p className="text-[11px] text-slate-400">Prefills draft into official form</p>
             </div>
           </div>
           <button
-            onClick={() => onNavigate(action.payload?.path || "/tasks")}
+            onClick={handleNavClick}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white shadow transition-all active:scale-95"
           >
-            Open Form ↗
+            Review & Submit ↗
           </button>
         </div>
       </div>
