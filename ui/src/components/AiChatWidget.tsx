@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import React, { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Message, MessageHistory, SuggestedAction } from "../types/chat";
 import { aiChatApi } from "../services/api";
 
@@ -15,116 +16,283 @@ interface ContextSummary {
   dayStatus: string;
 }
 
-const PROMPT_CATEGORIES = [
-  {
-    category: "⚡ Smart Actions",
-    prompts: [
-      { label: "➕ Create Quick Task", text: 'Create task: "Review and merge pull request" with High priority' },
-      { label: "🕒 Check in for today", text: "Check me in for today" },
-      { label: "🏠 Apply for WFH", text: "Apply for WFH today" },
-      { label: "📝 Draft EOD report", text: "Draft my EOD report for today" },
-    ],
-  },
-  {
-    category: "📊 Live Day Analysis",
-    prompts: [
-      { label: "📋 What tasks did I log?", text: "What tasks did I log today and their statuses?" },
-      { label: "⏱ How long have I worked?", text: "How many hours have I worked today so far?" },
-      { label: "📅 Any meetings today?", text: "Do I have any meetings or 1-on-1s scheduled today?" },
-      { label: "🏖 Check leave status", text: "What are my recent leave and WFH requests?" },
-    ],
-  },
-];
+const getPromptCategories = (isCheckedIn: boolean) => {
+  if (!isCheckedIn) {
+    return [
+      {
+        category: "⚡ Attendance Actions",
+        prompts: [
+          { label: "🕒 Check in for today", text: "Check me in for today" },
+          { label: "🏠 Apply for WFH", text: "Apply for WFH" },
+          { label: "🏖 Apply for Leave", text: "Apply for casual leave" },
+          { label: "📅 Check meetings", text: "Do I have any meetings or 1-on-1s scheduled today?" },
+        ],
+      },
+    ];
+  }
+
+  return [
+    {
+      category: "⚡ Smart Actions",
+      prompts: [
+        { label: "➕ Add New Task", text: "Create task" },
+        { label: "☕ Take a Break", text: "Start break" },
+        { label: "📝 Draft EOD Report", text: "Draft my EOD report for today" },
+        { label: "🏖 Show Leave History", text: "Show my recent leaves" },
+      ],
+    },
+    {
+      category: "📊 Live Day Analysis",
+      prompts: [
+        { label: "📋 Today's tasks", text: "What tasks did I log today and their statuses?" },
+        { label: "⏱ Hours worked", text: "How many hours have I worked today so far?" },
+        { label: "📅 Meetings", text: "Do I have any meetings scheduled today?" },
+        { label: "🏖 Leave status", text: "Show my recent leaves" },
+      ],
+    },
+  ];
+};
 
 const INITIAL_MESSAGE: Message = {
   id: "init",
   role: "assistant",
   content:
-    "Hi! 👋 I'm your **Daily Tracker Copilot**.\n\nI have **live access to your day** (attendance, tasks, breaks, meetings & leaves). Ask me anything about your schedule or have me execute actions for you!",
+    "👋 Hello! I am your **Daily Tracker Copilot**. I have live access to your attendance, tasks, breaks, and meetings.\n\nHow can I help you today?",
   timestamp: new Date(),
 };
 
-const AssistantMessage = ({ content }: { content: string }) => {
-  const renderInline = (text: string) => {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, i) =>
-      part.startsWith("**") && part.endsWith("**") ? (
-        <strong key={i} className="text-white font-semibold">
-          {part.slice(2, -2)}
-        </strong>
-      ) : (
-        <span key={i}>{part}</span>
-      )
-    );
-  };
-
-  return (
-    <div className="space-y-1.5 text-sm leading-relaxed text-slate-200">
-      {content.split("\n").map((line, idx) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={idx} className="h-1" />;
-        if (trimmed.startsWith("• ") || trimmed.startsWith("- ")) {
-          return (
-            <div key={idx} className="flex items-start gap-2">
-              <span className="text-blue-400 mt-0.5 shrink-0 text-xs leading-5">●</span>
-              <span>{renderInline(trimmed.slice(2))}</span>
-            </div>
-          );
-        }
-        return <p key={idx}>{renderInline(trimmed)}</p>;
-      })}
-    </div>
-  );
-};
-
-const TypingIndicator = () => (
-  <div className="flex justify-start items-end gap-2">
-    <div className="w-7 h-7 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center shrink-0 text-sm">
-      🤖
-    </div>
-    <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-none px-4 py-3">
-      <div className="flex gap-1 items-center">
-        {[0, 150, 300].map((delay) => (
-          <span
-            key={delay}
-            className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-            style={{ animationDelay: `${delay}ms` }}
-          />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
+// ── Interactive Action Card ──────────────────────────────────────────────────
 const ActionCard = ({
   action,
   onExecute,
+  onNavigate,
 }: {
   action: SuggestedAction;
   onExecute: (act: SuggestedAction) => void;
+  onNavigate: (path: string) => void;
 }) => {
   const [executed, setExecuted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleClick = async () => {
+  // Leave Form State
+  const [fromDate, setFromDate] = useState(
+    action.payload?.fromDate || new Date().toISOString().split("T")[0]
+  );
+  const [toDate, setToDate] = useState(
+    action.payload?.toDate || new Date().toISOString().split("T")[0]
+  );
+  const [leaveType, setLeaveType] = useState(action.payload?.leaveType || "Casual");
+  const [reason, setReason] = useState(action.payload?.reason || "");
+
+  // WFH Form State
+  const [wfhDate, setWfhDate] = useState(
+    action.payload?.requestDate || new Date().toISOString().split("T")[0]
+  );
+
+  const getActionIcon = () => {
+    switch (action.type) {
+      case "CREATE_TASK": return "➕";
+      case "START_BREAK": return action.payload?.breakType === "Lunch" ? "🍱" : "☕";
+      case "END_BREAK": return "▶️";
+      case "APPLY_LEAVE": return "🏖";
+      case "APPLY_WFH": return "🏠";
+      case "CHECK_IN": return "🕒";
+      case "CHECK_OUT": return "🚪";
+      case "NAVIGATE": return "↗️";
+      default: return "⚡";
+    }
+  };
+
+  const handleConfirm = async () => {
     setLoading(true);
+
+    if (action.type === "APPLY_LEAVE") {
+      action.payload = {
+        ...action.payload,
+        fromDate,
+        toDate,
+        leaveType,
+        reason: reason || "Applied via AI Copilot",
+      };
+    } else if (action.type === "APPLY_WFH") {
+      action.payload = {
+        ...action.payload,
+        requestDate: wfhDate,
+        reason: reason || "Requested via AI Copilot",
+      };
+    }
+
     await onExecute(action);
     setLoading(false);
     setExecuted(true);
   };
 
+  // If this is a navigation action (e.g. Open Task Form, Open EOD Page)
+  if (action.type === "NAVIGATE") {
+    return (
+      <div className="mt-2.5 p-3 rounded-xl bg-slate-900/95 border border-indigo-500/40 shadow-md">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📋</span>
+            <div>
+              <p className="text-xs font-semibold text-white">{action.title}</p>
+              <p className="text-[11px] text-slate-400">Opens official form directly</p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate(action.payload?.path || "/tasks")}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white shadow transition-all active:scale-95"
+          >
+            Open Form ↗
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Interactive Date Selector for Leave
+  if (action.type === "APPLY_LEAVE") {
+    return (
+      <div className="mt-2.5 p-3 rounded-xl bg-slate-900/95 border border-emerald-500/40 shadow-md space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏖</span>
+            <p className="text-xs font-semibold text-white">Apply for Leave</p>
+          </div>
+          <button
+            onClick={() => onNavigate("/leave")}
+            className="text-[10px] text-emerald-400 hover:underline"
+          >
+            Open Full Leave Page ↗
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="text-[10px] text-slate-400 block mb-0.5">From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-slate-200 text-xs"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 block mb-0.5">To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-slate-200 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 text-xs">
+          <select
+            value={leaveType}
+            onChange={(e) => setLeaveType(e.target.value)}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs"
+          >
+            <option value="Casual">Casual</option>
+            <option value="Sick">Sick</option>
+            <option value="Earned">Earned</option>
+          </select>
+          <input
+            type="text"
+            placeholder="Reason (optional)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={handleConfirm}
+            disabled={executed || loading}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              executed
+                ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white shadow"
+            }`}
+          >
+            {loading ? "Submitting..." : executed ? "✓ Leave Submitted" : "Confirm Leave"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Interactive Date Selector for WFH
+  if (action.type === "APPLY_WFH") {
+    return (
+      <div className="mt-2.5 p-3 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-md space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🏠</span>
+            <p className="text-xs font-semibold text-white">Apply for WFH</p>
+          </div>
+          <button
+            onClick={() => onNavigate("/request")}
+            className="text-[10px] text-purple-400 hover:underline"
+          >
+            Open Full WFH Page ↗
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className="text-[10px] text-slate-400 block mb-0.5">Date</label>
+            <input
+              type="date"
+              value={wfhDate}
+              onChange={(e) => setWfhDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-slate-200 text-xs"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 block mb-0.5">Reason</label>
+            <input
+              type="text"
+              placeholder="Reason (optional)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1 text-slate-200 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={handleConfirm}
+            disabled={executed || loading}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              executed
+                ? "bg-purple-600/30 text-purple-300 border border-purple-500/40 cursor-default"
+                : "bg-purple-600 hover:bg-purple-500 text-white shadow"
+            }`}
+          >
+            {loading ? "Submitting..." : executed ? "✓ WFH Submitted" : "Confirm WFH"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Standard Action (Break, Check-in, Check-out)
   return (
-    <div className="mt-2.5 p-3 rounded-xl bg-slate-900/90 border border-blue-500/40 shadow-md">
+    <div className="mt-2 p-2.5 rounded-xl bg-slate-900/90 border border-blue-500/40 shadow-md">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-base">⚡</span>
+          <span className="text-base">{getActionIcon()}</span>
           <div>
             <p className="text-xs font-semibold text-white">{action.title}</p>
-            <p className="text-[11px] text-slate-400">Ready to execute automatically</p>
+            <p className="text-[10px] text-slate-400">Ready to execute automatically</p>
           </div>
         </div>
         <button
-          onClick={handleClick}
+          onClick={handleConfirm}
           disabled={executed || loading}
           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
             executed
@@ -139,12 +307,56 @@ const ActionCard = ({
   );
 };
 
+const AssistantMessage = ({ content }: { content: string }) => {
+  return (
+    <div className="space-y-1 text-xs">
+      {content.split("\n").map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-1" />;
+        const boldParsed = line.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, j) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return (
+              <strong key={j} className="text-white font-semibold">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          if (part.startsWith("*") && part.endsWith("*")) {
+            return (
+              <em key={j} className="text-blue-300 font-normal">
+                {part.slice(1, -1)}
+              </em>
+            );
+          }
+          return part;
+        });
+
+        if (line.trim().startsWith("•") || line.trim().startsWith("-")) {
+          return (
+            <div key={i} className="flex items-start gap-1.5 ml-1">
+              <span className="text-blue-400 font-bold shrink-0">•</span>
+              <span className="text-slate-300">{boldParsed}</span>
+            </div>
+          );
+        }
+
+        return (
+          <p key={i} className="text-slate-300">
+            {boldParsed}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
+
 const ChatBubble = ({
   msg,
   onExecuteAction,
+  onNavigate,
 }: {
   msg: Message;
   onExecuteAction: (act: SuggestedAction) => void;
+  onNavigate: (path: string) => void;
 }) => {
   const isUser = msg.role === "user";
 
@@ -156,7 +368,7 @@ const ChatBubble = ({
         </div>
       )}
       <div
-        className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+        className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
           isUser
             ? "bg-blue-600 text-white rounded-br-none shadow-md"
             : "bg-slate-800/95 border border-slate-700 text-slate-200 rounded-bl-none shadow-sm"
@@ -168,9 +380,14 @@ const ChatBubble = ({
           <>
             <AssistantMessage content={msg.content} />
             {msg.actions && msg.actions.length > 0 && (
-              <div className="space-y-1.5">
-                {msg.actions.map((act) => (
-                  <ActionCard key={act.id} action={act} onExecute={onExecuteAction} />
+              <div className="space-y-1.5 mt-2">
+                {msg.actions.map((act, index) => (
+                  <ActionCard
+                    key={`${act.type}-${index}`}
+                    action={act}
+                    onExecute={onExecuteAction}
+                    onNavigate={onNavigate}
+                  />
                 ))}
               </div>
             )}
@@ -185,14 +402,13 @@ const ChatBubble = ({
 };
 
 export const AiChatWidget = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState(false);
   const [contextSummary, setContextSummary] = useState<ContextSummary | null>(null);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -272,46 +488,16 @@ export const AiChatWidget = () => {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, confirmMsg]);
-        fetchSummary(); // Refresh live status
+        fetchSummary();
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to execute action.");
     }
   };
 
-  const toggleVoiceInput = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError("Speech recognition is not supported in this browser.");
-      return;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
-
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
-      recognition.onresult = (e: any) => {
-        const transcript = e.results[0][0].transcript;
-        if (transcript) {
-          setInput(transcript);
-          handleSend(transcript);
-        }
-      };
-
-      recognition.start();
-    } catch {
-      setIsListening(false);
-    }
+  const handleNavigate = (path: string) => {
+    setIsOpen(false);
+    navigate(path);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -321,109 +507,120 @@ export const AiChatWidget = () => {
     }
   };
 
-  const handleClear = () => {
-    setMessages([INITIAL_MESSAGE]);
-    setError(null);
-  };
-
   return (
     <>
-      {/* ── Floating toggle button ── */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Floating Trigger Button */}
+      {!isOpen && (
         <button
-          onClick={() => setIsOpen((prev) => !prev)}
-          className="relative group p-3.5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl hover:shadow-blue-500/25 transition-all duration-300 hover:scale-105 active:scale-95"
-          aria-label="Toggle AI Copilot"
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 z-50 p-3.5 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 group flex items-center gap-2"
+          aria-label="Open AI Assistant"
         >
-          {isOpen ? (
-            <span className="text-xl">✕</span>
-          ) : (
-            <>
-              <span className="text-2xl">🤖</span>
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
-              </span>
-            </>
-          )}
+          <span className="text-xl">🤖</span>
+          <span className="text-xs font-medium pr-1 hidden sm:inline">AI Copilot</span>
         </button>
-      </div>
+      )}
 
-      {/* ── Chat Modal Window ── */}
+      {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 sm:w-[420px] max-h-[620px] h-[580px] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-5 right-5 z-50 w-[94vw] sm:w-[440px] h-[640px] max-h-[86vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
-          <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
+          <div className="px-4 py-3 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-base">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-base shadow">
                 🤖
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">Daily Tracker Copilot</h3>
-                <p className="text-[11px] text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live Context Connected
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  Live Context Connected
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={handleClear}
-                title="Clear conversation"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition text-xs"
+                onClick={() => setMessages([INITIAL_MESSAGE])}
+                className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded hover:bg-slate-700/60 transition"
               >
                 Clear
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition text-sm"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700 transition"
               >
                 ✕
               </button>
             </div>
           </div>
 
-          {/* ── Real-Time Context Sync Pill Banner ── */}
-          <div className="px-3.5 py-1.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-300">
-            <div className="flex items-center gap-1.5 truncate">
-              {contextSummary?.isCheckedIn ? (
-                <span className="text-emerald-400 font-medium">
-                  🟢 In: {contextSummary.checkInTime}
-                </span>
-              ) : (
-                <span className="text-amber-400 font-medium">⚪ Not Checked In</span>
-              )}
+          {/* Live Context Banner */}
+          <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-800/80 flex items-center justify-between text-[11px] text-slate-300 overflow-x-auto">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                {contextSummary?.isCheckedIn ? (
+                  <span className="text-emerald-400 font-medium">
+                    🟢 In: {contextSummary.checkInTime}
+                  </span>
+                ) : (
+                  <span className="text-slate-400">⚪ Not Checked In</span>
+                )}
+              </span>
               <span>•</span>
-              <span>📋 {contextSummary?.tasksCount ?? 0} tasks</span>
+              <span className="text-blue-400">{contextSummary?.tasksCount ?? 0} tasks</span>
               {contextSummary?.isOnBreak && (
                 <>
                   <span>•</span>
-                  <span className="text-amber-300">☕ On Break</span>
+                  <span className="text-amber-400 font-medium">
+                    ☕ On {contextSummary.activeBreakType || "Break"}
+                  </span>
                 </>
               )}
             </div>
             <button
               onClick={fetchSummary}
-              title="Refresh live context"
-              className="text-slate-400 hover:text-blue-400 transition"
+              className="text-slate-400 hover:text-slate-200 text-xs ml-2"
+              title="Refresh status"
             >
               ↻
             </button>
           </div>
 
+          {/* Warning Banner if Not Checked In */}
+          {!contextSummary?.isCheckedIn && (
+            <div className="mx-4 mt-3 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Please <strong>Check In</strong> to start logging tasks and breaks today.</span>
+            </div>
+          )}
+
           {/* Messages Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-900/60">
             {messages.map((m) => (
-              <ChatBubble key={m.id} msg={m} onExecuteAction={handleExecuteAction} />
+              <ChatBubble
+                key={m.id}
+                msg={m}
+                onExecuteAction={handleExecuteAction}
+                onNavigate={handleNavigate}
+              />
             ))}
 
-            {isLoading && <TypingIndicator />}
+            {isLoading && (
+              <div className="flex items-center gap-2 text-slate-400 text-xs italic">
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                Copilot is thinking...
+              </div>
+            )}
 
             {/* Quick Prompts */}
             {showQuickPrompts && (
               <div className="mt-3 space-y-3 pt-2">
-                {PROMPT_CATEGORIES.map((cat) => (
+                {getPromptCategories(!!contextSummary?.isCheckedIn).map((cat) => (
                   <div key={cat.category}>
-                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5 px-0.5">{cat.category}</p>
+                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5 px-0.5">
+                      {cat.category}
+                    </p>
                     <div className="grid grid-cols-2 gap-1.5">
                       {cat.prompts.map((p) => (
                         <button
@@ -441,9 +638,8 @@ export const AiChatWidget = () => {
             )}
 
             {error && (
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex justify-between items-center">
-                <span>{error}</span>
-                <button onClick={() => setError(null)} className="text-rose-400 hover:text-white">✕</button>
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
+                {error}
               </div>
             )}
 
@@ -451,41 +647,24 @@ export const AiChatWidget = () => {
           </div>
 
           {/* Input Footer */}
-          <div className="p-3 bg-slate-800/80 border-t border-slate-700/80">
-            <div className="relative flex items-center">
+          <div className="p-3 bg-slate-800/90 border-t border-slate-700">
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-blue-500 transition">
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about tasks, check-in, leaves..."
-                disabled={isLoading}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-20 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition disabled:opacity-50"
+                placeholder="Ask about hours, leaves, or say 'take a break'..."
+                className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
               />
-              <div className="absolute right-1.5 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={toggleVoiceInput}
-                  disabled={isLoading}
-                  className={`p-1.5 rounded-lg text-xs transition ${
-                    isListening
-                      ? "bg-rose-500/20 text-rose-400 animate-pulse border border-rose-500/40"
-                      : "text-slate-400 hover:text-white hover:bg-slate-800"
-                  }`}
-                  title="Voice input"
-                >
-                  🎙️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSend()}
-                  disabled={isLoading || !input.trim()}
-                  className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs disabled:opacity-40 disabled:hover:bg-blue-600 transition"
-                >
-                  ➤
-                </button>
-              </div>
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim() || isLoading}
+                className="p-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg transition"
+              >
+                ➤
+              </button>
             </div>
           </div>
         </div>
@@ -493,5 +672,3 @@ export const AiChatWidget = () => {
     </>
   );
 };
-
-export default AiChatWidget;
