@@ -45,7 +45,12 @@ namespace DailyTrackerAPI.Services.Attendance
 
             var existing = await _db.DailyLogs
                 .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
-            if (existing != null) return await MapToDtoAsync(existing.Id);
+
+            // Already checked in today
+            if (existing != null && existing.CheckInTime != null)
+            {
+                return null; // Controller returns 400 "Already checked in today."
+            }
 
             // ── STEP 1: Detect weekend ────────────────────────────────────────
             var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
@@ -65,7 +70,6 @@ namespace DailyTrackerAPI.Services.Attendance
             var isWFH = approvedWFH != null;
 
             // ── STEP 4: Location check ────────────────────────────────────────
-            // Skip for WFH, Weekend, Holiday — they can check in from anywhere
             if (!isWFH && !isWeekend && !isHoliday)
             {
                 var distance = _location.GetDistanceFromOffice(dto.Latitude, dto.Longitude);
@@ -87,19 +91,32 @@ namespace DailyTrackerAPI.Services.Attendance
             else if (isWeekend) dayStatus = "Weekend";
             else dayStatus = "Present";
 
-            // ── STEP 6: Create log ────────────────────────────────────────────
-            var log = new DailyLog
+            // ── STEP 6: Create or Update log ──────────────────────────────────
+            DailyLog log;
+            if (existing != null)
             {
-                UserId = userId,
-                LogDate = today,
-                CheckInTime = DateTime.UtcNow,
-                DayStatus = dayStatus,
-                Notes = dto.Notes,
-                CheckInLatitude = (isWFH || isWeekend || isHoliday) ? null : dto.Latitude,
-                CheckInLongitude = (isWFH || isWeekend || isHoliday) ? null : dto.Longitude,
-            };
+                existing.CheckInTime = DateTime.UtcNow;
+                existing.DayStatus = dayStatus;
+                if (!string.IsNullOrWhiteSpace(dto.Notes)) existing.Notes = dto.Notes;
+                existing.CheckInLatitude = (isWFH || isWeekend || isHoliday) ? null : dto.Latitude;
+                existing.CheckInLongitude = (isWFH || isWeekend || isHoliday) ? null : dto.Longitude;
+                log = existing;
+            }
+            else
+            {
+                log = new DailyLog
+                {
+                    UserId = userId,
+                    LogDate = today,
+                    CheckInTime = DateTime.UtcNow,
+                    DayStatus = dayStatus,
+                    Notes = dto.Notes,
+                    CheckInLatitude = (isWFH || isWeekend || isHoliday) ? null : dto.Latitude,
+                    CheckInLongitude = (isWFH || isWeekend || isHoliday) ? null : dto.Longitude,
+                };
+                _db.DailyLogs.Add(log);
+            }
 
-            _db.DailyLogs.Add(log);
             await _db.SaveChangesAsync();
 
             if (approvedWFH != null)

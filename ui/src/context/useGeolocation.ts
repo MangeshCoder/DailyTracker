@@ -4,8 +4,8 @@
 import { useState, useCallback } from 'react';
 
 // ── Office config from .env ───────────────────────────────────────────────────
- const OFFICE_LAT    = parseFloat(import.meta.env.VITE_OFFICE_LAT    ?? '18.603609331275763');
- const OFFICE_LNG    = parseFloat(import.meta.env.VITE_OFFICE_LNG    ?? '73.74756220045437');
+ const OFFICE_LAT    = parseFloat(import.meta.env.VITE_OFFICE_LAT    ?? '18.738089228557875');
+ const OFFICE_LNG    = parseFloat(import.meta.env.VITE_OFFICE_LNG    ?? '73.67283053582766');
  const OFFICE_RADIUS = parseFloat(import.meta.env.VITE_OFFICE_RADIUS ?? '5000');
 //const OFFICE_LAT    = parseFloat(import.meta.env.VITE_OFFICE_LAT    ?? '18.7381098, ');
 //const OFFICE_LNG    = parseFloat(import.meta.env.VITE_OFFICE_LNG    ?? '73.6716409');

@@ -2,7 +2,18 @@ export type MessageRole = "user" | "assistant";
 
 export interface SuggestedAction {
   id: string;
-  type: "CREATE_TASK" | "SUBMIT_EOD" | "APPLY_WFH" | "APPLY_LEAVE" | "CHECK_IN" | "CHECK_OUT" | "NAVIGATE";
+  type:
+    | "CREATE_TASK"
+    | "UPDATE_TASK_STATUS"
+    | "START_BREAK"
+    | "END_BREAK"
+    | "APPLY_LEAVE"
+    | "APPLY_WFH"
+    | "CHECK_IN"
+    | "CHECK_OUT"
+    | "CREATE_GOAL"
+    | "SUBMIT_EOD"
+    | "NAVIGATE";
   title: string;
   payload: Record<string, any>;
   confirmed?: boolean;
