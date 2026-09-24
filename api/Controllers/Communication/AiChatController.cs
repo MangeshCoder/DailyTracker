@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using DailyTrackerAPI.Services.HR;
+using DailyTrackerAPI.DTOs;
+using DailyTrackerAPI.Custom;
 
 namespace DailyTrackerAPI.Controllers.Communication
 {
@@ -17,13 +20,16 @@ namespace DailyTrackerAPI.Controllers.Communication
     {
         private readonly IAiService _aiService;
         private readonly AppDbContext _db;
+        private readonly ILeaveService _leaveService;
         private readonly ILogger<AiChatController> _logger;
 
-        public AiChatController(IAiService aiService, AppDbContext db, ILogger<AiChatController> logger)
+        public AiChatController(IAiService aiService, AppDbContext db, ILeaveService leaveService, ILogger<AiChatController> logger)
         {
             _aiService = aiService;
             _db = db;
+            _leaveService = leaveService;
             _logger = logger;
+
         }
 
         [Authorize]
@@ -247,20 +253,38 @@ namespace DailyTrackerAPI.Controllers.Communication
                         toDate = parsedTo.Date;
                     }
 
-                    var leave = new LeaveRequest
+                    if (fromDate > toDate)
                     {
-                        UserId = userId,
-                        LeaveType = leaveType ?? "Casual",
-                        FromDate = fromDate,
-                        ToDate = toDate,
-                        Reason = reason ?? "Applied via AI Copilot",
-                        Status = "Pending",
-                        AppliedAt = DateTime.UtcNow
-                    };
-                    _db.LeaveRequests.Add(leave);
-                    await _db.SaveChangesAsync();
+                        return BadRequest(new { success = false, message = "From date cannot be after To date." });
+                    }
 
-                    return Ok(new { success = true, message = $"{leave.LeaveType} leave applied ({fromDate:MMM dd} - {toDate:MMM dd})! Pending manager review." });
+                    try
+                    {
+                        var dto = new ApplyLeaveDto
+                        {
+                            FromDate = fromDate,
+                            ToDate = toDate,
+                            LeaveType = leaveType ?? "Casual",
+                            Reason = string.IsNullOrWhiteSpace(reason) ? "Applied via AI Copilot" : reason
+                        };
+
+                        var createdLeave = await _leaveService.ApplyAsync(userId, dto);
+
+                        return Ok(new
+                        {
+                            success = true,
+                            message = $"{createdLeave.LeaveType} leave request submitted ({fromDate:MMM dd} - {toDate:MMM dd})! {createdLeave.LeaveDays} working day(s). Manager notified.",
+                            leave = createdLeave
+                        });
+                    }
+                    catch (ValidationException vex)
+                    {
+                        return BadRequest(new { success = false, message = vex.Message });
+                    }
+                    catch (Exception ex)
+                    {
+                        return BadRequest(new { success = false, message = ex.Message });
+                    }
                 }
 
                 // ── 6. Apply WFH (Allowed before check-in) ───────────────────
