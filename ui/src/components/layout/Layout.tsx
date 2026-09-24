@@ -356,6 +356,26 @@ export const Layout = () => {
 
         {/* ── User Profile Section ─────────────────────────────────────────── */}
         <div ref={profileRef} className="p-3 border-t border-slate-800/50 relative">
+        <a
+              href="/DailyTracker_v2_Feature_Guide.pdf"
+              download="DailyTracker_v2_Feature_Guide.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setProfileOpen(false)}
+              className="w-full flex items-center gap-2 text-xs py-2 px-3 rounded-xl bg-slate-800 hover:bg-emerald-600/20 text-emerald-400 hover:text-emerald-300 transition mb-1 font-medium"
+            >
+            📑 PDF Guide (English)
+          </a>
+          <a
+              href="/DailyTracker_v2_Feature_Guide_Marathi.pdf"
+              download="DailyTracker_v2_Feature_Guide_Marathi.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setProfileOpen(false)}
+              className="w-full flex items-center gap-2 text-xs py-2 px-3 rounded-xl bg-slate-800 hover:bg-emerald-600/20 text-emerald-400 hover:text-emerald-300 transition mb-1 font-medium"
+            >
+            🇮🇳 मराठी मार्गदर्शिका (PDF)
+          </a>
           <div
             onClick={() => setProfileOpen(!profileOpen)}
             className={`flex items-center gap-2 px-2 mb-2 cursor-pointer rounded-xl
@@ -451,6 +471,7 @@ export const Layout = () => {
             { to: '/leave',         icon: '🗓️', label: 'Leave'              },
             { to: '/notifications', icon: '🔔', label: 'Alerts',  badge: notifUnread },
             { to: '/profile',       icon: '👤', label: 'Profile'            },
+            { to: '/guide',         icon: '📑', label: 'Feature Manual & Guide'}
           ].map((item) => (
             <NavLink
               key={item.to}

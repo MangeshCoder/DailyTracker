@@ -143,6 +143,9 @@ const SupportAssignmentPage = lazy(() =>
 const UserDetailPage = lazy(() =>
   import('./pages/Userdetailpage').then(m => ({ default: m.UserDetailPage }))
 );
+const FeatureGuidePage = lazy(() =>
+  import('./pages/FeatureGuidePage').then(m => ({ default: m.FeatureGuidePage }))
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROUTE GUARDS
@@ -194,6 +197,18 @@ const AppRoutes = () => {
             <ForgotPasswordPage />
           </Suspense>
         )}
+      />
+      <Route
+        path="guide"
+        element={
+          <Suspense fallback={<SkeletonDashboard />}>
+            <FeatureGuidePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="feature-guide"
+        element={<Navigate to="/guide" replace />}
       />
 
       {/* ─── Protected Routes ─────────────────────────────────────────────── */}
