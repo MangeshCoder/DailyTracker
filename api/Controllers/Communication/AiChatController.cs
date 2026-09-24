@@ -1,16 +1,17 @@
-﻿using DailyTrackerAPI.Data;
-using DailyTrackerAPI.Models.Communication;
-using DailyTrackerAPI.Models.Tasks;
-using DailyTrackerAPI.Models.HR;
+﻿using DailyTrackerAPI.Custom;
+using DailyTrackerAPI.Data;
+using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Attendance;
+using DailyTrackerAPI.Models.Communication;
+using DailyTrackerAPI.Models.HR;
+using DailyTrackerAPI.Models.Tasks;
 using DailyTrackerAPI.Services.AI;
+using DailyTrackerAPI.Services.Attendance;
+using DailyTrackerAPI.Services.HR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using DailyTrackerAPI.Services.HR;
-using DailyTrackerAPI.DTOs;
-using DailyTrackerAPI.Custom;
 
 namespace DailyTrackerAPI.Controllers.Communication
 {
@@ -21,13 +22,15 @@ namespace DailyTrackerAPI.Controllers.Communication
         private readonly IAiService _aiService;
         private readonly AppDbContext _db;
         private readonly ILeaveService _leaveService;
+        private readonly IWFHRequestService _wfhService;
         private readonly ILogger<AiChatController> _logger;
 
-        public AiChatController(IAiService aiService, AppDbContext db, ILeaveService leaveService, ILogger<AiChatController> logger)
+        public AiChatController(IAiService aiService, AppDbContext db, ILeaveService leaveService, IWFHRequestService wfhService, ILogger<AiChatController> logger)
         {
             _aiService = aiService;
             _db = db;
             _leaveService = leaveService;
+            _wfhService = wfhService;
             _logger = logger;
 
         }
@@ -291,6 +294,8 @@ namespace DailyTrackerAPI.Controllers.Communication
                 if (request.Type == "APPLY_WFH")
                 {
                     var reason = request.Payload.TryGetValue("reason", out var rObj) ? rObj?.ToString() : "Requested via AI Copilot";
+                    var requestType = request.Payload.TryGetValue("requestType", out var rtObj) ? rtObj?.ToString() : "WFH";
+                    var halfDaySlot = request.Payload.TryGetValue("halfDaySlot", out var slotObj) ? slotObj?.ToString() : null;
 
                     // Parse user-selected or AI-provided date, fallback to today
                     DateTime requestDate = today;
@@ -303,28 +308,33 @@ namespace DailyTrackerAPI.Controllers.Communication
                         requestDate = parsedAlt.Date;
                     }
 
-                    // Prevent duplicate active/pending WFH requests for the same date
-                    var existingWfh = await _db.WFHRequests
-                        .FirstOrDefaultAsync(w => w.UserId == userId && w.RequestDate == requestDate && w.Status != "Rejected" && w.Status != "Cancelled");
-                    if (existingWfh != null)
+                    try
                     {
-                        return BadRequest(new { success = false, message = $"A WFH request for {requestDate:MMM dd, yyyy} already exists (Status: {existingWfh.Status})." });
+                        var dto = new CreateWFHRequestDto
+                        {
+                            RequestType = string.IsNullOrWhiteSpace(requestType) ? "WFH" : requestType,
+                            RequestDate = requestDate,
+                            HalfDaySlot = halfDaySlot,
+                            Reason = string.IsNullOrWhiteSpace(reason) ? "Requested via AI Copilot" : reason
+                        };
+
+                        var createdWfh = await _wfhService.SubmitRequestAsync(userId, dto);
+
+                        return Ok(new
+                        {
+                            success = true,
+                            message = $"{createdWfh.RequestType} request for {requestDate:MMM dd, yyyy} submitted! Email notification sent to your manager.",
+                            wfh = createdWfh
+                        });
                     }
-
-                    var wfh = new WFHRequest
+                    catch (InvalidOperationException ioEx)
                     {
-                        UserId = userId,
-                        RequestType = "WFH",
-                        RequestDate = requestDate,
-                        Reason = string.IsNullOrWhiteSpace(reason) ? "Requested via AI Copilot" : reason,
-                        Status = "Pending",
-                        RequestedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    _db.WFHRequests.Add(wfh);
-                    await _db.SaveChangesAsync();
-
-                    return Ok(new { success = true, message = $"WFH request for {requestDate:MMM dd, yyyy} submitted for manager review!" });
+                        return BadRequest(new { success = false, message = ioEx.Message });
+                    }
+                    catch (Exception ex)
+                    {
+                        return BadRequest(new { success = false, message = ex.Message });
+                    }
                 }
 
                 // ── 7. Check In ─────────────────────────────────────────────

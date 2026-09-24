@@ -115,12 +115,26 @@ const ActionCard = ({
   const [wfhDate, setWfhDate] = useState(
     action.payload?.requestDate || new Date().toISOString().split("T")[0]
   );
+  const [wfhRequestType, setWfhRequestType] = useState(
+    action.payload?.requestType || "WFH"
+  );
+  const [wfhHalfDaySlot, setWfhHalfDaySlot] = useState(
+    action.payload?.halfDaySlot || "Morning"
+  );
   const [wfhReason, setWfhReason] = useState(action.payload?.reason || "");
 
-  const handleConfirm = async () => {
+const handleConfirm = async () => {
     if (action.type === "APPLY_LEAVE") {
       if (fromDate > toDate) {
         toast.error("From Date cannot be after To Date.");
+        return;
+      }
+    }
+
+    if (action.type === "APPLY_WFH") {
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (wfhDate < todayStr) {
+        toast.error("Cannot submit a WFH request for past dates.");
         return;
       }
     }
@@ -144,7 +158,9 @@ const ActionCard = ({
       updatedPayload.leaveType = leaveType;
       updatedPayload.reason = leaveReason || "Applied via AI Copilot";
     } else if (action.type === "APPLY_WFH") {
+      updatedPayload.requestType = wfhRequestType;
       updatedPayload.requestDate = wfhDate;
+      updatedPayload.halfDaySlot = wfhRequestType === "HalfDay" ? wfhHalfDaySlot : undefined;
       updatedPayload.reason = wfhReason || "Requested via AI Copilot";
     }
 
@@ -488,15 +504,16 @@ const ActionCard = ({
     );
   }
 
-  if (action.type === "APPLY_WFH") {
+if (action.type === "APPLY_WFH") {
+    const todayStr = new Date().toISOString().split("T")[0];
     return (
       <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-base">🏠</span>
             <div>
-              <p className="text-xs font-semibold text-white">Apply for WFH</p>
-              <p className="text-[10px] text-purple-400">Editable preview</p>
+              <p className="text-xs font-semibold text-white">Apply for {wfhRequestType === "HalfDay" ? "Half Day WFH" : "WFH"}</p>
+              <p className="text-[10px] text-purple-400">Validated with manager notification</p>
             </div>
           </div>
           <button
@@ -510,24 +527,60 @@ const ActionCard = ({
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
+            <label className="text-[10px] text-slate-400 block mb-1">Type</label>
+            <select
+              value={wfhRequestType}
+              onChange={(e) => setWfhRequestType(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+            >
+              <option value="WFH">Full Day WFH</option>
+              <option value="HalfDay">Half Day WFH</option>
+            </select>
+          </div>
+
+          <div>
             <label className="text-[10px] text-slate-400 block mb-1">Request Date</label>
             <input
               type="date"
+              min={todayStr}
               value={wfhDate}
               onChange={(e) => setWfhDate(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
             />
           </div>
-          <div>
-            <label className="text-[10px] text-slate-400 block mb-1">Reason</label>
-            <input
-              type="text"
-              placeholder="Reason for WFH"
-              value={wfhReason}
-              onChange={(e) => setWfhReason(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
-            />
+        </div>
+
+        {wfhRequestType === "HalfDay" && (
+          <div className="text-xs">
+            <label className="text-[10px] text-slate-400 block mb-1">Half Day Slot</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["Morning", "Afternoon"] as const).map((slot) => (
+                <button
+                  type="button"
+                  key={slot}
+                  onClick={() => setWfhHalfDaySlot(slot)}
+                  className={`py-1 px-2 rounded-lg border text-xs text-center transition ${
+                    wfhHalfDaySlot === slot
+                      ? "bg-purple-600/30 border-purple-500 text-purple-200 font-semibold"
+                      : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {slot === "Morning" ? "🌅 Morning" : "🌇 Afternoon"}
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+
+        <div className="text-xs">
+          <label className="text-[10px] text-slate-400 block mb-1">Reason</label>
+          <input
+            type="text"
+            placeholder="Reason for WFH"
+            value={wfhReason}
+            onChange={(e) => setWfhReason(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+          />
         </div>
 
         <div className="flex justify-end pt-1 border-t border-slate-800">
@@ -536,7 +589,7 @@ const ActionCard = ({
             disabled={loading}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow active:scale-95 transition"
           >
-            {loading ? "Submitting..." : "Confirm WFH"}
+            {loading ? "Submitting..." : `Confirm ${wfhRequestType === "HalfDay" ? "Half Day" : "WFH"}`}
           </button>
         </div>
       </div>
@@ -913,6 +966,9 @@ export const AiChatWidget = () => {
         fetchSummary();
         if (action.type === "APPLY_LEAVE") {
           window.dispatchEvent(new Event("leave_applied"));
+        }
+        if (action.type === "APPLY_WFH") {
+          window.dispatchEvent(new Event("wfh_applied"));
         }
         return true;
       }
