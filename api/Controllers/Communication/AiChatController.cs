@@ -338,11 +338,40 @@ namespace DailyTrackerAPI.Controllers.Communication
                 // ── 8. Check Out ────────────────────────────────────────────
                 if (request.Type == "CHECK_OUT")
                 {
-                    todayLog!.CheckOutTime = DateTime.UtcNow;
-                    todayLog.TotalWorkMinutes = (int)(todayLog.CheckOutTime.Value - todayLog.CheckInTime!.Value).TotalMinutes;
+                    // 1. Guard against duplicate checkout
+                    if (todayLog!.CheckOutTime != null)
+                    {
+                        return BadRequest(new { success = false, message = $"You have already checked out for today at {todayLog.CheckOutTime.Value:hh:mm tt} UTC." });
+                    }
+
+                    // 2. Automatically close any active break
+                    var breakLogs = await _db.BreakLogs.Where(b => b.DailyLogId == todayLog.Id).ToListAsync();
+                    var activeBreak = breakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
+                    if (activeBreak != null)
+                    {
+                        activeBreak.EndTime = DateTime.UtcNow;
+                        activeBreak.DurationMinutes = (int)Math.Max(1, (DateTime.UtcNow - activeBreak.StartTime).TotalMinutes);
+                        activeBreak.IsActive = false;
+                    }
+
+                    // 3. Compute accurate total break minutes
+                    int totalBreakMinutes = breakLogs.Sum(b => b.DurationMinutes);
+                    todayLog.TotalBreakMinutes = totalBreakMinutes;
+
+                    // 4. Set check-out time & calculate net total work minutes (Elapsed Time minus Break Time)
+                    todayLog.CheckOutTime = DateTime.UtcNow;
+                    var totalElapsedMinutes = (int)(todayLog.CheckOutTime.Value - todayLog.CheckInTime!.Value).TotalMinutes;
+                    todayLog.TotalWorkMinutes = Math.Max(0, totalElapsedMinutes - totalBreakMinutes);
+
                     await _db.SaveChangesAsync();
 
-                    return Ok(new { success = true, message = "Successfully checked out for today!" });
+                    int hours = todayLog.TotalWorkMinutes / 60;
+                    int mins = todayLog.TotalWorkMinutes % 60;
+                    return Ok(new
+                    {
+                        success = true,
+                        message = $"Successfully checked out! Worked: {hours}h {mins}m (Breaks: {totalBreakMinutes}m)."
+                    });
                 }
 
                 // ── 9. Set Daily Goal ───────────────────────────────────────

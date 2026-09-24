@@ -16,8 +16,11 @@ import {
   Check
 } from "lucide-react";
 import { Message, MessageHistory, SuggestedAction } from "../types/chat";
-import { aiChatApi } from "../services/api";
+import { aiChatApi, dailyLogApi } from "../services/api";
 import { useToast } from "../context/ToastContext";
+import { FaceVerifyModal } from "./FaceVerifyModal";
+import { useGeolocation } from "../context/useGeolocation";
+import type { FaceVerifyResult } from "../hooks/useFaceRecognition";
 
 interface ContextSummary {
   isCheckedIn: boolean;
@@ -92,16 +95,13 @@ const ActionCard = ({
   const [isEditing, setIsEditing] = useState(false);
 
   // Form states for editable action previews
-  // 1. Task State
   const [taskTitle, setTaskTitle] = useState(action.payload?.taskTitle || action.title || "New Task");
   const [taskMinutes, setTaskMinutes] = useState<number>(action.payload?.timeSpentMinutes || 30);
   const [taskPriority, setTaskPriority] = useState(action.payload?.priority || "Medium");
   const [taskStatus, setTaskStatus] = useState(action.payload?.status || "Completed");
 
-  // 2. Break State
   const [breakType, setBreakType] = useState(action.payload?.breakType || "Tea");
 
-  // 3. Leave Form State
   const [fromDate, setFromDate] = useState(
     action.payload?.fromDate || new Date().toISOString().split("T")[0]
   );
@@ -111,7 +111,6 @@ const ActionCard = ({
   const [leaveType, setLeaveType] = useState(action.payload?.leaveType || "Casual");
   const [leaveReason, setLeaveReason] = useState(action.payload?.reason || "");
 
-  // 4. WFH Form State
   const [wfhDate, setWfhDate] = useState(
     action.payload?.requestDate || new Date().toISOString().split("T")[0]
   );
@@ -151,7 +150,6 @@ const ActionCard = ({
     setExecuted(true);
   };
 
-  // If already executed
   if (executed) {
     return (
       <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 shadow-sm">
@@ -163,7 +161,6 @@ const ActionCard = ({
     );
   }
 
-  // ── Navigation Action (e.g. Open EOD Report, Tasks) ──
   if (action.type === "NAVIGATE") {
     const handleNavClick = async () => {
       if (action.payload?.path === "/eod-reports") {
@@ -201,7 +198,6 @@ const ActionCard = ({
     );
   }
 
-  // ── 1. Create Task Preview with Editable Fields ──
   if (action.type === "CREATE_TASK") {
     return (
       <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-blue-500/40 shadow-lg space-y-3">
@@ -287,7 +283,6 @@ const ActionCard = ({
     );
   }
 
-  // ── 2. Update Task Status Preview ──
   if (action.type === "UPDATE_TASK_STATUS") {
     return (
       <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-lg space-y-3">
@@ -347,7 +342,6 @@ const ActionCard = ({
     );
   }
 
-  // ── 3. Start Break Preview ──
   if (action.type === "START_BREAK") {
     const breakOptions = [
       { type: "Tea", emoji: "☕", label: "Tea Break (15m)" },
@@ -402,7 +396,6 @@ const ActionCard = ({
     );
   }
 
-  // ── 4. Apply Leave Preview ──
   if (action.type === "APPLY_LEAVE") {
     return (
       <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/40 shadow-lg space-y-3">
@@ -476,7 +469,6 @@ const ActionCard = ({
     );
   }
 
-  // ── 5. Apply WFH Preview ──
   if (action.type === "APPLY_WFH") {
     return (
       <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-lg space-y-3">
@@ -532,7 +524,6 @@ const ActionCard = ({
     );
   }
 
-  // ── Standard Action (Check-in, Check-out, End Break) ──
   const getActionIcon = () => {
     switch (action.type) {
       case "CHECK_IN": return "🕒";
@@ -663,13 +654,18 @@ export const AiChatWidget = () => {
   const { toast } = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false); // ⚡ Expandable / Fullscreen mode
+  const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshingSummary, setIsRefreshingSummary] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contextSummary, setContextSummary] = useState<ContextSummary | null>(null);
+
+  // 📷 Face Verification & Geolocation for AI Assistant Check-In/Out
+  const [showFaceVerify, setShowFaceVerify] = useState(false);
+  const [pendingAttendanceAction, setPendingAttendanceAction] = useState<"checkin" | "checkout" | null>(null);
+  const geo = useGeolocation();
 
   // 🎙️ Voice-to-Text Speech Recognition States
   const [isListening, setIsListening] = useState(false);
@@ -679,7 +675,6 @@ export const AiChatWidget = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check browser SpeechRecognition support on mount
   useEffect(() => {
     const SpeechClass =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -711,7 +706,6 @@ export const AiChatWidget = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  // Clean up speech recognition when unmounting or closing
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -724,7 +718,6 @@ export const AiChatWidget = () => {
     };
   }, []);
 
-  // 🎙️ Toggle Speech Recognition
   const toggleListening = () => {
     if (!speechSupported) {
       toast.warning("Speech recognition is not supported in this browser. Please try Chrome or Edge.");
@@ -787,6 +780,126 @@ export const AiChatWidget = () => {
 
   const showQuickPrompts = messages.length === 1 && messages[0].id === "init" && !isLoading;
 
+  // ── Face Verification Completion Flow (Check In & Check Out) ──
+  const handleFaceVerifyComplete = async (faceResult: FaceVerifyResult | null) => {
+    setShowFaceVerify(false);
+    const actionType = pendingAttendanceAction;
+    setPendingAttendanceAction(null);
+
+    if (!actionType) return;
+
+    try {
+      setIsLoading(true);
+
+      // 1. Get GPS coordinates (geofencing check)
+      const coords = await geo.requestLocation();
+      const isWFH = contextSummary?.dayStatus === "WFH" || contextSummary?.dayStatus === "HalfDay";
+
+      if (!coords && !isWFH) {
+        if (geo.status === "denied") {
+          toast.error("📍 Location permission denied. Please allow location access in your browser settings.");
+        } else if (geo.status === "outside") {
+          toast.error(`📍 ${geo.errorMessage || "You are outside the office geofence. If working from home, apply for WFH first."}`);
+        } else {
+          toast.error("📍 Could not acquire your GPS location. Please try again.");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Perform CheckIn or CheckOut via DailyLog service
+      if (actionType === "checkin") {
+        await dailyLogApi.checkIn({
+          dayStatus: "Present",
+          latitude: coords?.latitude,
+          longitude: coords?.longitude,
+          notes: "Checked in via AI Copilot with Face Verify",
+        });
+
+        toast.success("Successfully checked in with face verification!");
+        const checkInMsg: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `✅ **Checked In**: Face verified! Checked in for today at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Have a great day!`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, checkInMsg]);
+      } else if (actionType === "checkout") {
+        await dailyLogApi.checkOut({
+          latitude: coords?.latitude,
+          longitude: coords?.longitude,
+          notes: "Checked out via AI Copilot with Face Verify",
+        });
+
+        toast.success("Successfully checked out with face verification!");
+        const checkOutMsg: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `🚪 **Checked Out**: Face verified! Checked out for today at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Great job today!`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, checkOutMsg]);
+      }
+
+      // 3. Refresh AI context pill & notify dashboard/other components
+      await fetchSummary();
+      window.dispatchEvent(new Event("daily_log_updated"));
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || "Attendance action failed. Please try again.";
+      setError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExecuteAction = async (action: SuggestedAction) => {
+    // 📷 Check-In: Open Face Registration / Verify Screen
+    if (action.type === "CHECK_IN") {
+      if (contextSummary?.isCheckedIn) {
+        toast.warning("You are already checked in for today.");
+        return;
+      }
+      setPendingAttendanceAction("checkin");
+      setShowFaceVerify(true);
+      return;
+    }
+
+    // 📷 Check-Out: Open Face Registration / Verify Screen
+    if (action.type === "CHECK_OUT") {
+      if (!contextSummary?.isCheckedIn) {
+        toast.warning("You must check in before checking out.");
+        return;
+      }
+      if (contextSummary?.isCheckedOut) {
+        toast.warning("You have already checked out for today.");
+        return;
+      }
+      setPendingAttendanceAction("checkout");
+      setShowFaceVerify(true);
+      return;
+    }
+
+    try {
+      const res = await aiChatApi.executeAction(action.type, action.payload);
+      if (res.data.success) {
+        const confirmMsg: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `✅ **Success**: ${res.data.message}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, confirmMsg]);
+        toast.success(res.data.message);
+        fetchSummary();
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || "Failed to execute action.";
+      setError(errMsg);
+      toast.error(errMsg);
+    }
+  };
+
   const handleSend = async (overrideText?: string) => {
     if (isListening && recognitionRef.current) {
       try {
@@ -799,6 +912,74 @@ export const AiChatWidget = () => {
 
     const trimmed = (overrideText ?? input).trim();
     if (!trimmed || isLoading) return;
+
+    const lower = trimmed.toLowerCase();
+
+    // ⚡ Direct Fast-Path for Check In: open Face Registration / Verify Modal immediately
+    if (
+      lower.includes("check in") ||
+      lower.includes("check me in") ||
+      lower.includes("clock in") ||
+      lower.includes("clock me in") ||
+      lower.includes("check-in")
+    ) {
+      if (contextSummary?.isCheckedIn) {
+        toast.warning("You are already checked in for today.");
+        return;
+      }
+      if (!overrideText) setInput("");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "user",
+          content: trimmed,
+          timestamp: new Date(),
+        },
+      ]);
+      handleExecuteAction({
+        id: "checkin-" + Date.now(),
+        type: "CHECK_IN",
+        title: "Check In for Today",
+        payload: { dayStatus: "Present" },
+      });
+      return;
+    }
+
+    // ⚡ Direct Fast-Path for Check Out: open Face Registration / Verify Modal immediately
+    if (
+      lower.includes("check out") ||
+      lower.includes("check me out") ||
+      lower.includes("clock out") ||
+      lower.includes("clock me out") ||
+      lower.includes("check-out")
+    ) {
+      if (!contextSummary?.isCheckedIn) {
+        toast.warning("You must check in before checking out.");
+        return;
+      }
+      if (contextSummary?.isCheckedOut) {
+        toast.warning("You have already checked out for today.");
+        return;
+      }
+      if (!overrideText) setInput("");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "user",
+          content: trimmed,
+          timestamp: new Date(),
+        },
+      ]);
+      handleExecuteAction({
+        id: "checkout-" + Date.now(),
+        type: "CHECK_OUT",
+        title: "Check Out for Today",
+        payload: {},
+      });
+      return;
+    }
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -837,27 +1018,6 @@ export const AiChatWidget = () => {
     }
   };
 
-  const handleExecuteAction = async (action: SuggestedAction) => {
-    try {
-      const res = await aiChatApi.executeAction(action.type, action.payload);
-      if (res.data.success) {
-        const confirmMsg: Message = {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: `✅ **Success**: ${res.data.message}`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, confirmMsg]);
-        toast.success(res.data.message);
-        fetchSummary();
-      }
-    } catch (err: any) {
-      const errMsg = err?.response?.data?.message || "Failed to execute action.";
-      setError(errMsg);
-      toast.error(errMsg);
-    }
-  };
-
   const handleNavigate = (path: string) => {
     setIsOpen(false);
     navigate(path);
@@ -870,7 +1030,6 @@ export const AiChatWidget = () => {
     }
   };
 
-  // Helper for live context badge text
   const getLiveContextPill = () => {
     if (!contextSummary) {
       return {
@@ -926,6 +1085,19 @@ export const AiChatWidget = () => {
         />
       )}
 
+      {/* ── Face Verification Screen for AI Copilot Check-In / Check-Out ── */}
+      {showFaceVerify && pendingAttendanceAction && (
+        <FaceVerifyModal
+          action={pendingAttendanceAction === "checkin" ? "CheckIn" : "CheckOut"}
+          isWFH={contextSummary?.dayStatus === "WFH"}
+          onSuccess={handleFaceVerifyComplete}
+          onCancel={() => {
+            setShowFaceVerify(false);
+            setPendingAttendanceAction(null);
+          }}
+        />
+      )}
+
       {/* Chat Window Container */}
       {isOpen && (
         <div
@@ -956,7 +1128,6 @@ export const AiChatWidget = () => {
 
             {/* Header Controls: Expand, Clear, Close */}
             <div className="flex items-center gap-1">
-              {/* ⚡ Expandable / Fullscreen Mode Toggle */}
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -1019,8 +1190,15 @@ export const AiChatWidget = () => {
               </div>
               <button
                 type="button"
-                onClick={() => handleSend("Check me in for today")}
-                className="text-[11px] font-semibold bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded-lg transition shrink-0"
+                onClick={() =>
+                  handleExecuteAction({
+                    id: "checkin-banner-" + Date.now(),
+                    type: "CHECK_IN",
+                    title: "Check In for Today",
+                    payload: { dayStatus: "Present" },
+                  })
+                }
+                className="text-[11px] font-semibold bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded-lg transition shrink-0 shadow active:scale-95"
               >
                 Check In Now
               </button>
@@ -1102,7 +1280,6 @@ export const AiChatWidget = () => {
           {/* Input Footer */}
           <div className="p-3 bg-slate-800/95 border-t border-slate-700">
             <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/30 transition">
-              {/* 🎙️ Voice-to-Text Button */}
               <button
                 type="button"
                 onClick={toggleListening}

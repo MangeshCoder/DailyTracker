@@ -288,7 +288,7 @@ namespace DailyTrackerAPI.Services.AI
             var lower = text.ToLowerInvariant();
 
             // 1. Check In
-            if ((lower.Contains("check in") || lower.Contains("clock in")) && !isCheckedIn)
+            if ((lower.Contains("check in") || lower.Contains("check me in") || lower.Contains("check-in") || lower.Contains("clock in") || lower.Contains("clock me in") || lower.Contains("clock-in")) && !isCheckedIn)
             {
                 actions.Add(new SuggestedAction
                 {
@@ -416,7 +416,7 @@ namespace DailyTrackerAPI.Services.AI
                 }
 
                 // Check Out
-                if (lower.Contains("check out") || lower.Contains("clock out"))
+                if (lower.Contains("check out") || lower.Contains("check me out") || lower.Contains("check-out") || lower.Contains("clock out") || lower.Contains("clock me out") || lower.Contains("clock-out"))
                 {
                     actions.Add(new SuggestedAction
                     {
