@@ -807,7 +807,8 @@ export const AiChatWidget = () => {
       return;
     }
 
-    try {
+try {
+      const baselineText = input.trim();
       const SpeechClass =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechClass();
@@ -824,7 +825,7 @@ export const AiChatWidget = () => {
         const transcript = Array.from(event.results)
           .map((result: any) => result[0].transcript)
           .join("");
-        setInput(transcript);
+        setInput(baselineText ? `${baselineText} ${transcript}` : transcript);
       };
 
       recognition.onerror = (event: any) => {

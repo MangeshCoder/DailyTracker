@@ -154,8 +154,8 @@ export const aiChatApi = {
         dayStatus: string;
       };
     }>('/aichat/context-summary'),
-    getEodDraft: () =>
-    api.get<{ success: boolean; draft?: any; message?: string }>("/AiChat/eod-draft"),
+      getEodDraft: () =>
+      api.get<{ success: boolean; draft?: any; message?: string }>("/aichat/eod-draft"),
     
 };
 
