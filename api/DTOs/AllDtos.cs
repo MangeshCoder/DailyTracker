@@ -131,7 +131,6 @@ namespace DailyTrackerAPI.DTOs
     }
 
     /// <summary>
-    /// Login can return either full tokens OR a pending 2FA requirement.
     /// Check RequiresTwoFactor: if true, send TempToken + Code to verify-2fa-login.
     /// </summary>
     public class LoginResponseDto
@@ -140,6 +139,7 @@ namespace DailyTrackerAPI.DTOs
         public string? TempToken { get; set; }           // Present when RequiresTwoFactor
         public string? Message { get; set; }             // "Enter the 6-digit code from your authenticator app"
         public AuthResponseV2Dto? Tokens { get; set; }   // Present when !RequiresTwoFactor
+        public UserDto? User => Tokens?.User;            // <-- ADD THIS LINE for direct frontend compatibility
     }
 
     public class ChangePasswordDto
