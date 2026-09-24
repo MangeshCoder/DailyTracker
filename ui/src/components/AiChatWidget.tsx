@@ -87,9 +87,10 @@ const ActionCard = ({
   onNavigate,
 }: {
   action: SuggestedAction;
-  onExecute: (act: SuggestedAction) => void;
+  onExecute: (act: SuggestedAction) => Promise<boolean | void> | boolean | void;
   onNavigate: (path: string) => void;
 }) => {
+  const { toast } = useToast();
   const [executed, setExecuted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -117,6 +118,13 @@ const ActionCard = ({
   const [wfhReason, setWfhReason] = useState(action.payload?.reason || "");
 
   const handleConfirm = async () => {
+    if (action.type === "APPLY_LEAVE") {
+      if (fromDate > toDate) {
+        toast.error("From Date cannot be after To Date.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     const updatedPayload = { ...action.payload };
@@ -145,9 +153,11 @@ const ActionCard = ({
       payload: updatedPayload,
     };
 
-    await onExecute(finalAction);
+    const res = await onExecute(finalAction);
     setLoading(false);
-    setExecuted(true);
+    if (res !== false) {
+      setExecuted(true);
+    }
   };
 
   if (executed) {
@@ -404,7 +414,7 @@ const ActionCard = ({
             <span className="text-base">🏖</span>
             <div>
               <p className="text-xs font-semibold text-white">Apply for Leave</p>
-              <p className="text-[10px] text-emerald-400">Editable preview</p>
+              <p className="text-[10px] text-emerald-400">Editable preview (Entitlement validated)</p>
             </div>
           </div>
           <button
@@ -422,7 +432,13 @@ const ActionCard = ({
             <input
               type="date"
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFromDate(val);
+                if (toDate < val) {
+                  setToDate(val);
+                }
+              }}
               className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
             />
           </div>
@@ -430,6 +446,7 @@ const ActionCard = ({
             <label className="text-[10px] text-slate-400 block mb-1">To Date</label>
             <input
               type="date"
+              min={fromDate}
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
@@ -443,9 +460,11 @@ const ActionCard = ({
             onChange={(e) => setLeaveType(e.target.value)}
             className="bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs outline-none"
           >
-            <option value="Casual">Casual Leave</option>
-            <option value="Sick">Sick Leave</option>
-            <option value="Earned">Earned Leave</option>
+            <option value="Casual">Casual Leave (12d/yr)</option>
+            <option value="Sick">Sick Leave (7d/yr)</option>
+            <option value="Earned">Earned Leave (15d/yr)</option>
+            <option value="CompOff">Comp Off</option>
+            <option value="Unpaid">Unpaid Leave</option>
           </select>
           <input
             type="text"
@@ -603,7 +622,7 @@ const ChatBubble = ({
   onNavigate,
 }: {
   msg: Message;
-  onExecuteAction: (act: SuggestedAction) => void;
+  onExecuteAction: (act: SuggestedAction) => Promise<boolean | void> | boolean | void;
   onNavigate: (path: string) => void;
 }) => {
   const isUser = msg.role === "user";
@@ -853,7 +872,7 @@ export const AiChatWidget = () => {
     }
   };
 
-  const handleExecuteAction = async (action: SuggestedAction) => {
+  const handleExecuteAction = async (action: SuggestedAction): Promise<boolean | void> => {
     // 📷 Check-In: Open Face Registration / Verify Screen
     if (action.type === "CHECK_IN") {
       if (contextSummary?.isCheckedIn) {
@@ -892,11 +911,17 @@ export const AiChatWidget = () => {
         setMessages((prev) => [...prev, confirmMsg]);
         toast.success(res.data.message);
         fetchSummary();
+        if (action.type === "APPLY_LEAVE") {
+          window.dispatchEvent(new Event("leave_applied"));
+        }
+        return true;
       }
+      return false;
     } catch (err: any) {
       const errMsg = err?.response?.data?.message || "Failed to execute action.";
       setError(errMsg);
       toast.error(errMsg);
+      return false;
     }
   };
 
