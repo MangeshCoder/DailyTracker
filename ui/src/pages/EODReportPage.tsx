@@ -31,17 +31,19 @@ export const EODReportPage = () => {
     queryFn: () => eodApi.getToday().then(r => r.data),
   });
 
-    useEffect(() => {
-    if (todayReport) {
-        setForm({
+useEffect(() => {
+    // If an AI draft is pending from sessionStorage, do NOT let todayReport overwrite it
+    const hasPendingAiDraft = sessionStorage.getItem('pending_eod_draft');
+    if (todayReport && !hasPendingAiDraft) {
+      setForm({
         whatWasDone: todayReport.whatWasDone,
         blockers: todayReport.blockers || '',
         planForTomorrow: todayReport.planForTomorrow || '',
         learnings: todayReport.learnings || '',
         moodRating: todayReport.moodRating,
-        });
+      });
     }
-    }, [todayReport]);
+  }, [todayReport]);
 
  const submit = useMutation({
   mutationFn: () => eodApi.submit(form),
