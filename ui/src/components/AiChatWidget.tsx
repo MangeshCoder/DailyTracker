@@ -88,7 +88,7 @@ const ActionCard = ({
 }: {
   action: SuggestedAction;
   onExecute: (act: SuggestedAction) => Promise<boolean | void> | boolean | void;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, payload?: any) => void;
 }) => {
   const { toast } = useToast();
   const [executed, setExecuted] = useState(false);
@@ -199,7 +199,7 @@ const handleConfirm = async () => {
           // Proceed anyway
         }
       }
-      onNavigate(action.payload?.path || "/tasks");
+      onNavigate(action.payload?.path || "/tasks", action.payload);
     };
 
     return (
@@ -1100,10 +1100,10 @@ try {
     }
   };
 
-  const handleNavigate = (path: string) => {
-    setIsOpen(false);
-    navigate(path);
-  };
+  const handleNavigate = (path: string, payload?: any) => {
+      setIsOpen(false);
+      navigate(path, { state: payload?.action === "open_add_modal" ? { openAddModal: true } : payload });
+    };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

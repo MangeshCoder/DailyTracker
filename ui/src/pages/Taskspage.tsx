@@ -3,6 +3,7 @@ import { tasksApi } from '../services/api';
 import type { TaskLog, CreateTaskDto } from '../types';
 import { KanbanBoard } from './Kanbanboard';
 import { useConfirm } from '../hooks/useConfirm';
+import { useLocation } from 'react-router-dom';
 
 const statusColors: Record<string, string> = {
   InProgress: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -37,6 +38,7 @@ export const TasksPage = () => {
   const [filter, setFilter] = useState('All');
   const [view, setView] = useState<'list' | 'kanban'>('list');
   const { confirm } = useConfirm();
+  const location = useLocation();
 
   const load = async () => {
     try {
@@ -46,8 +48,17 @@ export const TasksPage = () => {
       setLoading(false);
     }
   };
-
+  
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (location.state?.openAddModal || location.state?.action === "open_add_modal") {
+      setShowForm(true);
+      setEditTask(null);
+      setForm(defaultForm);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
