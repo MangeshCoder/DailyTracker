@@ -267,12 +267,32 @@ namespace DailyTrackerAPI.Controllers.Communication
                 if (request.Type == "APPLY_WFH")
                 {
                     var reason = request.Payload.TryGetValue("reason", out var rObj) ? rObj?.ToString() : "Requested via AI Copilot";
+
+                    // Parse user-selected or AI-provided date, fallback to today
+                    DateTime requestDate = today;
+                    if (request.Payload.TryGetValue("requestDate", out var dObj) && DateTime.TryParse(dObj?.ToString(), out var parsedDate))
+                    {
+                        requestDate = parsedDate.Date;
+                    }
+                    else if (request.Payload.TryGetValue("date", out var altObj) && DateTime.TryParse(altObj?.ToString(), out var parsedAlt))
+                    {
+                        requestDate = parsedAlt.Date;
+                    }
+
+                    // Prevent duplicate active/pending WFH requests for the same date
+                    var existingWfh = await _db.WFHRequests
+                        .FirstOrDefaultAsync(w => w.UserId == userId && w.RequestDate == requestDate && w.Status != "Rejected" && w.Status != "Cancelled");
+                    if (existingWfh != null)
+                    {
+                        return BadRequest(new { success = false, message = $"A WFH request for {requestDate:MMM dd, yyyy} already exists (Status: {existingWfh.Status})." });
+                    }
+
                     var wfh = new WFHRequest
                     {
                         UserId = userId,
                         RequestType = "WFH",
-                        RequestDate = today,
-                        Reason = reason ?? "Requested via AI Copilot",
+                        RequestDate = requestDate,
+                        Reason = string.IsNullOrWhiteSpace(reason) ? "Requested via AI Copilot" : reason,
                         Status = "Pending",
                         RequestedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
@@ -280,7 +300,7 @@ namespace DailyTrackerAPI.Controllers.Communication
                     _db.WFHRequests.Add(wfh);
                     await _db.SaveChangesAsync();
 
-                    return Ok(new { success = true, message = "WFH request submitted for manager review!" });
+                    return Ok(new { success = true, message = $"WFH request for {requestDate:MMM dd, yyyy} submitted for manager review!" });
                 }
 
                 // ── 7. Check In ─────────────────────────────────────────────
