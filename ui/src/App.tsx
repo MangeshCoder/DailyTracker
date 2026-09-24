@@ -323,21 +323,23 @@ const AppRoutes = () => {
           }
         />
         <Route
-          path="Goals"
+          path="goals"
           element={
             <Suspense fallback={<SkeletonDashboard />}>
               <GoalsWidget />
             </Suspense>
           }
         />
+        <Route path="Goals" element={<Navigate to="/goals" replace />} />
         <Route
-          path="Goal history"
+          path="goal-history"
           element={
             <Suspense fallback={<SkeletonDashboard />}>
               <GoalHistoryPage />
             </Suspense>
           }
         />
+        <Route path="Goal history" element={<Navigate to="/goal-history" replace />} />
         <Route
           path="history"
           element={

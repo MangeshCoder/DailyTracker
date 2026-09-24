@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { eodApi,presenceApi,kudosApi } from '../services/api';
+import { eodApi,presenceApi,kudosApi, aiChatApi } from '../services/api';
 import { UserPresence } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/Authcontext';
@@ -34,6 +34,32 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
 
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleAiGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const res = await aiChatApi.getEodDraft();
+      if (res.data.success && res.data.draft) {
+        setForm((prev) => ({
+          ...prev,
+          whatWasDone: res.data.draft.whatWasDone || prev.whatWasDone,
+          blockers: res.data.draft.blockers || prev.blockers,
+          planForTomorrow: res.data.draft.planForTomorrow || prev.planForTomorrow,
+          learnings: res.data.draft.learnings || prev.learnings,
+          moodRating: res.data.draft.moodRating || prev.moodRating,
+        }));
+        toast.success("✨ Form filled with today’s accomplishments and tasks!");
+      } else {
+        toast.error(res.data.message || "Could not generate draft. Please ensure you are checked in.");
+      }
+    } catch {
+      toast.error("Failed to generate AI EOD draft.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   // Fetch existing EOD report for today (if any)
   const { data: existingReport, isLoading: isFetching } = useQuery({
@@ -154,6 +180,16 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
           <div className="flex items-center gap-2">
             <button
               type="button"
+                onClick={handleAiGenerate}
+                disabled={isGenerating}
+                className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-500/30 hover:border-blue-400/50 bg-blue-500/10 hover:bg-blue-500/20 transition disabled:opacity-50"
+                title="Auto-fill form using today's completed tasks and activity"
+              >
+              <span>✨</span>
+              <span>{isGenerating ? "Generating..." : "Auto-Generate with AI"}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleClearForm}
               className="text-xs text-slate-400 hover:text-amber-400 px-2.5 py-1 rounded-lg border border-slate-700 hover:border-amber-500/50 transition"
               title="Clear all inputs"
@@ -166,6 +202,7 @@ export const EODReportModal = ({ open, onClose }: EODReportModalProps) => {
             >
               <X size={20} />
             </button>
+            
           </div>
         </div>
 
