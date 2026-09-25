@@ -11,6 +11,7 @@ import { Suspense, useState, useRef, useEffect } from 'react';
 import { SkeletonDashboard } from '../Skeleton';
 import { announcementsApi, notifApi } from '../../services/api';
 import { useQuery } from '@tanstack/react-query';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 export const Layout = () => {
   const { user, logout } = useAuth();
@@ -663,9 +664,11 @@ export const Layout = () => {
 
         {/* ── Main Content Area ─────────────────────────────────────────── */}
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
-          <Suspense fallback={<SkeletonDashboard />}>
-            <Outlet />
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<SkeletonDashboard />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
 
         {/* ── Mobile Bottom Navigation Bar ──────────────────────────────── */}
