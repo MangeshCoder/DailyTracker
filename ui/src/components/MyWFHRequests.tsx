@@ -4,24 +4,39 @@ import { Home, Sun, Calendar, UserCheck, MessageSquare, Ban } from 'lucide-react
 import Swal from 'sweetalert2';
 import { wfhApi } from '../services/api';
 import { WFHRequest } from '../types';
-import { StatusBadge, FilterBar } from './ui';
-import { Card } from './ui/Card';
+import { StatusBadge, FilterBar, Card } from './ui';
 
 export const MyWFHRequests: React.FC = () => {
   const qc = useQueryClient();
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
 
-  const { data: requests = [], isLoading } = useQuery<WFHRequest[]>({
+  const { data: rawRequests, isLoading } = useQuery({
     queryKey: ['myWFHRequests'],
-    queryFn: () => wfhApi.getMy(),
+    queryFn: async () => {
+      try {
+        const res = await wfhApi.getMy();
+        return res;
+      } catch (err) {
+        console.warn('Could not load user WFH requests', err);
+        return [];
+      }
+    },
   });
+
+  const requests: WFHRequest[] = useMemo(() => {
+    if (!rawRequests) return [];
+    if (Array.isArray(rawRequests)) return rawRequests;
+    if (Array.isArray((rawRequests as any)?.data)) return (rawRequests as any).data;
+    if (Array.isArray((rawRequests as any)?.requests)) return (rawRequests as any).requests;
+    return [];
+  }, [rawRequests]);
 
   const cancelMutation = useMutation({
     mutationFn: (id: number) => wfhApi.cancel(id),
     onSuccess: (_, id) => {
       qc.setQueryData<WFHRequest[]>(['myWFHRequests'], (old) =>
-        old
+        Array.isArray(old)
           ? old.map((r) => (r.id === id ? { ...r, status: 'Cancelled' } : r))
           : []
       );
@@ -51,22 +66,22 @@ export const MyWFHRequests: React.FC = () => {
 
   const filteredRequests = useMemo(() => {
     return requests.filter((req) => {
+      if (!req) return false;
       if (filter !== 'All' && req.status !== filter) return false;
       if (!search.trim()) return true;
       const q = search.toLowerCase();
-      return (
-        req.reason.toLowerCase().includes(q) ||
-        req.requestType.toLowerCase().includes(q) ||
-        (req.reviewedByName && req.reviewedByName.toLowerCase().includes(q))
-      );
+      const reasonStr = (req.reason || '').toLowerCase();
+      const typeStr = (req.requestType || 'WFH').toLowerCase();
+      const reviewerStr = (req.reviewedByName || '').toLowerCase();
+      return reasonStr.includes(q) || typeStr.includes(q) || reviewerStr.includes(q);
     });
   }, [requests, filter, search]);
 
   const filterOptions = [
     { key: 'All', label: 'All Requests', count: requests.length },
-    { key: 'Pending', label: 'Pending', count: requests.filter((r) => r.status === 'Pending').length },
-    { key: 'Approved', label: 'Approved', count: requests.filter((r) => r.status === 'Approved').length },
-    { key: 'Rejected', label: 'Rejected', count: requests.filter((r) => r.status === 'Rejected').length },
+    { key: 'Pending', label: 'Pending', count: requests.filter((r) => r?.status === 'Pending').length },
+    { key: 'Approved', label: 'Approved', count: requests.filter((r) => r?.status === 'Approved').length },
+    { key: 'Rejected', label: 'Rejected', count: requests.filter((r) => r?.status === 'Rejected').length },
   ];
 
   if (isLoading) {
@@ -115,7 +130,18 @@ export const MyWFHRequests: React.FC = () => {
       ) : (
         <div className="space-y-3">
           {filteredRequests.map((req) => {
+            if (!req) return null;
             const isPending = req.status === 'Pending';
+            const isHalfDay = req.requestType === 'HalfDay' || !!(req as any).halfDaySlot;
+
+            const dateLabel = req.requestDate
+              ? new Date(req.requestDate).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'Date not specified';
 
             return (
               <Card
@@ -127,12 +153,12 @@ export const MyWFHRequests: React.FC = () => {
                     <div className="flex items-start gap-3.5 min-w-0">
                       <div
                         className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          req.requestType === 'WFH'
+                          !isHalfDay
                             ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
                             : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                         }`}
                       >
-                        {req.requestType === 'WFH' ? (
+                        {!isHalfDay ? (
                           <Home className="w-5 h-5" />
                         ) : (
                           <Sun className="w-5 h-5" />
@@ -142,23 +168,16 @@ export const MyWFHRequests: React.FC = () => {
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                            {req.requestType === 'WFH'
+                            {!isHalfDay
                               ? 'Work From Home'
-                              : `Half Day (${req.halfDaySlot || 'Half Shift'})`}
+                              : `Half Day (${req.halfDaySlot || 'Shift'})`}
                           </h4>
-                          <StatusBadge status={req.status} size="xs" />
+                          <StatusBadge status={req.status || 'Pending'} size="xs" />
                         </div>
 
                         <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>
-                            {new Date(req.requestDate).toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                          </span>
+                          <span>{dateLabel}</span>
                         </p>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Home, Calendar, Clock, CheckCircle2, PlusCircle, History } from 'lucide-react';
 import { WFHRequestForm } from '../components/WFHRequestForm';
@@ -11,17 +11,37 @@ export const WFHRequestPage: React.FC = () => {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'new' | 'history'>('new');
 
-  const { data: requests = [], isLoading } = useQuery<WFHRequest[]>({
+  const { data: rawRequests, isLoading } = useQuery({
     queryKey: ['myWFHRequests'],
-    queryFn: () => wfhApi.getMy(),
+    queryFn: async () => {
+      try {
+        const res = await wfhApi.getMy();
+        return res;
+      } catch (err) {
+        console.warn('Could not fetch WFH requests', err);
+        return [];
+      }
+    },
   });
 
-  const approvedCount = requests.filter(r => r.status === 'Approved').length;
-  const pendingCount = requests.filter(r => r.status === 'Pending').length;
-  const wfhDaysCount = requests.filter(r => r.status === 'Approved' && r.requestType === 'WFH').length;
+  // Resilient array extraction: handles array, axios-wrapped { data: [...] }, or object envelopes
+  const requests: WFHRequest[] = useMemo(() => {
+    if (!rawRequests) return [];
+    if (Array.isArray(rawRequests)) return rawRequests;
+    if (Array.isArray((rawRequests as any)?.data)) return (rawRequests as any).data;
+    if (Array.isArray((rawRequests as any)?.requests)) return (rawRequests as any).requests;
+    return [];
+  }, [rawRequests]);
+
+  const approvedCount = requests.filter(r => r?.status === 'Approved').length;
+  const pendingCount = requests.filter(r => r?.status === 'Pending').length;
+  const wfhDaysCount = requests.filter(
+    r => r?.status === 'Approved' && (r?.requestType === 'WFH' || !(r as any)?.halfDaySlot)
+  ).length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      {/* Page Header */}
       <PageHeader
         title="WFH & Flexible Attendance"
         description="Submit requests for work-from-home or half-day attendance, check supervisor approvals, and track your remote days."
@@ -36,6 +56,7 @@ export const WFHRequestPage: React.FC = () => {
         ]}
       />
 
+      {/* Summary Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Total Requests"
@@ -71,6 +92,7 @@ export const WFHRequestPage: React.FC = () => {
         />
       </div>
 
+      {/* Navigation Tabs */}
       <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-fit">
         <button
           type="button"
@@ -109,6 +131,7 @@ export const WFHRequestPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Tab Panels */}
       {tab === 'new' ? (
         <WFHRequestForm
           onSuccess={() => {

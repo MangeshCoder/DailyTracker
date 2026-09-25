@@ -321,6 +321,10 @@ const AppRoutes = () => {
             path="request"
             element={<WFHRequestPage />}
           />
+          <Route path="requests" element={<Navigate to="/request" replace />} />
+          <Route path="wfh" element={<Navigate to="/request" replace />} />
+          <Route path="wfh-request" element={<Navigate to="/request" replace />} />
+          <Route path="wfh-requests" element={<Navigate to="/request" replace />} />
           <Route
             path="wfh-summary"
             element={
