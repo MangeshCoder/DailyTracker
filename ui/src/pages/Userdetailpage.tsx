@@ -1,15 +1,69 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE: ui/src/pages/Userdetailpage.tsx
+//  Employee Detail (Manager) - Modern Design System Upgrade
+//
+//  Route: /manager/user/:userId
+//  Logic unchanged from previous version:
+//  ✅ Loads attendance summary, calendar and full report for the user
+//  ✅ Report period (from/to) + calendar month/year filters
+//  ✅ Overview / Calendar / Report tabs
+//  ✅ Download report as PDF (HTML) or Word (.docx)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// import { managerApi, downloadBlob } from '../../services/api';
 import { managerApi, downloadBlob } from '../services/api';
-// import {
-//   UserAttendanceSummary,
-//   AttendanceDay,
-//   UserFullReport,
-// } from '../../types';
-
-import { UserAttendanceSummary,AttendanceDay,UserFullReport } from '../types';
+import type { UserAttendanceSummary, AttendanceDay, UserFullReport } from '../types';
 import { DatePicker } from '../components/DatePicker';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
+import { Card, CardContent } from '../components/ui/Card';
+import {
+  ArrowLeft,
+  FileText,
+  FileDown,
+  Loader2,
+  BarChart3,
+  CalendarDays,
+  ClipboardList,
+  ChevronDown,
+  RefreshCw,
+  CalendarRange,
+  UserCheck,
+  Timer,
+  ListChecks,
+  LifeBuoy,
+  Coffee,
+  Clock,
+  CheckCircle2,
+  Ban,
+  RefreshCcw,
+  StickyNote,
+  Mail,
+  Home,
+  Inbox,
+} from 'lucide-react';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const STATUS_CHIP: Record<string, string> = {
+  Present: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+  WFH:     'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+  HalfDay: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+  Absent:  'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+};
+const statusChip = (s: string) =>
+  STATUS_CHIP[s] ?? 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
+
+const SELECT_CLS =
+  'appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ' +
+  'rounded-xl pl-3.5 pr-9 py-2.5 text-sm font-medium cursor-pointer ' +
+  'focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition';
+
+const START_YEAR = 2024;
+const YEARS = Array.from({ length: new Date().getFullYear() - START_YEAR + 1 }, (_, i) => START_YEAR + i);
+
+const fullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ─── Attendance Calendar ──────────────────────────────────────────────────────
 
@@ -23,12 +77,12 @@ const AttendanceCalendar = ({
   year: number;
 }) => {
   const statusStyle: Record<string, { bg: string; text: string; dot: string }> = {
-    Present:  { bg: 'bg-emerald-500/20 border-emerald-500/40',  text: 'text-emerald-400',  dot: 'bg-emerald-400' },
-    WFH:      { bg: 'bg-blue-500/20 border-blue-500/40',        text: 'text-blue-400',      dot: 'bg-blue-400' },
-    HalfDay:  { bg: 'bg-amber-500/20 border-amber-500/40',      text: 'text-amber-400',     dot: 'bg-amber-400' },
-    Absent:   { bg: 'bg-red-500/15 border-red-500/30',          text: 'text-red-400',       dot: 'bg-red-400' },
-    Weekend:  { bg: 'bg-slate-800/50 border-slate-700/30',      text: 'text-slate-600',     dot: 'bg-slate-600' },
-    Future:   { bg: 'bg-slate-800/30 border-slate-700/20',      text: 'text-slate-700',     dot: 'bg-slate-700' },
+    Present: { bg: 'bg-emerald-500/10 border-emerald-500/30', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
+    WFH:     { bg: 'bg-blue-500/10 border-blue-500/30',       text: 'text-blue-700 dark:text-blue-400',       dot: 'bg-blue-500' },
+    HalfDay: { bg: 'bg-amber-500/10 border-amber-500/30',     text: 'text-amber-700 dark:text-amber-400',     dot: 'bg-amber-500' },
+    Absent:  { bg: 'bg-rose-500/10 border-rose-500/25',       text: 'text-rose-700 dark:text-rose-400',       dot: 'bg-rose-500' },
+    Weekend: { bg: 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/40', text: 'text-slate-400 dark:text-slate-600', dot: 'bg-slate-300 dark:bg-slate-600' },
+    Future:  { bg: 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/40',  text: 'text-slate-300 dark:text-slate-700', dot: 'bg-slate-200 dark:bg-slate-700' },
   };
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -40,12 +94,12 @@ const AttendanceCalendar = ({
 
   return (
     <div>
-      <div className="grid grid-cols-7 mb-2">
+      <div className="grid grid-cols-7 gap-1.5 mb-2">
         {weekDays.map(d => (
-          <div key={d} className="text-center text-xs font-semibold text-slate-500 py-1">{d}</div>
+          <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 py-1">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {padded.map((day, i) => {
           if (!day) return <div key={`pad-${i}`} />;
           const s = statusStyle[day.status] ?? statusStyle.Absent;
@@ -55,15 +109,15 @@ const AttendanceCalendar = ({
           return (
             <div
               key={day.date}
-              className={`border rounded-xl p-1.5 ${s.bg} ${isToday ? 'ring-2 ring-blue-500' : ''}`}
+              className={`border rounded-xl p-1.5 sm:p-2 min-h-[52px] transition hover:scale-[1.03] ${s.bg} ${isToday ? 'ring-2 ring-blue-500' : ''}`}
               title={`${d.toDateString()} — ${day.status}${day.checkIn ? ` | In: ${day.checkIn}` : ''}${day.checkOut ? ` | Out: ${day.checkOut}` : ''}${day.tasksCompleted ? ` | Tasks: ${day.tasksCompleted}` : ''}`}
             >
               <div className="flex items-center justify-between">
-                <span className={`text-xs font-semibold ${s.text}`}>{d.getDate()}</span>
+                <span className={`text-xs font-bold ${s.text}`}>{d.getDate()}</span>
                 <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
               </div>
               {day.status !== 'Weekend' && day.status !== 'Future' && day.status !== 'Absent' && (
-                <p className="text-xs text-slate-500 mt-0.5 truncate">{day.workHours}</p>
+                <p className="hidden sm:block text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">{day.workHours}</p>
               )}
             </div>
           );
@@ -71,15 +125,48 @@ const AttendanceCalendar = ({
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 mt-4">
-        {Object.entries(statusStyle).filter(([k]) => !['Future'].includes(k)).map(([status, style]) => (
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-5">
+        {Object.entries(statusStyle).filter(([k]) => k !== 'Future').map(([status, style]) => (
           <div key={status} className="flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
-            <span className="text-xs text-slate-400">{status}</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">{status}</span>
           </div>
         ))}
       </div>
     </div>
+  );
+};
+
+// ─── Attendance Ring ──────────────────────────────────────────────────────────
+
+const AttendanceRing = ({ pct, label }: { pct: number; label: string }) => {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const color = pct >= 90 ? '#10b981' : pct >= 75 ? '#f59e0b' : '#f43f5e';
+  const textCls = pct >= 90 ? 'text-emerald-600 dark:text-emerald-400' : pct >= 75 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
+
+  return (
+    <Card className="p-5 flex flex-col items-center justify-center">
+      <div className="relative w-24 h-24 mb-3">
+        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r={r} fill="none" strokeWidth="8" className="stroke-slate-200 dark:stroke-slate-800" />
+          <circle
+            cx="40" cy="40" r={r} fill="none"
+            stroke={color}
+            strokeWidth="8"
+            strokeDasharray={`${c}`}
+            strokeDashoffset={`${c * (1 - Math.min(pct, 100) / 100)}`}
+            strokeLinecap="round"
+            className="transition-all duration-700"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-xl font-extrabold ${textCls}`}>{pct}%</span>
+        </div>
+      </div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Attendance</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{label}</p>
+    </Card>
   );
 };
 
@@ -140,237 +227,243 @@ export const UserDetailPage = () => {
     }
   };
 
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-  if (loading) {
+  if (loading && !attendance) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="h-24 bg-slate-100 dark:bg-slate-800/60 rounded-2xl animate-pulse" />
+        <div className="h-20 bg-slate-100 dark:bg-slate-800/60 rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-36 bg-slate-100 dark:bg-slate-800/60 rounded-2xl animate-pulse" />)}
+        </div>
       </div>
     );
   }
 
   const user = attendance?.user;
+  const fmtShort = (d: string) =>
+    new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const tabs = [
+    { key: 'overview' as const, label: 'Overview', icon: BarChart3 },
+    { key: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
+    { key: 'report'   as const, label: 'Report',   icon: ClipboardList },
+  ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/manager')}
-            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition"
-          >
-            ←
-          </button>
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xl font-bold">
-            {user?.fullName.charAt(0)}
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* ── Page Header ── */}
+      <PageHeader
+        title={user?.fullName ?? 'Employee'}
+        description={`${user?.role ?? ''}${user?.email ? ` · ${user.email}` : ''}`}
+        breadcrumbs={[
+          { label: 'Workspace', href: '/' },
+          { label: 'Manager Dashboard', href: '/manager' },
+          { label: user?.fullName ?? 'Employee' },
+        ]}
+        actions={
+          <>
+            <button
+              onClick={() => navigate('/manager')}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+            <button
+              onClick={() => handleDownload('pdf')}
+              disabled={!!downloading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-500/20 transition disabled:opacity-50"
+            >
+              {downloading === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              PDF
+            </button>
+            <button
+              onClick={() => handleDownload('docx')}
+              disabled={!!downloading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition disabled:opacity-50"
+            >
+              {downloading === 'docx' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Word
+            </button>
+          </>
+        }
+        className="!mb-0"
+      >
+        {user && (
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-lg font-bold text-white shadow-md">
+              {user.fullName.charAt(0)}
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <Mail className="w-3.5 h-3.5" /> {user.email}
+            </span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">{user?.fullName}</h1>
-            <p className="text-slate-400 text-sm">{user?.role} · {user?.email}</p>
+        )}
+      </PageHeader>
+
+      {/* ── Filters ── */}
+      <Card>
+        <CardContent className="!py-4">
+          <div className="flex flex-col xl:flex-row xl:items-end gap-4">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                  <CalendarRange className="w-3.5 h-3.5" /> Report From
+                </label>
+                <DatePicker value={fromDate} onChange={setFromDate} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">Report To</label>
+                <DatePicker value={toDate} onChange={setToDate} />
+              </div>
+            </div>
+
+            <div className="hidden xl:block w-px h-10 bg-slate-200 dark:bg-slate-800" />
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                <CalendarDays className="w-3.5 h-3.5" /> Calendar Month
+              </label>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <select value={month} onChange={e => setMonth(parseInt(e.target.value))} className={SELECT_CLS}>
+                    {fullMonths.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <div className="relative">
+                  <select value={year} onChange={e => setYear(parseInt(e.target.value))} className={SELECT_CLS}>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <button
+                  onClick={loadData}
+                  disabled={loading}
+                  title="Refresh"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Apply
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Download Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleDownload('pdf')}
-            disabled={!!downloading}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-lg shadow-red-500/20"
-          >
-            {downloading === 'pdf' ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : '📄'}
-            Download PDF
-          </button>
-          <button
-            onClick={() => handleDownload('docx')}
-            disabled={!!downloading}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-lg shadow-blue-500/20"
-          >
-            {downloading === 'docx' ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : '📝'}
-            Download Word
-          </button>
-        </div>
-      </div>
-
-      {/* Date Range Picker (for report & downloads) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-5 flex flex-wrap items-center gap-4">
-        <span className="text-sm text-slate-400 font-medium">Report Period:</span>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">From</label>
-          {/* <input
-            type="date"
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          /> */}
-          <DatePicker value={fromDate} onChange={setFromDate} />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-500">To</label>
-          {/* <input
-            type="date"
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          /> */}
-          <DatePicker value={toDate} onChange={setToDate} />
-        </div>
-
-        <span className="text-slate-600 text-sm">|</span>
-        <span className="text-sm text-slate-400 font-medium">Calendar Month:</span>
-
-        <select
-          value={month}
-          onChange={e => setMonth(parseInt(e.target.value))}
-          className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none"
-        >
-          {fullMonths.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-        </select>
-        <select
-          value={year}
-          onChange={e => setYear(parseInt(e.target.value))}
-          className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm focus:outline-none"
-        >
-          {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-
-        <button
-          onClick={loadData}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-xl transition"
-        >
-          Apply
-        </button>
-      </div>
-
-      {/* Sub Tabs */}
-      <div className="flex gap-2 mb-6">
-        {(['overview', 'calendar', 'report'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setActiveTab(t)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition ${
-              activeTab === t
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            {t === 'overview' ? '📊 Overview' : t === 'calendar' ? '📅 Calendar' : '📋 Report'}
-          </button>
-        ))}
+      {/* ── Tabs ── */}
+      <div className="inline-flex gap-1 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+        {tabs.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                activeTab === t.key
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Icon className="w-4 h-4" /> {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── OVERVIEW TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'overview' && attendance && (
-        <div>
-          {/* Attendance Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {/* Attendance % with circular ring */}
-            <div className="col-span-2 md:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col items-center justify-center">
-              <div className="relative w-20 h-20 mb-3">
-                <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                  <circle cx="40" cy="40" r="34" fill="none" stroke="#1e293b" strokeWidth="8" />
-                  <circle
-                    cx="40" cy="40" r="34" fill="none"
-                    stroke={attendance.attendancePercentage >= 90 ? '#10b981' : attendance.attendancePercentage >= 75 ? '#f59e0b' : '#ef4444'}
-                    strokeWidth="8"
-                    strokeDasharray={`${2 * Math.PI * 34}`}
-                    strokeDashoffset={`${2 * Math.PI * 34 * (1 - attendance.attendancePercentage / 100)}`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-lg font-bold ${
-                    attendance.attendancePercentage >= 90 ? 'text-emerald-400' :
-                    attendance.attendancePercentage >= 75 ? 'text-amber-400' : 'text-red-400'
-                  }`}>
-                    {attendance.attendancePercentage}%
-                  </span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="col-span-2 lg:col-span-1">
+              <AttendanceRing pct={attendance.attendancePercentage} label={`${fullMonths[month - 1]} ${year}`} />
+            </div>
+
+            <Card className="p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Days Present</p>
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <UserCheck className="w-4 h-4" />
                 </div>
               </div>
-              <p className="text-white text-sm font-medium">Attendance</p>
-              <p className="text-slate-500 text-xs">{fullMonths[month - 1]} {year}</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-xs text-slate-400 mb-2">Days Present</p>
-              <p className="text-3xl font-bold text-emerald-400">{attendance.daysPresent}</p>
-              <p className="text-xs text-slate-500 mt-1">of {attendance.workingDaysInMonth} working days</p>
-              <div className="mt-2 space-y-1 text-xs">
-                <p className="text-blue-400">🏠 WFH: {attendance.daysWFH}</p>
-                <p className="text-amber-400">½ Half Day: {attendance.daysHalfDay}</p>
-                <p className="text-red-400">✗ Absent: {attendance.daysAbsent}</p>
+              <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-1">{attendance.daysPresent}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">of {attendance.workingDaysInMonth} working days</p>
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Home className="w-3 h-3" /> WFH {attendance.daysWFH}
+                </span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  Half {attendance.daysHalfDay}
+                </span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                  Absent {attendance.daysAbsent}
+                </span>
               </div>
-            </div>
+            </Card>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-xs text-slate-400 mb-2">Work Hours</p>
-              <p className="text-3xl font-bold text-blue-400">{attendance.totalWorkHours}</p>
-              <p className="text-xs text-slate-500 mt-1">this month</p>
-              <p className="text-xs text-slate-400 mt-2">Avg: <span className="text-white">{attendance.averageDailyHours}h/day</span></p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-xs text-slate-400 mb-2">Productivity</p>
-              <p className="text-3xl font-bold text-violet-400">{attendance.totalTasksCompleted}</p>
-              <p className="text-xs text-slate-500 mt-1">tasks completed</p>
-              <p className="text-xs text-slate-400 mt-2">Support: <span className="text-amber-400">{attendance.totalSupportGiven} times</span></p>
-            </div>
+            <StatCard
+              title="Work Hours"
+              value={attendance.totalWorkHours}
+              subtitle={`Avg ${attendance.averageDailyHours}h / day`}
+              icon={Timer}
+              color="blue"
+            />
+            <StatCard
+              title="Tasks Completed"
+              value={attendance.totalTasksCompleted}
+              subtitle={`Support given ${attendance.totalSupportGiven} times`}
+              icon={ListChecks}
+              color="purple"
+            />
           </div>
 
-          {/* Report Preview Table */}
-          {fullReport && fullReport.dailyEntries.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-slate-800">
-                <h3 className="text-white font-semibold">Recent Activity ({fullReport.dailyEntries.length} days logged)</h3>
+          {/* Recent activity table */}
+          {fullReport && fullReport.dailyEntries.length > 0 ? (
+            <Card className="overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Recent Activity</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{fullReport.dailyEntries.length} days logged · showing latest 15</p>
+                </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
+                <table className="w-full text-sm min-w-[720px]">
                   <thead>
-                    <tr className="border-b border-slate-800/50">
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Date</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Status</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Check In</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Check Out</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Work Hours</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Tasks</th>
-                      <th className="text-left text-slate-500 px-4 py-3 font-medium">Support</th>
+                    <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800">
+                      {['Date', 'Status', 'Check In', 'Check Out', 'Work Hours', 'Tasks', 'Support'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{h}</th>
+                      ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {fullReport.dailyEntries.slice().reverse().slice(0, 15).map(entry => {
-                      const statusColors: Record<string, string> = {
-                        Present: 'text-emerald-400',
-                        WFH: 'text-blue-400',
-                        HalfDay: 'text-amber-400',
-                        Absent: 'text-red-400',
-                      };
-                      return (
-                        <tr key={entry.date} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                          <td className="px-4 py-3 text-slate-300 font-medium">
-                            {new Date(entry.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`font-medium ${statusColors[entry.dayStatus] ?? 'text-slate-400'}`}>
-                              {entry.dayStatus}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">{entry.checkIn}</td>
-                          <td className="px-4 py-3 text-slate-300">{entry.checkOut}</td>
-                          <td className="px-4 py-3 text-blue-400 font-semibold">{entry.workHours}</td>
-                          <td className="px-4 py-3 text-slate-400">{entry.tasksSummary.length} task(s)</td>
-                          <td className="px-4 py-3 text-slate-400">{entry.supportSummary.length} log(s)</td>
-                        </tr>
-                      );
-                    })}
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {fullReport.dailyEntries.slice().reverse().slice(0, 15).map(entry => (
+                      <tr key={entry.date} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                          {new Date(entry.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${statusChip(entry.dayStatus)}`}>
+                            {entry.dayStatus}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{entry.checkIn}</td>
+                        <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{entry.checkOut}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-600 dark:text-blue-400">{entry.workHours}</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{entry.tasksSummary.length} task(s)</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{entry.supportSummary.length} log(s)</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
+            </Card>
+          ) : (
+            <div className="text-center py-12 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+              <Inbox className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-2">No activity in this report period</p>
             </div>
           )}
         </div>
@@ -378,91 +471,109 @@ export const UserDetailPage = () => {
 
       {/* ── CALENDAR TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'calendar' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-          <h3 className="text-white font-semibold mb-5">
-            Attendance Calendar — {fullMonths[month - 1]} {year}
-          </h3>
-          <AttendanceCalendar days={calendar} month={month} year={year} />
-        </div>
+        <Card>
+          <CardContent>
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Attendance Calendar — {fullMonths[month - 1]} {year}
+              </h3>
+            </div>
+            <AttendanceCalendar days={calendar} month={month} year={year} />
+          </CardContent>
+        </Card>
       )}
 
       {/* ── REPORT TAB ────────────────────────────────────────────────────────── */}
       {activeTab === 'report' && fullReport && (
-        <div>
-          {/* Summary Banner */}
-          <div className="bg-gradient-to-r from-blue-900/40 to-violet-900/40 border border-blue-500/20 rounded-2xl p-5 mb-5">
-            <div className="flex flex-wrap gap-6 text-sm">
-              <div><span className="text-slate-400">Period: </span><span className="text-white font-medium">{new Date(fullReport.fromDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} – {new Date(fullReport.toDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
-              <div><span className="text-slate-400">Attendance: </span><span className="text-emerald-400 font-bold">{fullReport.attendancePercentage}%</span></div>
-              <div><span className="text-slate-400">Work Hours: </span><span className="text-blue-400 font-bold">{fullReport.totalWorkHours}</span></div>
-              <div><span className="text-slate-400">Tasks: </span><span className="text-violet-400 font-bold">{fullReport.totalTasksCompleted}/{fullReport.totalTasksLogged}</span></div>
-              <div><span className="text-slate-400">Support: </span><span className="text-amber-400 font-bold">{fullReport.totalSupportGiven}</span></div>
+        <div className="space-y-4">
+          {/* Summary banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-5 sm:p-6 text-white shadow-lg">
+            <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Report Period</p>
+            <p className="text-lg font-bold mt-0.5">
+              {fmtShort(fullReport.fromDate)} – {fmtShort(fullReport.toDate)}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+              {[
+                { l: 'Attendance', v: `${fullReport.attendancePercentage}%` },
+                { l: 'Work Hours', v: fullReport.totalWorkHours },
+                { l: 'Tasks',      v: `${fullReport.totalTasksCompleted}/${fullReport.totalTasksLogged}` },
+                { l: 'Support',    v: fullReport.totalSupportGiven.toString() },
+              ].map(s => (
+                <div key={s.l} className="rounded-2xl bg-white/10 border border-white/15 px-3 py-2.5">
+                  <p className="text-[11px] text-white/70">{s.l}</p>
+                  <p className="text-lg font-bold">{s.v}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Daily entries */}
-          <div className="space-y-3">
-            {fullReport.dailyEntries.slice().reverse().map(entry => (
-              <div key={entry.date} className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                {/* Day header */}
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <p className="text-white font-semibold">
-                      {new Date(entry.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </p>
-                    <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${
-                      entry.dayStatus === 'Present' ? 'bg-emerald-500/20 text-emerald-400' :
-                      entry.dayStatus === 'WFH' ? 'bg-blue-500/20 text-blue-400' :
-                      entry.dayStatus === 'HalfDay' ? 'bg-amber-500/20 text-amber-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>{entry.dayStatus}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-400">
-                    <span>🕐 {entry.checkIn} → {entry.checkOut}</span>
-                    <span className="text-blue-400 font-semibold">{entry.workHours}</span>
-                    <span>☕ {entry.breakMinutes}m break</span>
+          {fullReport.dailyEntries.slice().reverse().map(entry => (
+            <Card key={entry.date} className="p-4 sm:p-5">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                    {new Date(entry.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${statusChip(entry.dayStatus)}`}>
+                    {entry.dayStatus}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {entry.checkIn} → {entry.checkOut}</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">{entry.workHours}</span>
+                  <span className="inline-flex items-center gap-1"><Coffee className="w-3.5 h-3.5" /> {entry.breakMinutes}m</span>
+                </div>
+              </div>
+
+              {entry.tasksSummary.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Tasks</p>
+                  <div className="space-y-1">
+                    {entry.tasksSummary.map((t, i) => {
+                      const Icon = t.startsWith('[Completed]') ? CheckCircle2 : t.startsWith('[Blocked]') ? Ban : RefreshCcw;
+                      const cls = t.startsWith('[Completed]') ? 'text-emerald-500' : t.startsWith('[Blocked]') ? 'text-rose-500' : 'text-blue-500';
+                      return (
+                        <p key={i} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 pl-3 border-l-2 border-slate-200 dark:border-slate-700">
+                          <Icon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${cls}`} /> {t}
+                        </p>
+                      );
+                    })}
                   </div>
                 </div>
+              )}
 
-                {/* Tasks */}
-                {entry.tasksSummary.length > 0 && (
-                  <div className="mb-2">
-                    <p className="text-xs text-slate-500 font-medium mb-1.5 uppercase tracking-wider">Tasks</p>
-                    <div className="space-y-1">
-                      {entry.tasksSummary.map((t, i) => (
-                        <p key={i} className="text-xs text-slate-400 pl-3 border-l-2 border-slate-700">
-                          {t.startsWith('[Completed]') ? '✅' : t.startsWith('[Blocked]') ? '🚫' : '🔄'} {t}
-                        </p>
-                      ))}
-                    </div>
+              {entry.supportSummary.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Support Given</p>
+                  <div className="space-y-1">
+                    {entry.supportSummary.map((s, i) => (
+                      <p key={i} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 pl-3 border-l-2 border-violet-300 dark:border-violet-700">
+                        <LifeBuoy className="w-3.5 h-3.5 shrink-0 mt-0.5 text-violet-500" /> {s}
+                      </p>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Support */}
-                {entry.supportSummary.length > 0 && (
-                  <div>
-                    <p className="text-xs text-slate-500 font-medium mb-1.5 uppercase tracking-wider">Support Given</p>
-                    <div className="space-y-1">
-                      {entry.supportSummary.map((s, i) => (
-                        <p key={i} className="text-xs text-slate-400 pl-3 border-l-2 border-violet-700">🤝 {s}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              {entry.notes && (
+                <p className="flex items-start gap-1.5 text-xs italic text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <StickyNote className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {entry.notes}
+                </p>
+              )}
+            </Card>
+          ))}
 
-                {/* Notes */}
-                {entry.notes && (
-                  <p className="text-xs text-slate-500 mt-2 italic">📝 {entry.notes}</p>
-                )}
-              </div>
-            ))}
-
-            {fullReport.dailyEntries.length === 0 && (
-              <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl">
-                <p className="text-slate-400">No activity logged in this date range.</p>
-              </div>
-            )}
-          </div>
+          {fullReport.dailyEntries.length === 0 && (
+            <div className="text-center py-12 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+              <Inbox className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-2">No activity logged in this date range.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
