@@ -1,4 +1,16 @@
-import React, { useState, useEffect, useRef, KeyboardEvent } from "react";
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE: ui/src/components/AiChatWidget.tsx
+//  AI Copilot Widget - Modern Design System Upgrade (styling only)
+//
+//  Logic unchanged from previous version:
+//  ✅ Floating button → chat window (compact / expanded)
+//  ✅ Live context pill (check-in, tasks, break) + sync
+//  ✅ Gemini chat with editable action cards (task, status, break, leave, WFH, navigate)
+//  ✅ Check-in / check-out fast path with face verify + geofence
+//  ✅ Voice input (Web Speech API)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useState, useEffect, useRef, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mic,
@@ -13,9 +25,23 @@ import {
   ChevronRight,
   Edit2,
   AlertCircle,
-  Check
+  Check,
+  Bot,
+  Sparkles,
+  Plus,
+  RefreshCw,
+  Palmtree,
+  Home,
+  FileText,
+  Clock,
+  LogOut,
+  Play,
+  Zap,
+  Eraser,
+  Loader2,
+  LogIn,
 } from "lucide-react";
-import { Message, MessageHistory, SuggestedAction } from "../types/chat";
+import type { Message, MessageHistory, SuggestedAction } from "../types/chat";
 import { aiChatApi, dailyLogApi } from "../services/api";
 import { useToast } from "../context/ToastContext";
 import { FaceVerifyModal } from "./FaceVerifyModal";
@@ -80,6 +106,37 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
+// ─── Shared styles for action cards ──────────────────────────────────────────
+const CARD_CLS = "mt-2.5 p-3.5 rounded-xl bg-white dark:bg-slate-900/95 border shadow-sm space-y-3";
+const FIELD_CLS =
+  "w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 " +
+  "text-slate-900 dark:text-white text-xs outline-none transition dark:[color-scheme:dark]";
+const LABEL_CLS = "text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-1";
+const FOOTER_CLS = "flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800";
+const CHOICE_OFF =
+  "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
+
+const CardHead = ({
+  icon: Icon, tone, title, subtitle, right,
+}: {
+  icon: React.ElementType; tone: string; title: string; subtitle: string; right?: React.ReactNode;
+}) => (
+  <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center gap-2 min-w-0">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${tone}`}>
+        <Icon size={14} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{title}</p>
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>
+      </div>
+    </div>
+    {right}
+  </div>
+);
+
+const Spin = () => <Loader2 size={13} className="animate-spin" />;
+
 // ── Interactive Rich Action Card with Editable Previews ─────────────────────
 const ActionCard = ({
   action,
@@ -123,7 +180,7 @@ const ActionCard = ({
   );
   const [wfhReason, setWfhReason] = useState(action.payload?.reason || "");
 
-const handleConfirm = async () => {
+  const handleConfirm = async () => {
     if (action.type === "APPLY_LEAVE") {
       if (fromDate > toDate) {
         toast.error("From Date cannot be after To Date.");
@@ -178,10 +235,10 @@ const handleConfirm = async () => {
 
   if (executed) {
     return (
-      <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 shadow-sm">
-        <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+      <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+        <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
         <span className="font-medium">
-          ✓ Action Executed: <strong>{action.title}</strong>
+          Action executed: <strong>{action.title}</strong>
         </span>
       </div>
     );
@@ -203,85 +260,76 @@ const handleConfirm = async () => {
     };
 
     return (
-      <div className="mt-2.5 p-3 rounded-xl bg-slate-900/95 border border-indigo-500/40 shadow-md">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📝</span>
-            <div>
-              <p className="text-xs font-semibold text-white">{action.title}</p>
-              <p className="text-[11px] text-slate-400">Prefills draft into official form</p>
-            </div>
-          </div>
-          <button
-            onClick={handleNavClick}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white shadow transition-all active:scale-95 flex items-center gap-1"
-          >
-            <span>Review & Submit</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
+      <div className={`${CARD_CLS} border-indigo-500/40`}>
+        <CardHead
+          icon={FileText}
+          tone="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+          title={action.title}
+          subtitle="Prefills draft into official form"
+          right={
+            <button
+              onClick={handleNavClick}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition active:scale-95 flex items-center gap-1 shrink-0"
+            >
+              Review & Submit <ChevronRight size={13} />
+            </button>
+          }
+        />
       </div>
     );
   }
 
   if (action.type === "CREATE_TASK") {
     return (
-      <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-blue-500/40 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">
-              ➕
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-white">Create & Log Task</p>
-              <p className="text-[10px] text-blue-400">Review & customize before creating</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-[11px] text-slate-400 hover:text-blue-400 flex items-center gap-1 transition"
-          >
-            <Edit2 size={11} />
-            <span>{isEditing ? "Done" : "Edit"}</span>
-          </button>
-        </div>
+      <div className={`${CARD_CLS} border-blue-500/40`}>
+        <CardHead
+          icon={Plus}
+          tone="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          title="Create & Log Task"
+          subtitle="Review & customize before creating"
+          right={
+            <button
+              type="button"
+              onClick={() => setIsEditing(!isEditing)}
+              className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition shrink-0"
+            >
+              <Edit2 size={11} />
+              {isEditing ? "Done" : "Edit"}
+            </button>
+          }
+        />
 
         <div className="space-y-2 text-xs">
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">Task Title</label>
+            <label className={LABEL_CLS}>Task Title</label>
             <input
               type="text"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
               placeholder="e.g. Implement user authentication"
-              className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-white text-xs outline-none transition"
+              className={`${FIELD_CLS} focus:border-blue-500`}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Time Spent (minutes)</label>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min="5"
-                  max="480"
-                  step="5"
-                  value={taskMinutes}
-                  onChange={(e) => setTaskMinutes(Number(e.target.value))}
-                  className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-lg px-2.5 py-1 text-white text-xs outline-none transition"
-                />
-                <span className="text-[11px] text-slate-400">min</span>
-              </div>
+              <label className={LABEL_CLS}>Time Spent (minutes)</label>
+              <input
+                type="number"
+                min="5"
+                max="480"
+                step="5"
+                value={taskMinutes}
+                onChange={(e) => setTaskMinutes(Number(e.target.value))}
+                className={`${FIELD_CLS} focus:border-blue-500`}
+              />
             </div>
-
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Priority</label>
+              <label className={LABEL_CLS}>Priority</label>
               <select
                 value={taskPriority}
                 onChange={(e) => setTaskPriority(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 focus:border-blue-500 rounded-lg px-2 py-1 text-white text-xs outline-none transition"
+                className={`${FIELD_CLS} focus:border-blue-500`}
               >
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
@@ -291,18 +339,14 @@ const handleConfirm = async () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
+        <div className={FOOTER_CLS}>
           <button
             onClick={handleConfirm}
             disabled={loading || !taskTitle.trim()}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow-md active:scale-95 transition flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
-            {loading ? (
-              <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Check size={13} />
-            )}
-            <span>{loading ? "Creating..." : "Confirm & Log Task"}</span>
+            {loading ? <Spin /> : <Check size={13} />}
+            {loading ? "Creating..." : "Confirm & Log Task"}
           </button>
         </div>
       </div>
@@ -311,56 +355,53 @@ const handleConfirm = async () => {
 
   if (action.type === "UPDATE_TASK_STATUS") {
     return (
-      <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🔄</span>
-            <div>
-              <p className="text-xs font-semibold text-white">Update Task Status</p>
-              <p className="text-[10px] text-purple-400">Review new task state</p>
-            </div>
-          </div>
-        </div>
+      <div className={`${CARD_CLS} border-violet-500/40`}>
+        <CardHead
+          icon={RefreshCw}
+          tone="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          title="Update Task Status"
+          subtitle="Review new task state"
+        />
 
         <div className="space-y-2 text-xs">
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">Target Task</label>
+            <label className={LABEL_CLS}>Target Task</label>
             <input
               type="text"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
               placeholder="Task name or keyword"
-              className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg px-2.5 py-1.5 text-white text-xs outline-none"
+              className={`${FIELD_CLS} focus:border-violet-500`}
             />
           </div>
-
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">New Status</label>
+            <label className={LABEL_CLS}>New Status</label>
             <div className="grid grid-cols-3 gap-1.5">
               {(["Completed", "InProgress", "Pending"] as const).map((st) => (
                 <button
                   type="button"
                   key={st}
                   onClick={() => setTaskStatus(st)}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium border transition ${
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition ${
                     taskStatus === st
-                      ? "bg-purple-600/30 border-purple-500 text-purple-200"
-                      : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                      ? "bg-violet-500/15 border-violet-500 text-violet-700 dark:text-violet-300"
+                      : CHOICE_OFF
                   }`}
                 >
-                  {st === "Completed" ? "✅ Completed" : st === "InProgress" ? "⚡ In Progress" : "⏳ Pending"}
+                  {st === "Completed" ? "Completed" : st === "InProgress" ? "In Progress" : "Pending"}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end pt-1 border-t border-slate-800">
+        <div className={FOOTER_CLS}>
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow active:scale-95 transition"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
+            {loading && <Spin />}
             {loading ? "Updating..." : "Update Status"}
           </button>
         </div>
@@ -377,14 +418,13 @@ const handleConfirm = async () => {
     ];
 
     return (
-      <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-amber-500/40 shadow-lg space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-base">☕</span>
-          <div>
-            <p className="text-xs font-semibold text-white">Start a Break</p>
-            <p className="text-[10px] text-amber-400">Select break type before confirming</p>
-          </div>
-        </div>
+      <div className={`${CARD_CLS} border-amber-500/40`}>
+        <CardHead
+          icon={Coffee}
+          tone="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          title="Start a Break"
+          subtitle="Select break type before confirming"
+        />
 
         <div className="grid grid-cols-2 gap-1.5 text-xs">
           {breakOptions.map((b) => (
@@ -394,28 +434,24 @@ const handleConfirm = async () => {
               onClick={() => setBreakType(b.type)}
               className={`p-2 rounded-lg border text-left flex items-center gap-1.5 transition ${
                 breakType === b.type
-                  ? "bg-amber-500/20 border-amber-500/60 text-amber-200"
-                  : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                  ? "bg-amber-500/15 border-amber-500/60 text-amber-800 dark:text-amber-200"
+                  : CHOICE_OFF
               }`}
             >
               <span>{b.emoji}</span>
-              <span className="text-[11px] font-medium">{b.label}</span>
+              <span className="text-[11px] font-semibold">{b.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="flex items-center justify-end pt-1 border-t border-slate-800">
+        <div className={FOOTER_CLS}>
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white shadow active:scale-95 transition flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
-            {loading ? (
-              <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Coffee size={13} />
-            )}
-            <span>{loading ? "Starting..." : `Start ${breakType} Break`}</span>
+            {loading ? <Spin /> : <Coffee size={13} />}
+            {loading ? "Starting..." : `Start ${breakType} Break`}
           </button>
         </div>
       </div>
@@ -424,27 +460,25 @@ const handleConfirm = async () => {
 
   if (action.type === "APPLY_LEAVE") {
     return (
-      <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/40 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🏖</span>
-            <div>
-              <p className="text-xs font-semibold text-white">Apply for Leave</p>
-              <p className="text-[10px] text-emerald-400">Editable preview (Entitlement validated)</p>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate("/leave")}
-            className="text-[10px] text-emerald-400 hover:underline flex items-center gap-0.5"
-          >
-            <span>Open Leave Page</span>
-            <ChevronRight size={11} />
-          </button>
-        </div>
+      <div className={`${CARD_CLS} border-emerald-500/40`}>
+        <CardHead
+          icon={Palmtree}
+          tone="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          title="Apply for Leave"
+          subtitle="Editable preview (entitlement validated)"
+          right={
+            <button
+              onClick={() => onNavigate("/leave")}
+              className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 shrink-0"
+            >
+              Leave Page <ChevronRight size={11} />
+            </button>
+          }
+        />
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">From Date</label>
+            <label className={LABEL_CLS}>From Date</label>
             <input
               type="date"
               value={fromDate}
@@ -455,48 +489,55 @@ const handleConfirm = async () => {
                   setToDate(val);
                 }
               }}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+              className={`${FIELD_CLS} focus:border-emerald-500`}
             />
           </div>
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">To Date</label>
+            <label className={LABEL_CLS}>To Date</label>
             <input
               type="date"
               min={fromDate}
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+              className={`${FIELD_CLS} focus:border-emerald-500`}
             />
           </div>
         </div>
 
-        <div className="flex gap-2 text-xs">
-          <select
-            value={leaveType}
-            onChange={(e) => setLeaveType(e.target.value)}
-            className="bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs outline-none"
-          >
-            <option value="Casual">Casual Leave (12d/yr)</option>
-            <option value="Sick">Sick Leave (7d/yr)</option>
-            <option value="Earned">Earned Leave (15d/yr)</option>
-            <option value="CompOff">Comp Off</option>
-            <option value="Unpaid">Unpaid Leave</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Reason (optional)"
-            value={leaveReason}
-            onChange={(e) => setLeaveReason(e.target.value)}
-            className="flex-1 bg-slate-800 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs outline-none"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div>
+            <label className={LABEL_CLS}>Leave Type</label>
+            <select
+              value={leaveType}
+              onChange={(e) => setLeaveType(e.target.value)}
+              className={`${FIELD_CLS} focus:border-emerald-500`}
+            >
+              <option value="Casual">Casual Leave (12d/yr)</option>
+              <option value="Sick">Sick Leave (7d/yr)</option>
+              <option value="Earned">Earned Leave (15d/yr)</option>
+              <option value="CompOff">Comp Off</option>
+              <option value="Unpaid">Unpaid Leave</option>
+            </select>
+          </div>
+          <div>
+            <label className={LABEL_CLS}>Reason</label>
+            <input
+              type="text"
+              placeholder="Reason (optional)"
+              value={leaveReason}
+              onChange={(e) => setLeaveReason(e.target.value)}
+              className={`${FIELD_CLS} focus:border-emerald-500`}
+            />
+          </div>
         </div>
 
-        <div className="flex justify-end pt-1 border-t border-slate-800">
+        <div className={FOOTER_CLS}>
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow active:scale-95 transition flex items-center gap-1"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
+            {loading ? <Spin /> : <Check size={13} />}
             {loading ? "Submitting..." : "Confirm Leave"}
           </button>
         </div>
@@ -504,65 +545,62 @@ const handleConfirm = async () => {
     );
   }
 
-if (action.type === "APPLY_WFH") {
+  if (action.type === "APPLY_WFH") {
     const todayStr = new Date().toISOString().split("T")[0];
     return (
-      <div className="mt-2.5 p-3.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🏠</span>
-            <div>
-              <p className="text-xs font-semibold text-white">Apply for {wfhRequestType === "HalfDay" ? "Half Day WFH" : "WFH"}</p>
-              <p className="text-[10px] text-purple-400">Validated with manager notification</p>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate("/request")}
-            className="text-[10px] text-purple-400 hover:underline flex items-center gap-0.5"
-          >
-            <span>Open WFH Page</span>
-            <ChevronRight size={11} />
-          </button>
-        </div>
+      <div className={`${CARD_CLS} border-violet-500/40`}>
+        <CardHead
+          icon={Home}
+          tone="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          title={`Apply for ${wfhRequestType === "HalfDay" ? "Half Day WFH" : "WFH"}`}
+          subtitle="Validated with manager notification"
+          right={
+            <button
+              onClick={() => onNavigate("/request")}
+              className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-0.5 shrink-0"
+            >
+              WFH Page <ChevronRight size={11} />
+            </button>
+          }
+        />
 
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">Type</label>
+            <label className={LABEL_CLS}>Type</label>
             <select
               value={wfhRequestType}
               onChange={(e) => setWfhRequestType(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+              className={`${FIELD_CLS} focus:border-violet-500`}
             >
               <option value="WFH">Full Day WFH</option>
               <option value="HalfDay">Half Day WFH</option>
             </select>
           </div>
-
           <div>
-            <label className="text-[10px] text-slate-400 block mb-1">Request Date</label>
+            <label className={LABEL_CLS}>Request Date</label>
             <input
               type="date"
               min={todayStr}
               value={wfhDate}
               onChange={(e) => setWfhDate(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+              className={`${FIELD_CLS} focus:border-violet-500`}
             />
           </div>
         </div>
 
         {wfhRequestType === "HalfDay" && (
           <div className="text-xs">
-            <label className="text-[10px] text-slate-400 block mb-1">Half Day Slot</label>
+            <label className={LABEL_CLS}>Half Day Slot</label>
             <div className="grid grid-cols-2 gap-2">
               {(["Morning", "Afternoon"] as const).map((slot) => (
                 <button
                   type="button"
                   key={slot}
                   onClick={() => setWfhHalfDaySlot(slot)}
-                  className={`py-1 px-2 rounded-lg border text-xs text-center transition ${
+                  className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold text-center transition ${
                     wfhHalfDaySlot === slot
-                      ? "bg-purple-600/30 border-purple-500 text-purple-200 font-semibold"
-                      : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                      ? "bg-violet-500/15 border-violet-500 text-violet-700 dark:text-violet-300"
+                      : CHOICE_OFF
                   }`}
                 >
                   {slot === "Morning" ? "🌅 Morning" : "🌇 Afternoon"}
@@ -573,22 +611,23 @@ if (action.type === "APPLY_WFH") {
         )}
 
         <div className="text-xs">
-          <label className="text-[10px] text-slate-400 block mb-1">Reason</label>
+          <label className={LABEL_CLS}>Reason</label>
           <input
             type="text"
             placeholder="Reason for WFH"
             value={wfhReason}
             onChange={(e) => setWfhReason(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 focus:border-purple-500 rounded-lg p-1.5 text-slate-200 text-xs outline-none"
+            className={`${FIELD_CLS} focus:border-violet-500`}
           />
         </div>
 
-        <div className="flex justify-end pt-1 border-t border-slate-800">
+        <div className={FOOTER_CLS}>
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white shadow active:scale-95 transition"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
+            {loading ? <Spin /> : <Check size={13} />}
             {loading ? "Submitting..." : `Confirm ${wfhRequestType === "HalfDay" ? "Half Day" : "WFH"}`}
           </button>
         </div>
@@ -596,53 +635,49 @@ if (action.type === "APPLY_WFH") {
     );
   }
 
-  const getActionIcon = () => {
-    switch (action.type) {
-      case "CHECK_IN": return "🕒";
-      case "CHECK_OUT": return "🚪";
-      case "END_BREAK": return "▶️";
-      default: return "⚡";
-    }
-  };
+  const ActionIcon =
+    action.type === "CHECK_IN" ? LogIn :
+    action.type === "CHECK_OUT" ? LogOut :
+    action.type === "END_BREAK" ? Play : Zap;
 
   return (
-    <div className="mt-2.5 p-3 rounded-xl bg-slate-900/90 border border-blue-500/40 shadow-md">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span className="text-xl">{getActionIcon()}</span>
-          <div>
-            <p className="text-xs font-semibold text-white">{action.title}</p>
-            <p className="text-[10px] text-slate-400">Ready to execute automatically</p>
-          </div>
-        </div>
-        <button
-          onClick={handleConfirm}
-          disabled={loading}
-          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow active:scale-95 transition"
-        >
-          {loading ? "Executing..." : "Confirm"}
-        </button>
-      </div>
+    <div className={`${CARD_CLS} border-blue-500/40`}>
+      <CardHead
+        icon={ActionIcon}
+        tone="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+        title={action.title}
+        subtitle="Ready to execute automatically"
+        right={
+          <button
+            onClick={handleConfirm}
+            disabled={loading}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5 shrink-0"
+          >
+            {loading && <Spin />}
+            {loading ? "Executing..." : "Confirm"}
+          </button>
+        }
+      />
     </div>
   );
 };
 
 const AssistantMessage = ({ content }: { content: string }) => {
   return (
-    <div className="space-y-1.5 text-xs leading-relaxed">
+    <div className="space-y-1.5 text-[13px] leading-relaxed">
       {content.split("\n").map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-1" />;
         const boldParsed = line.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, j) => {
           if (part.startsWith("**") && part.endsWith("**")) {
             return (
-              <strong key={j} className="text-white font-semibold">
+              <strong key={j} className="text-slate-900 dark:text-white font-semibold">
                 {part.slice(2, -2)}
               </strong>
             );
           }
           if (part.startsWith("*") && part.endsWith("*")) {
             return (
-              <em key={j} className="text-blue-300 font-normal">
+              <em key={j} className="text-blue-600 dark:text-blue-300 font-normal">
                 {part.slice(1, -1)}
               </em>
             );
@@ -653,14 +688,14 @@ const AssistantMessage = ({ content }: { content: string }) => {
         if (line.trim().startsWith("•") || line.trim().startsWith("-")) {
           return (
             <div key={i} className="flex items-start gap-1.5 ml-1">
-              <span className="text-blue-400 font-bold shrink-0">•</span>
-              <span className="text-slate-300">{boldParsed}</span>
+              <span className="text-blue-500 font-bold shrink-0">•</span>
+              <span className="text-slate-700 dark:text-slate-300">{boldParsed}</span>
             </div>
           );
         }
 
         return (
-          <p key={i} className="text-slate-300">
+          <p key={i} className="text-slate-700 dark:text-slate-300">
             {boldParsed}
           </p>
         );
@@ -683,15 +718,15 @@ const ChatBubble = ({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} items-end gap-2.5`}>
       {!isUser && (
-        <div className="w-7 h-7 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl flex items-center justify-center shrink-0 text-sm shadow-md">
-          🤖
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shrink-0 text-white shadow-md">
+          <Bot size={16} />
         </div>
       )}
       <div
         className={`max-w-[88%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
           isUser
-            ? "bg-blue-600 text-white rounded-br-none shadow-md"
-            : "bg-slate-800/95 border border-slate-700/80 text-slate-200 rounded-bl-none shadow-sm"
+            ? "bg-blue-600 text-white rounded-br-md shadow-md shadow-blue-500/20"
+            : "bg-white dark:bg-slate-800/95 border border-slate-200 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 rounded-bl-md shadow-sm"
         }`}
       >
         {isUser ? (
@@ -713,7 +748,7 @@ const ChatBubble = ({
             )}
           </>
         )}
-        <p className={`text-[10px] mt-1.5 ${isUser ? "text-blue-200 text-right" : "text-slate-500"}`}>
+        <p className={`text-[10px] mt-1.5 ${isUser ? "text-blue-100 text-right" : "text-slate-400 dark:text-slate-500"}`}>
           {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
@@ -734,12 +769,12 @@ export const AiChatWidget = () => {
   const [error, setError] = useState<string | null>(null);
   const [contextSummary, setContextSummary] = useState<ContextSummary | null>(null);
 
-  // 📷 Face Verification & Geolocation for AI Assistant Check-In/Out
+  // Face Verification & Geolocation for AI Assistant Check-In/Out
   const [showFaceVerify, setShowFaceVerify] = useState(false);
   const [pendingAttendanceAction, setPendingAttendanceAction] = useState<"checkin" | "checkout" | null>(null);
   const geo = useGeolocation();
 
-  // 🎙️ Voice-to-Text Speech Recognition States
+  // Voice-to-Text Speech Recognition
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -807,7 +842,7 @@ export const AiChatWidget = () => {
       return;
     }
 
-try {
+    try {
       const baselineText = input.trim();
       const SpeechClass =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -854,7 +889,7 @@ try {
   const showQuickPrompts = messages.length === 1 && messages[0].id === "init" && !isLoading;
 
   // ── Face Verification Completion Flow (Check In & Check Out) ──
-  const handleFaceVerifyComplete = async (faceResult: FaceVerifyResult | null) => {
+  const handleFaceVerifyComplete = async (_faceResult: FaceVerifyResult | null) => {
     setShowFaceVerify(false);
     const actionType = pendingAttendanceAction;
     setPendingAttendanceAction(null);
@@ -927,7 +962,7 @@ try {
   };
 
   const handleExecuteAction = async (action: SuggestedAction): Promise<boolean | void> => {
-    // 📷 Check-In: Open Face Registration / Verify Screen
+    // Check-In: open face verify screen
     if (action.type === "CHECK_IN") {
       if (contextSummary?.isCheckedIn) {
         toast.warning("You are already checked in for today.");
@@ -938,7 +973,7 @@ try {
       return;
     }
 
-    // 📷 Check-Out: Open Face Registration / Verify Screen
+    // Check-Out: open face verify screen
     if (action.type === "CHECK_OUT") {
       if (!contextSummary?.isCheckedIn) {
         toast.warning("You must check in before checking out.");
@@ -997,7 +1032,7 @@ try {
 
     const lower = trimmed.toLowerCase();
 
-    // ⚡ Direct Fast-Path for Check In: open Face Registration / Verify Modal immediately
+    // Fast path for Check In → face verify modal immediately
     if (
       lower.includes("check in") ||
       lower.includes("check me in") ||
@@ -1028,7 +1063,7 @@ try {
       return;
     }
 
-    // ⚡ Direct Fast-Path for Check Out: open Face Registration / Verify Modal immediately
+    // Fast path for Check Out → face verify modal immediately
     if (
       lower.includes("check out") ||
       lower.includes("check me out") ||
@@ -1101,9 +1136,9 @@ try {
   };
 
   const handleNavigate = (path: string, payload?: any) => {
-      setIsOpen(false);
-      navigate(path, { state: payload?.action === "open_add_modal" ? { openAddModal: true } : payload });
-    };
+    setIsOpen(false);
+    navigate(path, { state: payload?.action === "open_add_modal" ? { openAddModal: true } : payload });
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1115,28 +1150,28 @@ try {
   const getLiveContextPill = () => {
     if (!contextSummary) {
       return {
-        badgeClass: "bg-slate-800/80 border-slate-700 text-slate-300",
+        badgeClass: "bg-slate-100 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300",
         dotClass: "bg-slate-400",
-        text: "⚪ Synced: Loading day status...",
+        text: "Syncing day status…",
       };
     }
 
     if (contextSummary.isCheckedIn) {
-      const checkInStr = contextSummary.checkInTime ? `Checked in at ${contextSummary.checkInTime}` : "Checked in";
-      const tasksStr = `${contextSummary.tasksCount} ${contextSummary.tasksCount === 1 ? "Task" : "Tasks"} Logged`;
-      const breakStr = contextSummary.isOnBreak ? ` · ☕ ${contextSummary.activeBreakType || "Break"}` : "";
+      const checkInStr = contextSummary.checkInTime ? `In at ${contextSummary.checkInTime}` : "Checked in";
+      const tasksStr = `${contextSummary.tasksCount} ${contextSummary.tasksCount === 1 ? "task" : "tasks"}`;
+      const breakStr = contextSummary.isOnBreak ? ` · On ${contextSummary.activeBreakType || "break"}` : "";
 
       return {
-        badgeClass: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300",
-        dotClass: "bg-emerald-400 animate-pulse",
-        text: `🟢 Synced: ${checkInStr} · ${tasksStr}${breakStr}`,
+        badgeClass: "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+        dotClass: "bg-emerald-500 animate-pulse",
+        text: `${checkInStr} · ${tasksStr}${breakStr}`,
       };
     }
 
     return {
-      badgeClass: "bg-amber-500/10 border-amber-500/30 text-amber-300",
-      dotClass: "bg-amber-400",
-      text: "⚪ Synced: Not Checked In · Click to check in",
+      badgeClass: "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300",
+      dotClass: "bg-amber-500",
+      text: "Not checked in yet",
     };
   };
 
@@ -1148,26 +1183,24 @@ try {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 p-3.5 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 group flex items-center gap-2"
+          className="fixed bottom-6 right-6 z-50 pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2"
           aria-label="Open AI Assistant"
         >
-          <span className="text-xl">🤖</span>
-          <span className="text-xs font-semibold pr-1 hidden sm:inline tracking-wide">
-            AI Copilot
-          </span>
+          <Sparkles size={18} />
+          <span className="text-xs font-bold hidden sm:inline tracking-wide">AI Copilot</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
         </button>
       )}
 
-      {/* Fullscreen Backdrop when expanded */}
+      {/* Backdrop when expanded */}
       {isOpen && isExpanded && (
         <div
           onClick={() => setIsExpanded(false)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity animate-in fade-in"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity animate-in fade-in"
         />
       )}
 
-      {/* ── Face Verification Screen for AI Copilot Check-In / Check-Out ── */}
+      {/* Face Verification Screen for AI Copilot Check-In / Check-Out */}
       {showFaceVerify && pendingAttendanceAction && (
         <FaceVerifyModal
           action={pendingAttendanceAction === "checkin" ? "CheckIn" : "CheckOut"}
@@ -1180,61 +1213,56 @@ try {
         />
       )}
 
-      {/* Chat Window Container */}
+      {/* Chat Window */}
       {isOpen && (
         <div
-          className={`fixed z-50 flex flex-col bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
+          className={`fixed z-50 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${
             isExpanded
               ? "inset-3 sm:inset-6 md:inset-8 lg:max-w-5xl lg:mx-auto"
               : "bottom-5 right-5 w-[94vw] sm:w-[460px] h-[660px] max-h-[88vh]"
           } animate-in fade-in slide-in-from-bottom-5`}
         >
-          {/* Header */}
-          <div className="px-4 py-3 bg-slate-800/95 border-b border-slate-700 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-base shadow">
-                🤖
+          {/* Gradient header */}
+          <div className="relative px-4 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                <Bot size={18} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-white">Daily Tracker Copilot</h3>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium border border-blue-500/30">
+                  <h3 className="text-sm font-bold truncate">Daily Tracker Copilot</h3>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 border border-white/25 font-semibold">
                     Live
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Real-time attendance, tasks & EOD assistant
-                </p>
+                <p className="text-[11px] text-white/75 truncate">Attendance, tasks & EOD assistant</p>
               </div>
             </div>
 
-            {/* Header Controls: Expand, Clear, Close */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 transition"
+                className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition"
                 title={isExpanded ? "Collapse to Widget" : "Expand to Full Window"}
               >
                 {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
-
               <button
                 type="button"
                 onClick={() => setMessages([INITIAL_MESSAGE])}
-                className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-lg hover:bg-slate-700/60 transition"
+                className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition"
                 title="Clear chat messages"
               >
-                Clear
+                <Eraser size={16} />
               </button>
-
               <button
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
                   setIsExpanded(false);
                 }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/80 transition"
+                className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition"
                 title="Close chat"
               >
                 <X size={17} />
@@ -1242,33 +1270,31 @@ try {
             </div>
           </div>
 
-          {/* 🟢 Live Context Badge Bar */}
-          <div className="px-3.5 py-2 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between text-[11px] gap-2">
-            <div
-              className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium tracking-wide transition-all ${liveBadge.badgeClass}`}
-            >
+          {/* Live context bar */}
+          <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-[11px] font-semibold min-w-0 ${liveBadge.badgeClass}`}>
               <span className={`w-2 h-2 rounded-full shrink-0 ${liveBadge.dotClass}`} />
+              <Clock size={11} className="shrink-0 opacity-70" />
               <span className="truncate">{liveBadge.text}</span>
             </div>
-
             <button
               type="button"
               onClick={fetchSummary}
               disabled={isRefreshingSummary}
-              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-slate-800 transition shrink-0"
+              className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
               title="Refresh live context"
             >
-              <RotateCw size={12} className={isRefreshingSummary ? "animate-spin text-blue-400" : ""} />
+              <RotateCw size={12} className={isRefreshingSummary ? "animate-spin text-blue-500" : ""} />
               <span className="hidden sm:inline">Sync</span>
             </button>
           </div>
 
-          {/* Warning Banner if Not Checked In */}
+          {/* Not-checked-in banner */}
           {!contextSummary?.isCheckedIn && (
-            <div className="mx-4 mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-2">
+            <div className="mx-4 mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <AlertCircle size={15} className="shrink-0" />
-                <span>You have not checked in yet today.</span>
+                <span className="font-medium">You have not checked in yet today.</span>
               </div>
               <button
                 type="button"
@@ -1280,15 +1306,15 @@ try {
                     payload: { dayStatus: "Present" },
                   })
                 }
-                className="text-[11px] font-semibold bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1 rounded-lg transition shrink-0 shadow active:scale-95"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-500 hover:bg-amber-400 text-white px-2.5 py-1.5 rounded-lg transition shrink-0 shadow active:scale-95"
               >
-                Check In Now
+                <LogIn size={12} /> Check In
               </button>
             </div>
           )}
 
-          {/* Messages Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/60">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/60 dark:bg-slate-900/60">
             {messages.map((m) => (
               <ChatBubble
                 key={m.id}
@@ -1299,18 +1325,27 @@ try {
             ))}
 
             {isLoading && (
-              <div className="flex items-center gap-2 text-slate-400 text-xs italic pl-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                <span>Copilot is analyzing your live data...</span>
+              <div className="flex items-end gap-2.5">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 rounded-xl flex items-center justify-center shrink-0 text-white">
+                  <Bot size={16} />
+                </div>
+                <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {[0, 150, 300].map(d => (
+                      <span key={d} className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Analyzing your live data…</span>
+                </div>
               </div>
             )}
 
-            {/* Quick Prompts */}
+            {/* Quick prompts */}
             {showQuickPrompts && (
-              <div className="mt-4 space-y-3 pt-2">
+              <div className="space-y-4 pt-1">
                 {getPromptCategories(!!contextSummary?.isCheckedIn).map((cat) => (
                   <div key={cat.category}>
-                    <p className="text-[11px] font-semibold text-slate-400 mb-1.5 px-0.5 uppercase tracking-wider">
+                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2 px-0.5 uppercase tracking-wider">
                       {cat.category}
                     </p>
                     <div className={`grid ${isExpanded ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"} gap-2`}>
@@ -1318,12 +1353,10 @@ try {
                         <button
                           key={p.label}
                           onClick={() => handleSend(p.text)}
-                          className="text-left px-3 py-2.5 rounded-xl bg-slate-800/90 hover:bg-blue-600/20 border border-slate-700/80 hover:border-blue-500/50 text-xs text-slate-300 hover:text-white transition group shadow-sm flex items-center justify-between"
+                          className="group text-left px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 hover:border-blue-500/50 hover:bg-blue-500/5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-blue-700 dark:hover:text-white shadow-sm transition flex items-center justify-between gap-1"
                         >
                           <span className="line-clamp-1">{p.label}</span>
-                          <span className="text-slate-500 group-hover:text-blue-400 transition text-[10px]">
-                            →
-                          </span>
+                          <ChevronRight size={12} className="shrink-0 text-slate-400 group-hover:text-blue-500 transition" />
                         </button>
                       ))}
                     </div>
@@ -1333,7 +1366,7 @@ try {
             )}
 
             {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
                 <AlertCircle size={15} className="shrink-0" />
                 <span>{error}</span>
               </div>
@@ -1342,35 +1375,35 @@ try {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Active Listening Soundwave Banner */}
+          {/* Listening banner */}
           {isListening && (
-            <div className="px-4 py-2 bg-red-500/15 border-t border-red-500/30 flex items-center justify-between text-xs text-red-300 animate-pulse">
+            <div className="px-4 py-2 bg-rose-500/10 border-t border-rose-500/30 flex items-center justify-between text-xs text-rose-700 dark:text-rose-300">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                <span className="font-medium">🎙️ Listening... speak hands-free now</span>
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                <span className="font-semibold">Listening… speak hands-free now</span>
               </div>
               <button
                 type="button"
                 onClick={toggleListening}
-                className="text-[10px] underline hover:text-white"
+                className="text-[11px] font-semibold underline hover:no-underline"
               >
                 Stop
               </button>
             </div>
           )}
 
-          {/* Input Footer */}
-          <div className="p-3 bg-slate-800/95 border-t border-slate-700">
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/30 transition">
+          {/* Input */}
+          <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl pl-2 pr-1.5 py-1.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition">
               <button
                 type="button"
                 onClick={toggleListening}
-                className={`p-1.5 rounded-lg transition-all relative ${
+                className={`p-2 rounded-xl transition-all ${
                   isListening
-                    ? "bg-red-600 text-white shadow-lg shadow-red-500/30 ring-2 ring-red-400"
-                    : "text-slate-400 hover:text-blue-400 hover:bg-slate-800"
+                    ? "bg-rose-600 text-white shadow-lg shadow-rose-500/30 ring-2 ring-rose-400"
+                    : "text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}
-                title={isListening ? "Stop listening" : "Voice update (Web Speech)"}
+                title={isListening ? "Stop listening" : "Voice input"}
               >
                 {isListening ? <MicOff size={16} /> : <Mic size={16} />}
               </button>
@@ -1381,19 +1414,15 @@ try {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  isListening
-                    ? "Listening to your voice..."
-                    : "Ask about hours, log tasks, or 'take a break'..."
-                }
-                className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+                placeholder={isListening ? "Listening to your voice..." : "Ask about hours, log tasks, or 'take a break'..."}
+                className="flex-1 min-w-0 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
               />
 
               <button
                 type="button"
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isLoading}
-                className="p-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg transition active:scale-95 shadow"
+                className="p-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-xl transition active:scale-95 shadow-md shadow-blue-500/20"
                 title="Send message"
               >
                 <Send size={15} />
