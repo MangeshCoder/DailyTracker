@@ -1187,7 +1187,7 @@ export const AiChatWidget = () => {
           aria-label="Open AI Assistant"
         >
           <Sparkles size={18} />
-          <span className="text-xs font-bold hidden sm:inline tracking-wide">AI Copilot</span>
+          <span className="text-xs font-bold hidden sm:inline tracking-wide">AI Help</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
         </button>
       )}

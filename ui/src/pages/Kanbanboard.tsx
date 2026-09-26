@@ -1,25 +1,76 @@
-import { useState, useRef } from 'react';
-import { tasksApi,taskTimerApi } from '../services/api';
-import { TaskLog } from '../types';
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE: ui/src/pages/Kanbanboard.tsx
+//  Task Kanban Board - Modern Design System Upgrade
+//
+//  Used by Taskspage.tsx (Kanban view).
+//  Logic unchanged from previous version:
+//  ✅ 4 columns (In Progress / Completed / Blocked / On Hold)
+//  ✅ Drag a card to another column → onStatusChange(id, status)
+//  ✅ Edit / delete callbacks
+//  ✅ Per-task live timer (taskTimerApi start/stop) — now has a button
+//     on In Progress cards (the handlers existed but were never wired up).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useState, useRef, useEffect } from 'react';
+import { taskTimerApi } from '../services/api';
+import type { TaskLog } from '../types';
 import { useToast } from '../context/ToastContext';
-import { StatusBadge } from '../components/StatusBadge';
-import { Trash2 } from 'lucide-react';
+import {
+  Trash2,
+  Pencil,
+  RefreshCw,
+  CheckCircle2,
+  Ban,
+  PauseOctagon,
+  Clock,
+  Play,
+  Square,
+  GripVertical,
+  FolderOpen,
+  Hash,
+} from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  Feature 3: Kanban Board with drag-and-drop
+//  Columns + priority styles
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const COLUMNS: { id: string; label: string; color: string; icon: string }[] = [
-  { id: 'InProgress', label: 'In Progress', color: 'border-blue-500/30 bg-blue-500/5', icon: '🔄' },
-  { id: 'Completed', label: 'Completed', color: 'border-emerald-500/30 bg-emerald-500/5', icon: '✅' },
-  { id: 'Blocked', label: 'Blocked', color: 'border-red-500/30 bg-red-500/5', icon: '🚫' },
-  { id: 'OnHold', label: 'On Hold', color: 'border-amber-500/30 bg-amber-500/5', icon: '⏸️' },
+const COLUMNS: { id: string; label: string; icon: React.ElementType; head: string; body: string; over: string }[] = [
+  {
+    id: 'InProgress', label: 'In Progress', icon: RefreshCw,
+    head: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+    body: 'bg-blue-500/[0.03] border-blue-500/20',
+    over: 'ring-2 ring-blue-500/50 bg-blue-500/10',
+  },
+  {
+    id: 'Completed', label: 'Completed', icon: CheckCircle2,
+    head: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    body: 'bg-emerald-500/[0.03] border-emerald-500/20',
+    over: 'ring-2 ring-emerald-500/50 bg-emerald-500/10',
+  },
+  {
+    id: 'Blocked', label: 'Blocked', icon: Ban,
+    head: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    body: 'bg-rose-500/[0.03] border-rose-500/20',
+    over: 'ring-2 ring-rose-500/50 bg-rose-500/10',
+  },
+  {
+    id: 'OnHold', label: 'On Hold', icon: PauseOctagon,
+    head: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+    body: 'bg-amber-500/[0.03] border-amber-500/20',
+    over: 'ring-2 ring-amber-500/50 bg-amber-500/10',
+  },
 ];
 
-const PRIORITY_COLORS: Record<string, string> = {
-  High: 'border-l-2 border-red-500',
-  Medium: 'border-l-2 border-amber-500',
-  Low: 'border-l-2 border-slate-600',
+const PRIORITY_BORDER: Record<string, string> = {
+  High:   'border-l-rose-500',
+  Medium: 'border-l-amber-500',
+  Low:    'border-l-slate-300 dark:border-l-slate-600',
+};
+
+const PRIORITY_CHIP: Record<string, string> = {
+  High:   'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+  Medium: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  Low:    'bg-slate-500/10 text-slate-600 dark:text-slate-400',
 };
 
 interface KanbanProps {
@@ -37,10 +88,13 @@ export const KanbanBoard = ({
 }: KanbanProps) => {
   const { toast } = useToast();
   const dragTaskRef = useRef<TaskLog | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [activeTimerId, setActiveTimerId] = useState<number | null>(null);
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Clear the interval if the board unmounts while a timer is running
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   // Drag handlers
   const onDragStart = (task: TaskLog) => { dragTaskRef.current = task; };
@@ -51,6 +105,7 @@ export const KanbanBoard = ({
       onStatusChange(task.id, columnId);
     }
     dragTaskRef.current = null;
+    setDragOverCol(null);
   };
 
   // Per-task live timer
@@ -84,88 +139,138 @@ export const KanbanBoard = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-      {COLUMNS.map(col => (
-        <div
-          key={col.id}
-          className={`rounded-2xl border p-4 min-h-[200px] ${col.color}`}
-          onDragOver={e => e.preventDefault()}
-          onDrop={() => onDrop(col.id)}
-        >
-          {/* Column header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span>{col.icon}</span>
-              <span className="text-sm font-semibold text-white">{col.label}</span>
+      {COLUMNS.map(col => {
+        const Icon = col.icon;
+        const items = grouped[col.id] ?? [];
+        const isOver = dragOverCol === col.id;
+        return (
+          <div
+            key={col.id}
+            className={`rounded-2xl border p-3 min-h-[240px] flex flex-col transition ${col.body} ${isOver ? col.over : ''}`}
+            onDragOver={e => { e.preventDefault(); if (dragOverCol !== col.id) setDragOverCol(col.id); }}
+            onDragLeave={e => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null);
+            }}
+            onDrop={() => onDrop(col.id)}
+          >
+            {/* Column header */}
+            <div className="flex items-center justify-between px-1 mb-3">
+              <div className="flex items-center gap-2">
+                <div className={`p-1.5 rounded-lg border ${col.head}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">{col.label}</span>
+              </div>
+              <span className="text-[11px] font-bold min-w-[22px] text-center px-1.5 py-0.5 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                {items.length}
+              </span>
             </div>
-            <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
-              {grouped[col.id]?.length ?? 0}
-            </span>
-          </div>
 
-          {/* Task cards */}
-          <div className="space-y-2">
-            {grouped[col.id]?.map(task => (
-              <div
-                key={task.id}
-                draggable
-                onDragStart={() => onDragStart(task)}
-                className={`bg-slate-900 rounded-xl p-3 cursor-grab active:cursor-grabbing
-                  hover:border-slate-600 border border-slate-800 transition group
-                  ${PRIORITY_COLORS[task.priority]}`}
-              >
-                {/* Task title */}
-                <p className="text-sm text-white font-medium leading-snug mb-1.5">{task.taskTitle}</p>
+            {/* Task cards */}
+            <div className="space-y-2 flex-1">
+              {items.map(task => {
+                const timing = activeTimerId === task.id;
+                return (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={() => onDragStart(task)}
+                    onDragEnd={() => setDragOverCol(null)}
+                    className={`group rounded-xl p-3 cursor-grab active:cursor-grabbing bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-[3px] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition ${
+                      PRIORITY_BORDER[task.priority] ?? PRIORITY_BORDER.Low
+                    } ${timing ? 'ring-2 ring-blue-500/40' : ''}`}
+                  >
+                    <div className="flex items-start gap-1.5">
+                      <GripVertical className="w-3.5 h-3.5 mt-0.5 text-slate-300 dark:text-slate-600 shrink-0" />
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white leading-snug flex-1 min-w-0">{task.taskTitle}</p>
+                    </div>
 
-                {/* Tags */}
-                {task.tags && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {task.tags.split(',').map(tag => (
-                      <span key={tag} className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
-                        #{tag.trim()}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Meta row */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {task.projectName && (
-                      <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                        {task.projectName}
-                      </span>
+                    {task.tags && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {task.tags.split(',').map(tag => (
+                          <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            <Hash className="w-2.5 h-2.5" />{tag.trim()}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                    <span className="text-[10px] text-slate-500">
-                      {task.priority === 'High' ? '🔴' : task.priority === 'Medium' ? '🟡' : '🟢'}
-                    </span>
+
+                    <div className="flex items-center justify-between gap-2 mt-2.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {task.projectName && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 truncate max-w-[110px]">
+                            <FolderOpen className="w-3 h-3 shrink-0" /> <span className="truncate">{task.projectName}</span>
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${PRIORITY_CHIP[task.priority] ?? PRIORITY_CHIP.Low}`}>
+                          {task.priority}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                        <Clock className="w-3 h-3" /> {task.timeSpentMinutes}m
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className={`flex items-center justify-between gap-1 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 transition ${
+                      timing ? 'opacity-100' : 'sm:opacity-0 sm:group-hover:opacity-100'
+                    }`}>
+                      {task.status === 'InProgress' ? (
+                        timing ? (
+                          <button
+                            onClick={() => stopTimer(task.id)}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition"
+                            title="Stop timer and add time to task"
+                          >
+                            <Square className="w-3 h-3 fill-current" />
+                            <span className="tabular-nums">{formatTimer(timerSeconds)}</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startTimer(task.id)}
+                            disabled={activeTimerId !== null}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={activeTimerId !== null ? 'Another timer is running' : 'Start timer'}
+                          >
+                            <Play className="w-3 h-3 fill-current" /> Timer
+                          </button>
+                        )
+                      ) : <span />}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => onEdit(task)}
+                          title="Edit task"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 transition"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(task.id)}
+                          title="Delete task"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-500">{task.timeSpentMinutes}m</span>
-                </div>
+                );
+              })}
 
-                {/* Timer row */}
-                <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition">
-                  <button onClick={() => onEdit(task)}
-                    className="text-xs text-slate-400 hover:text-blue-400 px-1.5 py-1 rounded-lg hover:bg-slate-800 transition">
-                    ✏️
-                  </button>
-                  <button
-                     onClick={() => onDelete(task.id)}
-                     className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition">
-                     <Trash2 size={16} />
-                   </button>
+              {items.length === 0 && (
+                <div className={`flex flex-col items-center justify-center text-center py-8 rounded-xl border-2 border-dashed text-xs font-medium transition ${
+                  isOver
+                    ? 'border-current text-slate-600 dark:text-slate-300'
+                    : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                }`}>
+                  <Icon className="w-5 h-5 mb-1.5 opacity-60" />
+                  Drop tasks here
                 </div>
-              </div>
-            ))}
-
-            {grouped[col.id]?.length === 0 && (
-              <div className="text-center py-6 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 text-xs">
-                Drop tasks here
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
-
