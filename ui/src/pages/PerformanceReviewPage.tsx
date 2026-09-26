@@ -20,7 +20,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import {
   Target,
   Award,
-  Calendar,
   CheckCircle2,
   Clock,
   UserCheck,
@@ -29,15 +28,10 @@ import {
   Plus,
   Search,
   X,
-  Sparkles,
   BarChart3,
   FileText,
   AlertCircle,
-  TrendingUp,
-  ShieldCheck,
-  Layers,
-  ArrowRight
-} from 'lucide-react';
+  Layers} from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BACKEND_ORIGIN = 'https://localhost:7096';
@@ -304,8 +298,6 @@ const ReviewDetailModal: React.FC<{
     !isManager &&
     (review.status === 'Pending' || review.status === 'SelfAssessment');
   const canEditManager = isManager && review.status === 'SelfAssessment';
-  const isReadOnly =
-    review.status === 'ManagerReview' || review.status === 'Completed';
 
   return (
     <div
@@ -400,7 +392,7 @@ const ReviewDetailModal: React.FC<{
           {/* SELF ASSESSMENT TAB */}
           {tab === 'self' && (
             <div className="space-y-4">
-              {!isManager && !isReadOnly ? (
+              {canEditSelf ? (
                 <>
                   <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-2">

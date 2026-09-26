@@ -13,8 +13,6 @@ import {
   ChevronDown,
   ChevronUp,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
   Calendar,
   Sparkles,
   Send,
@@ -23,7 +21,7 @@ import {
   Check,
   UserCheck
 } from 'lucide-react';
-import { LeaveBalanceDto, LeaveTypeBalanceItem } from '../types';
+import type { LeaveBalanceDto, LeaveTypeBalanceItem } from '../types';
 import { DatePicker } from '../components/DatePicker';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';

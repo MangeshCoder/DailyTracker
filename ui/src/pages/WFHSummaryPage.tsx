@@ -18,10 +18,7 @@ import {
   Award,
   Calendar,
   CheckCircle2,
-  Users,
-  PartyPopper,
-  Filter
-} from 'lucide-react';
+  PartyPopper} from 'lucide-react';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',

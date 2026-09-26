@@ -1,27 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { eodApi } from '../services/api';
-import { EODReport } from '../types';
-import { useAuth } from '../context/Authcontext';
+import type { EODReport } from '../types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import {
   ClipboardList,
   CheckCircle2,
   Clock,
   MessageSquare,
-  AlertCircle,
   AlertTriangle,
   Smile,
   Calendar,
   Sparkles,
   ChevronDown,
   ChevronUp,
-  Search,
-  Filter
-} from 'lucide-react';
+  Search} from 'lucide-react';
 
 const MOOD_DATA: Record<string, { emoji: string; label: string; bg: string; text: string }> = {
   Great: { emoji: '🚀', label: 'Great', bg: 'bg-emerald-500/10 dark:bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-300 border-emerald-500/25' },
@@ -47,7 +43,6 @@ function formatISTDate(dateString?: string) {
 }
 
 export const MyEODReviewsPage: React.FC = () => {
-  const { user } = useAuth();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'reviewed' | 'pending'>('all');

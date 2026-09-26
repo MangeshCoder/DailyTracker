@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eodApi } from '../services/api';
-import { EODReport } from '../types';
+import type { EODReport } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/Authcontext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import {
   ClipboardCheck,
@@ -15,18 +15,12 @@ import {
   AlertTriangle,
   MessageSquare,
   Search,
-  Filter,
-  Smile,
   Send,
   Sparkles,
   ChevronDown,
   ChevronUp,
   ShieldAlert,
-  Calendar,
-  User,
-  Check,
-  X
-} from 'lucide-react';
+  Calendar} from 'lucide-react';
 
 const QUICK_FEEDBACK_TEMPLATES = [
   'Great work! Approved without changes.',

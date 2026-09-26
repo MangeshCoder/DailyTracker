@@ -5,7 +5,7 @@ import { WFHRequestForm } from '../components/WFHRequestForm';
 import { MyWFHRequests } from '../components/MyWFHRequests';
 import { PageHeader, StatCard } from '../components/ui';
 import { wfhApi } from '../services/api';
-import { WFHRequest } from '../types';
+import type { WFHRequest } from '../types';
 
 export const WFHRequestPage: React.FC = () => {
   const qc = useQueryClient();

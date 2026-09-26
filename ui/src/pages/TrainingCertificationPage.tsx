@@ -25,21 +25,15 @@ import {
   Download,
   Edit3,
   Trash2,
-  Building2,
   CheckCircle2,
   AlertTriangle,
-  FileText,
-  Sparkles,
   BookOpen,
-  ShieldCheck,
   Plus,
   Search,
   X,
   Users,
   User,
-  Paperclip,
-  Check
-} from 'lucide-react';
+  Paperclip} from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TRAINING_TYPES = [

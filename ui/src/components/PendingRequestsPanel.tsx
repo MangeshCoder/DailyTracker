@@ -1,25 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { wfhApi } from '../services/api';
-import { WFHRequest } from '../types';
+import type { WFHRequest } from '../types';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
-import { StatusBadge } from './ui/StatusBadge';
 import {
   Clock,
-  Home,
-  SunMedium,
   CheckCircle2,
-  XCircle,
   Calendar,
   MessageSquare,
   Search,
-  Filter,
   Check,
-  X,
-  AlertCircle,
-  User,
-  Sparkles
-} from 'lucide-react';
+  X} from 'lucide-react';
 import Swal from 'sweetalert2';
 
 const QUICK_NOTES = [

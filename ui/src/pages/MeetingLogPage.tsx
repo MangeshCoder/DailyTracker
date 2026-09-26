@@ -5,7 +5,6 @@ import { useAuth } from '../context/Authcontext';
 import { useToast } from '../context/ToastContext';
 import type {
   MeetingDto,
-  MeetingAttendeeDto,
   MeetingActionItemDto,
   CreateMeetingDto,
   MeetingType,
@@ -16,12 +15,11 @@ import { DatePicker } from '../components/DatePicker';
 import { DateTimePicker } from '../components/DateTimePicker';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import {
   Calendar,
   Clock,
   MapPin,
-  Users,
   CheckSquare,
   AlertCircle,
   Plus,
@@ -29,15 +27,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  Edit3,
-  Trash2,
-  CheckCircle2,
-  FileText,
-  Video,
-  Send,
-  UserCheck
-} from 'lucide-react';
+  CheckCircle2} from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BACKEND_ORIGIN = 'https://localhost:7096';
@@ -326,7 +316,7 @@ const MeetingModal: React.FC<{
   meeting: MeetingDto;
   allUsers: { id: number; fullName: string }[];
   onClose: () => void;
-}> = ({ meeting, allUsers, onClose }) => {
+}> = ({ meeting, onClose }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -996,8 +986,6 @@ const MeetingCard: React.FC<{
 }> = ({ meeting, onClick }) => {
   const typeCfg = getMeetingTypeCfg(meeting.meetingType);
   const cfg = STATUS_CFG[meeting.status];
-  const isPast = new Date(meeting.scheduledAt) < new Date();
-
   return (
     <Card
       onClick={onClick}
@@ -1090,9 +1078,6 @@ const MeetingCard: React.FC<{
 
 // ─── Main MeetingLogPage ──────────────────────────────────────────────────────
 export const MeetingLogPage: React.FC = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const qc = useQueryClient();
   const now = new Date();
 
   const [month, setMonth] = useState(now.getMonth() + 1);

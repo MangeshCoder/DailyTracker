@@ -1,5 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { User } from '../types';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Feature 15: Toast Context – global toast notifications

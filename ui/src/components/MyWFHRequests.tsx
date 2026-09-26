@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Home, Sun, Calendar, UserCheck, MessageSquare, Ban } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { wfhApi } from '../services/api';
-import { WFHRequest } from '../types';
+import type { WFHRequest } from '../types';
 import { StatusBadge, FilterBar, Card } from './ui';
 
 export const MyWFHRequests: React.FC = () => {

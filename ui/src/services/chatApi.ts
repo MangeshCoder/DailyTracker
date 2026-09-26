@@ -1,4 +1,4 @@
-import { ChatApiResponse, MessageHistory } from "../types/chat";
+import type { ChatApiResponse, MessageHistory } from "../types/chat";
 
 const BASE_URL = 'https://localhost:7096/api';
 

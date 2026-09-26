@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { wfhApi } from '../services/api';
-import { WFHRequest, TeamDailyStatus } from '../types';
+import type { WFHRequest, TeamDailyStatus } from '../types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { TeamDailyStatusDashboard } from '../components/TeamDailyStatusDashboard';
@@ -16,7 +16,6 @@ import {
   Building2,
   Home,
   SunMedium,
-  CheckCircle2,
   RefreshCw
 } from 'lucide-react';
 
@@ -31,7 +30,7 @@ export const ManagerWFHDashboard: React.FC = () => {
   });
 
   // Team daily status for KPI counters
-  const { data: teamStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery<TeamDailyStatus>({
+  const { data: teamStatus, refetch: refetchStatus } = useQuery<TeamDailyStatus>({
     queryKey: ['teamStatus'],
     queryFn: () => wfhApi.getTeamStatus(),
     refetchInterval: 60000,

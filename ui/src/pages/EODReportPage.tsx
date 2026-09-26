@@ -14,7 +14,7 @@ import {
   Check
 } from 'lucide-react';
 import { eodApi, aiChatApi } from '../services/api';
-import { CreateEODReportDto } from '../types';
+import type { CreateEODReportDto } from '../types';
 import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, CardContent, StatusBadge } from '../components/ui';
 

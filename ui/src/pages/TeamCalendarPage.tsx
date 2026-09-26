@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { teamCalendarApi } from '../services/api';
-import { useAuth } from '../context/Authcontext';
 import type {
   TeamCalendarResponse,
   CalendarDay,
@@ -11,7 +10,6 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -22,11 +20,7 @@ import {
   Clock,
   PartyPopper,
   Users,
-  User,
-  Filter,
-  Sparkles,
   X,
-  Check,
   MapPin,
   CalendarDays
 } from 'lucide-react';
@@ -511,7 +505,6 @@ const DayCell: React.FC<{
 
 // ─── Main TeamCalendarPage ────────────────────────────────────────────────────
 export const TeamCalendarPage: React.FC = () => {
-  const { user } = useAuth();
   const now = new Date();
 
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -520,7 +513,7 @@ export const TeamCalendarPage: React.FC = () => {
   const [searchName, setSearchName] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const { data, isLoading, refetch } = useQuery<TeamCalendarResponse>({
+  const { data, isLoading } = useQuery<TeamCalendarResponse>({
     queryKey: ['teamCalendar', month, year],
     queryFn: () => teamCalendarApi.get(month, year).then((r) => r.data),
     staleTime: 60_000,

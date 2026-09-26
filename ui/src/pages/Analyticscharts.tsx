@@ -1,17 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsApi } from '../services/api';
-import { HeatmapData, ProjectTime, ProductivityTrend, PeakHour } from '../types';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
-import {
-  Calendar,
-  PieChart as PieIcon,
-  TrendingUp,
-  Clock,
-  Sparkles,
-  Zap,
-  CheckCircle2
-} from 'lucide-react';
+import type { HeatmapData, ProjectTime, ProductivityTrend, PeakHour } from '../types';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Feature 5: GitHub-style Heatmap Calendar

@@ -5,7 +5,7 @@
 //  forcing a full re-login).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../services/api';
 

@@ -13,7 +13,6 @@ import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import {
   Clock,
-  Calendar,
   Building2,
   TrendingUp,
   Zap,
@@ -21,9 +20,6 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  CheckCircle2,
-  AlertTriangle,
   Award,
   ChevronDown,
   ChevronUp

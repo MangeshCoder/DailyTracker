@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
-import { ChatMessage } from '../types';
+import type { ChatMessage } from '../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  useChatHub  —  ONE instance only, mounted at the ChatPage level

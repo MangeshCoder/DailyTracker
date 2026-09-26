@@ -23,11 +23,8 @@ import {
   Download,
   Receipt,
   Users,
-  Building2,
   AlertTriangle,
   CheckCircle2,
-  FileText,
-  Edit3,
   ChevronDown,
   ChevronUp,
   X,
@@ -622,8 +619,6 @@ const TeamPayrollView: React.FC<{
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {teamData.members.map((p) => {
               const isOpen = expandedId === p.userId;
-              const salaryConf = getSalary(p.userId);
-
               return (
                 <div key={p.userId}>
                   {/* Summary Row */}

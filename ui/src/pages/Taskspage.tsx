@@ -23,7 +23,7 @@ import {
   StatCard,
   StatusBadge,
   FilterBar,
-  ViewMode
+  type ViewMode
 } from '../components/ui';
 
 const defaultForm: CreateTaskDto = {

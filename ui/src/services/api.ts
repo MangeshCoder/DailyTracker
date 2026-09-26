@@ -1,17 +1,19 @@
 import axios from 'axios';
-import { ChatMessage, ConversationDetail,TrainingDto, 
-   CertificationDto, TrainingStatsDto, TeamTrainingStatsDto,
-   CreateTrainingDto, UpdateTrainingDto, CreateCertificationDto, 
-   UpdateCertificationDto, ConversationSummary, DocumentDto, DocumentSummaryDto, 
-   SendMessagePayload, UpdateDocumentDto, UserChatProfile, 
-   ExitChecklistItemDto,
-   ResignationDto,
-   CompleteExitDto,
-   ReviewResignationDto,
-   ResignationSummaryDto,
-   SubmitResignationDto,
-   AppNotification} from '../types';
-import { ChatApiResponse, MessageHistory } from '../types/chat';
+import type {
+  ChatMessage, ConversationDetail, TrainingDto,
+  CertificationDto, TrainingStatsDto, TeamTrainingStatsDto,
+  CreateTrainingDto, UpdateTrainingDto,
+  UpdateCertificationDto, ConversationSummary, DocumentDto, DocumentSummaryDto,
+  SendMessagePayload, UpdateDocumentDto, UserChatProfile,
+  ExitChecklistItemDto,
+  ResignationDto,
+  CompleteExitDto,
+  ReviewResignationDto,
+  ResignationSummaryDto,
+  SubmitResignationDto,
+  AppNotification,
+} from '../types';
+import type { ChatApiResponse, MessageHistory } from '../types/chat';
 
 //const BASE_URL = 'https://localhost:7096/api';
 //const BASE_URL = 'http://192.168.1.244:5053/api';
