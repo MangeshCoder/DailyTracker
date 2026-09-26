@@ -6,7 +6,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/Authcontext';
 import { useTheme } from '../../context/ThemeContext';
-import { NotificationBell } from '../../pages/Dashboardwidgets';
+import { NotificationBell } from '../NotificationBell';
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { SkeletonDashboard } from '../Skeleton';
 import { announcementsApi, notifApi } from '../../services/api';

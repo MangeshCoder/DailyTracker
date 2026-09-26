@@ -8,6 +8,10 @@
 //  3. Added orientation, description, categories to manifest
 //  4. Added workbox pre-caching for static assets
 //  5. Added devOptions so SW works in dev mode for testing
+//  6. Vendor code split into stable chunks (react / router / query / …) so
+//     app updates don't force users to re-download unchanged libraries
+//  7. face-api.js + TensorFlow (~650 kB) no longer precached for every user;
+//     cached on first face check instead, together with /models
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { defineConfig } from 'vite';
@@ -59,8 +63,23 @@ export default defineConfig({
       workbox: {
         // Pre-cache all JS/CSS/HTML built by Vite
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // face-api is only needed for face check-in — cache it on first use instead
+        globIgnores: ['**/face-api-*.js'],
 
         runtimeCaching: [
+          // ── face-api.js chunk + ML models — CacheFirst (hashed / static files)
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/models/') ||
+              /\/assets\/face-api-.*\.js$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'face-api-cache',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 }, // 30 days
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+
           // ── Google Fonts — cache forever ─────────────────────────────────
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -115,6 +134,27 @@ export default defineConfig({
       },
     }),
   ],
+
+  build: {
+    rollupOptions: {
+      output: {
+        // Split third-party libraries into long-lived cacheable chunks
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (/[\\/]node_modules[\\/](face-api\.js|@tensorflow)[\\/]/.test(id)) return 'face-api';
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
+          if (/[\\/]node_modules[\\/](react-router|react-router-dom|@remix-run)[\\/]/.test(id)) return 'router';
+          if (id.includes('@tanstack')) return 'query';
+          if (id.includes('@microsoft/signalr')) return 'signalr';
+          if (id.includes('sweetalert2')) return 'sweetalert';
+          if (/[\\/]node_modules[\\/]axios[\\/]/.test(id)) return 'axios';
+        },
+      },
+    },
+    // face-api.js + TensorFlow is one ~650 kB library that can't be split
+    // further; it loads only on face check-in, so allow it without a warning.
+    chunkSizeWarningLimit: 700,
+  },
 
   server: {
     port: 3000,

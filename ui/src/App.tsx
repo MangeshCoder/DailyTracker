@@ -10,13 +10,6 @@ import { ToastContainer } from './components/ToastContainer';
 import { Layout } from './components/layout/Layout';
 import { lazy, Suspense } from 'react';
 import { SkeletonDashboard } from './components/Skeleton';
-import { LeaveManagementPage } from './pages/LeaveManagementPage';
-import { WFHRequestPage } from './pages/WFHRequestPage';
-import { ManagerWFHDashboard } from './pages/ManagerWFHDashboard';
-import { EmailAction } from './pages/EmailAction';
-import { WFHEmailActionPage } from './pages/WFHEmailActionPage';
-import { AssignRole } from './pages/AssignRole';
-import { AiChatWidget } from './components/AiChatWidget';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LAZY PAGE IMPORTS (Code splitting)
@@ -133,6 +126,27 @@ const UserDetailPage = lazy(() =>
 );
 const FeatureGuidePage = lazy(() =>
   import('./pages/FeatureGuidePage').then(m => ({ default: m.FeatureGuidePage }))
+);
+const LeaveManagementPage = lazy(() =>
+  import('./pages/LeaveManagementPage').then(m => ({ default: m.LeaveManagementPage }))
+);
+const WFHRequestPage = lazy(() =>
+  import('./pages/WFHRequestPage').then(m => ({ default: m.WFHRequestPage }))
+);
+const ManagerWFHDashboard = lazy(() =>
+  import('./pages/ManagerWFHDashboard').then(m => ({ default: m.ManagerWFHDashboard }))
+);
+const AssignRole = lazy(() =>
+  import('./pages/AssignRole').then(m => ({ default: m.AssignRole }))
+);
+const EmailAction = lazy(() =>
+  import('./pages/EmailAction').then(m => ({ default: m.EmailAction }))
+);
+const WFHEmailActionPage = lazy(() =>
+  import('./pages/WFHEmailActionPage').then(m => ({ default: m.WFHEmailActionPage }))
+);
+const AiChatWidget = lazy(() =>
+  import('./components/AiChatWidget').then(m => ({ default: m.AiChatWidget }))
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -315,11 +329,19 @@ const AppRoutes = () => {
           {/* Leaves & Attendance */}
           <Route
             path="leave"
-            element={<LeaveManagementPage />}
+            element={
+              <Suspense fallback={<SkeletonDashboard />}>
+                <LeaveManagementPage />
+              </Suspense>
+            }
           />
           <Route
             path="request"
-            element={<WFHRequestPage />}
+            element={
+              <Suspense fallback={<SkeletonDashboard />}>
+                <WFHRequestPage />
+              </Suspense>
+            }
           />
           <Route path="requests" element={<Navigate to="/request" replace />} />
           <Route path="wfh" element={<Navigate to="/request" replace />} />
@@ -466,7 +488,9 @@ const AppRoutes = () => {
             path="manager/wfh-dashboard"
             element={
               <ManagerRoute>
-                <ManagerWFHDashboard />
+                <Suspense fallback={<SkeletonDashboard />}>
+                  <ManagerWFHDashboard />
+                </Suspense>
               </ManagerRoute>
             }
           />
@@ -484,7 +508,9 @@ const AppRoutes = () => {
             path="manager/assign-role"
             element={
               <ManagerRoute>
-                <AssignRole />
+                <Suspense fallback={<SkeletonDashboard />}>
+                  <AssignRole />
+                </Suspense>
               </ManagerRoute>
             }
           />
@@ -521,13 +547,29 @@ const AppRoutes = () => {
         </Route>
 
         {/* ── Public Email Action Endpoints ───────────────────────────────── */}
-        <Route path="/email-action" element={<EmailAction />} />
-        <Route path="/wfh-email-action" element={<WFHEmailActionPage />} />
+        <Route
+          path="/email-action"
+          element={
+            <Suspense fallback={<SkeletonDashboard />}>
+              <EmailAction />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/wfh-email-action"
+          element={
+            <Suspense fallback={<SkeletonDashboard />}>
+              <WFHEmailActionPage />
+            </Suspense>
+          }
+        />
 
         {/* ── 404 Route ───────────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AiChatWidget />
+      <Suspense fallback={null}>
+        <AiChatWidget />
+      </Suspense>
     </>
   );
 };

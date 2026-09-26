@@ -12,7 +12,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authApi, kudosApi } from '../services/api';
-import { KudosFeed } from './Dashboardwidgets';
+import { KudosFeed } from '../components/KudosFeed';
 import { GiveKudosForm } from './Teamcomponents';
 import type { KudosSummary, KudosLeaderboard, KudosLeaderboardEntry } from '../types';
 import { PageHeader } from '../components/ui/PageHeader';
