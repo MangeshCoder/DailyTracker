@@ -1,29 +1,67 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  FILE 12: frontend/src/pages/Supportpage.tsx
-//  ACTION: REPLACE entire file
+//  FILE: ui/src/pages/Supportpage.tsx
+//  Support Logs - Modern Design System Upgrade
 //
-//  Changes from previous version:
-//  Feature 2: Two dropdowns — Support Engineer + Developer (both required)
-//  Feature 3: On form open, calls GET /support/my-assignment
-//             If assignment found:
-//               - Engineer field shows "Assigned by manager: [Name]" (locked)
-//               - Cannot be changed by employee
-//             If no assignment:
-//               - Engineer field shows open dropdown "Choose support engineer"
-//  Location validation: unchanged (geo hook still used)
+//  Logic unchanged from previous version:
+//  ✅ Two dropdowns — Support Engineer + Developer (both required)
+//  ✅ On form open, calls GET /support/my-assignment
+//       Assignment found  → engineer locked to "Assigned by manager"
+//       No assignment     → open "Choose support engineer" dropdown
+//  ✅ Location validation (useGeolocation) — must be at office to save
+//  ✅ File upload with progress (createWithMedia) + delete with confirm
+//  ✅ List / Kanban views
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useMemo } from 'react';
 import { supportApi, authApi } from '../services/api';
-import { SupportLog, User, CreateSupportDto, MyAssignment } from '../types';
+import type { SupportLog, User, CreateSupportDto, MyAssignment } from '../types';
 import { SupportMediaDisplay } from '../components/SupportMediaDisplay';
 import { SupportKanbanBoard } from './SupportKanbanBoard';
 import { SupportFileUpload } from '../components/SupportFileUpload';
-import { Trash2 } from 'lucide-react';
 import { useGeolocation } from '../context/useGeolocation';
 import { useConfirm } from '../hooks/useConfirm';
+import { PageHeader } from '../components/ui/PageHeader';
+import { StatCard } from '../components/ui/StatCard';
+import { Card, CardContent } from '../components/ui/Card';
+import {
+  Trash2,
+  Plus,
+  X,
+  LifeBuoy,
+  Clock,
+  Timer,
+  Users,
+  UserCheck,
+  LayoutGrid,
+  Columns3,
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  Lock,
+  Info,
+  ChevronDown,
+  ArrowRight,
+  AlertCircle,
+  Paperclip,
+  Save,
+  FileText,
+  Wrench,
+  Code2,
+  Bug,
+  Rocket,
+  HelpCircle,
+} from 'lucide-react';
 
 const supportTypes = ['Technical', 'CodeReview', 'Debugging', 'Deployment', 'Other'];
+
+const SUPPORT_TYPE_STYLE: Record<string, { icon: React.ElementType; cls: string; label: string }> = {
+  Technical:  { icon: Wrench,     label: 'Technical',   cls: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+  CodeReview: { icon: Code2,      label: 'Code Review', cls: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+  Debugging:  { icon: Bug,        label: 'Debugging',   cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
+  Deployment: { icon: Rocket,     label: 'Deployment',  cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+  Other:      { icon: HelpCircle, label: 'Other',       cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
+};
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
@@ -43,29 +81,50 @@ const defaultForm: CreateSupportDto = {
   supportType:          'Technical',
 };
 
-// ── Location Status Banner (same as before) ───────────────────────────────────
+// ─── Shared input styles ──────────────────────────────────────────────────────
+
+const INPUT_CLS =
+  'w-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ' +
+  'placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl px-3.5 py-2.5 text-sm ' +
+  'focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-500 transition';
+
+const LABEL_CLS = 'block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5';
+
+const Select = ({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
+  <div className="relative">
+    <select {...props} className={`${INPUT_CLS} appearance-none pr-10 cursor-pointer`}>
+      {children}
+    </select>
+    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+  </div>
+);
+
+// ─── Location Status Banner ───────────────────────────────────────────────────
+
 function LocationBanner({ status, distance, accuracy, errorMessage, onRetry }: {
   status: string; distance: number | null; accuracy: number | null;
   errorMessage: string; onRetry: () => void;
 }) {
   if (status === 'requesting')
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+        <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
         <div>
-          <p className="text-blue-400 text-sm font-medium">Checking your location…</p>
-          <p className="text-blue-400/60 text-xs mt-0.5">Please allow location access when prompted</p>
+          <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Checking your location…</p>
+          <p className="text-xs text-blue-600/80 dark:text-blue-400/70 mt-0.5">Please allow location access when prompted</p>
         </div>
       </div>
     );
 
   if (status === 'success')
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl">
-        <span className="text-xl shrink-0">✅</span>
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+        <div className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+          <CheckCircle2 className="w-4 h-4" />
+        </div>
         <div>
-          <p className="text-green-400 text-sm font-medium">You are at the office</p>
-          <p className="text-green-400/60 text-xs mt-0.5">
+          <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">You are at the office</p>
+          <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-0.5">
             {distance !== null ? `${Math.round(distance)}m from office` : ''}
             {accuracy !== null ? ` · GPS accuracy ±${Math.round(accuracy)}m` : ''}
           </p>
@@ -76,16 +135,22 @@ function LocationBanner({ status, distance, accuracy, errorMessage, onRetry }: {
   if (status === 'outside' || status === 'denied' || status === 'timeout' ||
       status === 'unavailable' || status === 'error')
     return (
-      <div className="flex items-start gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl">
-        <span className="text-xl shrink-0 mt-0.5">📍</span>
-        <div className="flex-1">
-          <p className="text-red-400 text-sm font-medium">
+      <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+        <div className="p-1.5 rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400 shrink-0">
+          <MapPin className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
             {status === 'denied' ? 'Location permission denied' : 'Location check failed'}
           </p>
-          <p className="text-red-400/70 text-xs mt-0.5">{errorMessage}</p>
+          <p className="text-xs text-rose-600/90 dark:text-rose-400/80 mt-0.5">{errorMessage}</p>
         </div>
-        <button onClick={onRetry} className="shrink-0 text-xs text-red-400 hover:text-red-300 underline">
-          Retry
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Retry
         </button>
       </div>
     );
@@ -93,7 +158,8 @@ function LocationBanner({ status, distance, accuracy, errorMessage, onRetry }: {
   return null;
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export const SupportPage = () => {
   const [logs,    setLogs]    = useState<SupportLog[]>([]);
   const [users,   setUsers]   = useState<User[]>([]);
@@ -107,8 +173,8 @@ export const SupportPage = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const { confirm } = useConfirm();
 
-  // Feature 3 — assignment state
-  const [myAssignment,     setMyAssignment]     = useState<MyAssignment | null>(null);
+  // Assignment state
+  const [myAssignment,      setMyAssignment]      = useState<MyAssignment | null>(null);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
 
   const geo = useGeolocation();
@@ -133,7 +199,6 @@ export const SupportPage = () => {
     setShowForm(true);
     setError('');
 
-    // Fetch assignment and GPS in parallel
     setAssignmentLoading(true);
     const [assignmentRes] = await Promise.all([
       supportApi.getMyAssignment().catch(() => null),
@@ -154,6 +219,11 @@ export const SupportPage = () => {
       }
     }
     setAssignmentLoading(false);
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setMyAssignment(null);
   };
 
   const handleRetryLocation = async () => {
@@ -222,7 +292,7 @@ export const SupportPage = () => {
   };
 
   const handleDelete = async (id: number) => {
-     const ok = await confirm('This support log and any attached media will be permanently deleted.', {
+    const ok = await confirm('This support log and any attached media will be permanently deleted.', {
       title:       'Delete Support Log?',
       confirmText: 'Yes, delete',
       danger:      true,
@@ -235,234 +305,360 @@ export const SupportPage = () => {
   const totalTime = useMemo(
     () => logs.reduce((sum, l) => sum + l.timeSpentMinutes, 0), [logs]
   );
+  const developersHelped = useMemo(
+    () => new Set(logs.map(l => l.supportedDeveloperName)).size, [logs]
+  );
+  const assignedCount = logs.filter(l => l.wasAssigned).length;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Support Logs</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            {logs.length} logs · {Math.floor(totalTime / 60)}h {totalTime % 60}m total
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setView('list')}
-            className={`px-4 py-2 rounded-xl text-sm ${view === 'list' ? 'bg-violet-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-            List
-          </button>
-          <button onClick={() => setView('kanban')}
-            className={`px-4 py-2 rounded-xl text-sm ${view === 'kanban' ? 'bg-violet-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-            Kanban
-          </button>
-          <button onClick={handleOpenForm}
-            className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-sm">
-            Log Support
-          </button>
-        </div>
+      {/* ── Page Header ── */}
+      <PageHeader
+        title="Support Logs"
+        description="Log the help you give teammates — debugging, code reviews, deployments and more."
+        breadcrumbs={[
+          { label: 'Workspace', href: '/' },
+          { label: 'Work' },
+          { label: 'Support Logs' },
+        ]}
+        badge={{ label: 'Today', variant: 'purple', icon: <LifeBuoy className="w-3 h-3" /> }}
+        actions={
+          <>
+            {/* View toggle */}
+            <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              {([
+                { k: 'list',   l: 'List',   i: LayoutGrid },
+                { k: 'kanban', l: 'Kanban', i: Columns3 },
+              ] as const).map(v => {
+                const Icon = v.i;
+                return (
+                  <button
+                    key={v.k}
+                    type="button"
+                    onClick={() => setView(v.k)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                      view === v.k
+                        ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {v.l}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={showForm ? handleCancelForm : handleOpenForm}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                showForm
+                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700'
+                  : 'bg-violet-600 hover:bg-violet-500 text-white shadow-md shadow-violet-500/20'
+              }`}
+            >
+              {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {showForm ? 'Cancel' : 'Log Support'}
+            </button>
+          </>
+        }
+        className="!mb-0"
+      />
+
+      {/* ── Stats ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Logs Today"        value={logs.length}                                         icon={LifeBuoy}  color="purple"  loading={loading} />
+        <StatCard title="Time Spent"        value={`${Math.floor(totalTime / 60)}h ${totalTime % 60}m`} icon={Timer}     color="blue"    loading={loading} />
+        <StatCard title="Developers Helped" value={developersHelped}                                    icon={Users}     color="emerald" loading={loading} />
+        <StatCard title="Manager Assigned"  value={assignedCount}                                       icon={UserCheck} color="amber"   loading={loading} />
       </div>
 
-      {/* Form */}
+      {/* ── Form ── */}
       {showForm && (
-        <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 mb-6 space-y-4">
+        <Card className="relative overflow-hidden">
+          <div className="absolute -top-20 -right-20 w-56 h-56 bg-gradient-to-br from-violet-500/15 to-transparent rounded-full blur-2xl pointer-events-none" />
+          <CardContent className="relative z-10 space-y-5">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">New Support Log</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">You must be at the office to save a log</p>
+              </div>
+            </div>
 
-          {/* Location Banner */}
-          <LocationBanner
-            status={geo.status}
-            distance={geo.distance}
-            accuracy={geo.accuracy}
-            errorMessage={geo.errorMessage}
-            onRetry={handleRetryLocation}
-          />
+            <LocationBanner
+              status={geo.status}
+              distance={geo.distance}
+              accuracy={geo.accuracy}
+              errorMessage={geo.errorMessage}
+              onRetry={handleRetryLocation}
+            />
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              {/* ── Support Engineer dropdown (Feature 2 + 3) ──────────────── */}
-              <div className="col-span-2">
-                {assignmentLoading ? (
-                  <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800 rounded-xl text-sm text-slate-400">
-                    <div className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin" />
-                    Checking assignment…
-                  </div>
-                ) : myAssignment?.hasAssignment ? (
-                  /* Manager assigned — show locked field */
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2 px-3 py-2.5 bg-violet-500/10 border border-violet-500/30 rounded-xl">
-                      <span className="text-violet-400 text-sm">👨‍💻</span>
-                      <div className="flex-1">
-                        <p className="text-xs text-violet-400 font-medium">Assigned by manager</p>
-                        <p className="text-white text-sm font-semibold">{myAssignment.supportEngineerName}</p>
-                      </div>
-                      <span className="text-xs text-violet-400/60 bg-violet-500/10 px-2 py-0.5 rounded-lg">Locked</span>
+                {/* ── Support Engineer ── */}
+                <div className="md:col-span-2">
+                  <label className={LABEL_CLS}>Support Engineer <span className="text-rose-500">*</span></label>
+                  {assignmentLoading ? (
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Checking assignment…
                     </div>
-                    {myAssignment.notes && (
-                      <p className="text-xs text-slate-500 px-1">Note: {myAssignment.notes}</p>
-                    )}
-                  </div>
-                ) : (
-                  /* No assignment — open dropdown */
-                  <div className="flex flex-col gap-1">
-                    <p className="text-xs text-slate-400 px-1">
-                      ℹ️ No engineer assigned by manager — choose below
-                    </p>
-                    <select
-                      value={form.supportEngineerId}
-                      onChange={e => setForm({ ...form, supportEngineerId: parseInt(e.target.value) })}
-                      className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm w-full"
-                    >
-                      <option value={0}>Select support engineer…</option>
-                      {users.map(u => (
-                        <option key={u.id} value={u.id}>{u.fullName} — {u.role}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Developer dropdown (Feature 2) ────────────────────────── */}
-              <div className="col-span-2 md:col-span-1">
-                <select
-                  value={form.supportedDeveloperId}
-                  onChange={e => setForm({ ...form, supportedDeveloperId: parseInt(e.target.value) })}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm"
-                >
-                  <option value={0}>Select developer helped…</option>
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>{u.fullName} — {u.role}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Support Type */}
-              <div className="col-span-2 md:col-span-1">
-                <select
-                  value={form.supportType}
-                  onChange={e => setForm({ ...form, supportType: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm"
-                >
-                  {supportTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-
-              <textarea required rows={2}
-                value={form.issueDescription}
-                onChange={e => setForm({ ...form, issueDescription: e.target.value })}
-                className="col-span-2 bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm"
-                placeholder="Issue description…"
-              />
-
-              <textarea rows={2}
-                value={form.resolution}
-                onChange={e => setForm({ ...form, resolution: e.target.value })}
-                className="col-span-2 bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm"
-                placeholder="Resolution…"
-              />
-
-              <input type="number" min={0}
-                value={form.timeSpentMinutes}
-                onChange={e => setForm({ ...form, timeSpentMinutes: parseInt(e.target.value) || 0 })}
-                className="bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm"
-                placeholder="Time spent (minutes)"
-              />
-
-              <div className="col-span-2">
-                <label className="block text-xs text-slate-400 mb-2">Attach Files</label>
-                <SupportFileUpload files={files} setFiles={setFiles} uploadProgress={uploadProgress} />
-                {files.length > 0 && (
-                  <div className="mt-3 space-y-1 text-xs text-slate-400">
-                    {files.map((file, i) => (
-                      <div key={i} className="flex justify-between items-center bg-slate-800 px-3 py-2 rounded-lg border border-slate-700">
-                        <span className="truncate">{file.name}</span>
-                        <span className="text-slate-500">{(file.size / 1024).toFixed(1)} KB</span>
+                  ) : myAssignment?.hasAssignment ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/30">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                          {myAssignment.supportEngineerName?.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-semibold text-violet-600 dark:text-violet-400">Assigned by manager</p>
+                          <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{myAssignment.supportEngineerName}</p>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full shrink-0">
+                          <Lock className="w-3 h-3" /> Locked
+                        </span>
                       </div>
+                      {myAssignment.notes && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 px-1">Note: {myAssignment.notes}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Select
+                        value={form.supportEngineerId}
+                        onChange={e => setForm({ ...form, supportEngineerId: parseInt(e.target.value) })}
+                      >
+                        <option value={0}>Select support engineer…</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.fullName} — {u.role}</option>
+                        ))}
+                      </Select>
+                      <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 px-1">
+                        <Info className="w-3.5 h-3.5" /> No engineer assigned by manager — choose one above
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Developer ── */}
+                <div>
+                  <label className={LABEL_CLS}>Developer Helped <span className="text-rose-500">*</span></label>
+                  <Select
+                    value={form.supportedDeveloperId}
+                    onChange={e => setForm({ ...form, supportedDeveloperId: parseInt(e.target.value) })}
+                  >
+                    <option value={0}>Select developer helped…</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.fullName} — {u.role}</option>
                     ))}
+                  </Select>
+                </div>
+
+                {/* ── Support Type ── */}
+                <div>
+                  <label className={LABEL_CLS}>Support Type</label>
+                  <Select
+                    value={form.supportType}
+                    onChange={e => setForm({ ...form, supportType: e.target.value })}
+                  >
+                    {supportTypes.map(t => (
+                      <option key={t} value={t}>{SUPPORT_TYPE_STYLE[t]?.label ?? t}</option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* ── Issue ── */}
+                <div className="md:col-span-2">
+                  <label className={LABEL_CLS}>Issue Description <span className="text-rose-500">*</span></label>
+                  <textarea
+                    required rows={3}
+                    value={form.issueDescription}
+                    onChange={e => setForm({ ...form, issueDescription: e.target.value })}
+                    className={`${INPUT_CLS} resize-none`}
+                    placeholder="What was the problem?"
+                  />
+                </div>
+
+                {/* ── Resolution ── */}
+                <div className="md:col-span-2">
+                  <label className={LABEL_CLS}>Resolution</label>
+                  <textarea
+                    rows={2}
+                    value={form.resolution}
+                    onChange={e => setForm({ ...form, resolution: e.target.value })}
+                    className={`${INPUT_CLS} resize-none`}
+                    placeholder="How was it solved?"
+                  />
+                </div>
+
+                {/* ── Time Spent ── */}
+                <div>
+                  <label className={LABEL_CLS}>Time Spent (minutes)</label>
+                  <div className="relative">
+                    <Clock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="number" min={0}
+                      value={form.timeSpentMinutes}
+                      onChange={e => setForm({ ...form, timeSpentMinutes: parseInt(e.target.value) || 0 })}
+                      className={`${INPUT_CLS} pl-10`}
+                      placeholder="0"
+                    />
                   </div>
-                )}
+                </div>
+
+                {/* ── Attachments ── */}
+                <div className="md:col-span-2">
+                  <label className={`${LABEL_CLS} flex items-center gap-1.5`}>
+                    <Paperclip className="w-3.5 h-3.5" /> Attach Files
+                  </label>
+                  <SupportFileUpload files={files} setFiles={setFiles} uploadProgress={uploadProgress} />
+                  {files.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {files.map((file, i) => (
+                        <div
+                          key={i}
+                          className="flex justify-between items-center gap-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs"
+                        >
+                          <span className="flex items-center gap-2 truncate text-slate-700 dark:text-slate-300">
+                            <Paperclip className="w-3.5 h-3.5 shrink-0 text-slate-400" /> {file.name}
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400 shrink-0">{(file.size / 1024).toFixed(1)} KB</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && (
+                <div className="flex items-start gap-2 px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-rose-700 dark:text-rose-300">{error}</p>
+                </div>
+              )}
 
-            <div className="flex gap-2">
-              <button type="submit" disabled={saving || !geo.withinOffice}
-                title={!geo.withinOffice ? 'Location verification required' : ''}
-                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded-xl text-sm">
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); setMyAssignment(null); }}
-                className="bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm">
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleCancelForm}
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || !geo.withinOffice}
+                  title={!geo.withinOffice ? 'Location verification required' : ''}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white shadow-md shadow-violet-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {saving ? 'Saving…' : 'Save Log'}
+                </button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Log cards */}
+      {/* ── Logs ── */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-48 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse" />
+          ))}
         </div>
       ) : view === 'kanban' ? (
         <SupportKanbanBoard logs={logs} onDelete={handleDelete} />
+      ) : logs.length === 0 ? (
+        <div className="text-center py-14 px-4 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+            <LifeBuoy className="w-7 h-7 text-violet-500" />
+          </div>
+          <p className="text-base font-bold text-slate-900 dark:text-white mt-3">No support logged today</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Helped a teammate? Click <span className="font-semibold text-violet-600 dark:text-violet-400">Log Support</span> to record it.
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {logs.map((log) => (
-            <div key={log.id}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-violet-500/40 transition-all duration-200 shadow-md">
-
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  {/* Engineer → Developer header (Feature 2) */}
-                  <div className="flex items-center gap-1.5 text-sm">
-                    <span className="text-violet-400 font-semibold">{log.supportEngineerName}</span>
-                    <span className="text-slate-500 text-xs">→ helped →</span>
-                    <span className="text-white font-semibold">{log.supportedDeveloperName}</span>
+          {logs.map((log) => {
+            const st = SUPPORT_TYPE_STYLE[log.supportType] ?? SUPPORT_TYPE_STYLE.Other;
+            const TypeIcon = st.icon;
+            return (
+              <Card key={log.id} hover className="p-5 flex flex-col">
+                {/* Engineer → Developer */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex -space-x-2 shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-xs font-bold text-white ring-2 ring-white dark:ring-slate-900" title={log.supportEngineerName}>
+                        {log.supportEngineerName.charAt(0)}
+                      </div>
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-white ring-2 ring-white dark:ring-slate-900" title={log.supportedDeveloperName}>
+                        {log.supportedDeveloperName.charAt(0)}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white min-w-0">
+                        <span className="truncate text-violet-600 dark:text-violet-400">{log.supportEngineerName}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{log.supportedDeveloperName}</span>
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                          <Clock className="w-3 h-3" /> {formatISTTime(log.supportedAt)}
+                        </span>
+                        {log.wasAssigned && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            <UserCheck className="w-3 h-3" /> Manager assigned
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xs text-slate-500">{formatISTTime(log.supportedAt)}</p>
-                    {/* Assignment badge (Feature 3) */}
-                    {log.wasAssigned && (
-                      <span className="text-[10px] bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded-full">
-                        Manager assigned
+                  <button
+                    onClick={() => handleDelete(log.id)}
+                    title="Delete log"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3 mb-3">{log.issueDescription}</p>
+
+                {log.resolution && (
+                  <div className="flex items-start gap-2 px-3 py-2 mb-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">{log.resolution}</p>
+                  </div>
+                )}
+
+                {log.media && log.media.length > 0 && <SupportMediaDisplay media={log.media} />}
+
+                <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                      <Timer className="w-3.5 h-3.5" /> {log.timeSpentMinutes} min
+                    </span>
+                    {log.distanceFromOfficeMetres != null && (
+                      <span className="hidden sm:inline-flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                        <MapPin className="w-3.5 h-3.5" /> {Math.round(log.distanceFromOfficeMetres)}m from office
                       </span>
                     )}
                   </div>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-semibold ${st.cls}`}>
+                    <TypeIcon className="w-3 h-3" /> {st.label}
+                  </span>
                 </div>
-                <button onClick={() => handleDelete(log.id)}
-                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              <p className="text-slate-300 text-sm mb-2 line-clamp-2">{log.issueDescription}</p>
-
-              {log.resolution && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg px-3 py-2 text-xs mb-3">
-                  ✔ {log.resolution}
-                </div>
-              )}
-
-              {log.media && log.media.length > 0 && <SupportMediaDisplay media={log.media} />}
-
-              {log.distanceFromOfficeMetres != null && (
-                <div className="mt-2 flex items-center gap-1 text-xs text-slate-600">
-                  <span>📍</span>
-                  <span>{Math.round(log.distanceFromOfficeMetres)}m from office</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center mt-3 text-xs">
-                <span className="bg-slate-800 px-3 py-1 rounded-lg text-slate-300">
-                  ⏱ {log.timeSpentMinutes} min
-                </span>
-                <span className="text-slate-500">{log.supportType}</span>
-              </div>
-            </div>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
