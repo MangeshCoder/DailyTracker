@@ -10,11 +10,14 @@
 //  UI: native window.confirm() replaced with the themed useConfirm dialog.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useRef, useCallback, createContext, useContext, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import type { ChatMessage, ConversationSummary, UserChatProfile, ConversationDetail } from '../types/index';
-import { authApi, chatApi } from '../services/api';
+import { chatApi } from '../services/api';
 import { useChatHub } from './useChatHub';
+import { useAuth } from '../context/Authcontext';
+import { useChat, parseUtcDate } from '../context/ChatContext';
 import { useConfirm } from '../hooks/useConfirm';
 import {
   MessageSquare,
@@ -37,18 +40,10 @@ import {
   UserPlus,
   Loader2,
   Info,
+  WifiOff,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
-const parseUtcDate = (iso: string): Date => {
-  if (!iso) return new Date();
-  // .NET naive DateTime strings (no Z / offset) are UTC — append 'Z'
-  if (!iso.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(iso)) {
-    return new Date(iso + 'Z');
-  }
-  return new Date(iso);
-};
-
 const formatTime = (iso: string) =>
   parseUtcDate(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -108,13 +103,19 @@ const INPUT_CLS =
 //  New Chat Modal
 // ─────────────────────────────────────────────────────────────────────────────
 const NewChatModal = ({
-  onClose, onOpenDirect, onCreateGroup
+  onClose, onOpenDirect, onCreateGroup, mode = 'new', excludeIds = [], onAddMembers
 }: {
   onClose: () => void;
-  onOpenDirect: (userId: number) => void;
-  onCreateGroup: (name: string, members: number[]) => void;
+  onOpenDirect?: (userId: number) => void;
+  onCreateGroup?: (name: string, members: number[]) => void;
+  /** 'add' = pick people to add to an existing group */
+  mode?: 'new' | 'add';
+  excludeIds?: number[];
+  onAddMembers?: (userIds: number[]) => void;
 }) => {
-  const [tab, setTab] = useState<'direct' | 'group'>('direct');
+  const isAdd = mode === 'add';
+  const { isOnline } = useChat();
+  const [tab, setTab] = useState<'direct' | 'group'>(isAdd ? 'group' : 'direct');
   const [search, setSearch] = useState('');
   const [groupName, setGroupName] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
@@ -125,8 +126,10 @@ const NewChatModal = ({
   });
 
   const filtered = users.filter(u =>
-    u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+    !excludeIds.includes(u.id) && (
+      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   const toggleUser = (id: number) =>
@@ -152,14 +155,14 @@ const NewChatModal = ({
               <MessageSquare className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold">New Chat</h3>
-              <p className="text-xs text-white/80">Message a teammate or start a group</p>
+              <h3 className="text-lg font-bold">{isAdd ? 'Add Members' : 'New Chat'}</h3>
+              <p className="text-xs text-white/80">{isAdd ? 'Pick teammates to add to this group' : 'Message a teammate or start a group'}</p>
             </div>
           </div>
         </div>
 
         <div className="p-5 space-y-3 flex-shrink-0">
-          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+          {!isAdd && <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
             {(['direct', 'group'] as const).map(t => (
               <button
                 key={t}
@@ -174,9 +177,9 @@ const NewChatModal = ({
                 {t === 'direct' ? 'Direct Message' : 'Group Chat'}
               </button>
             ))}
-          </div>
+          </div>}
 
-          {tab === 'group' && (
+          {tab === 'group' && !isAdd && (
             <input
               placeholder="Group name..."
               value={groupName}
@@ -225,13 +228,13 @@ const NewChatModal = ({
                   isSel ? 'bg-blue-500/5' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                 }`}
                 onClick={() => {
-                  if (tab === 'direct') { onOpenDirect(u.id); onClose(); }
+                  if (tab === 'direct') { onOpenDirect?.(u.id); onClose(); }
                   else toggleUser(u.id);
                 }}
               >
                 <div className="relative">
                   <Avatar name={u.fullName} size="sm" />
-                  <div className="absolute -bottom-0.5 -right-0.5"><OnlineDot status={u.onlineStatus} /></div>
+                  <div className="absolute -bottom-0.5 -right-0.5"><OnlineDot status={isOnline(u.id) ? 'Online' : u.onlineStatus} /></div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{u.fullName}</p>
@@ -252,12 +255,16 @@ const NewChatModal = ({
         {tab === 'group' && (
           <div className="px-5 pb-5 flex-shrink-0">
             <button
-              disabled={!groupName.trim() || selected.length < 1}
-              onClick={() => { onCreateGroup(groupName, selected); onClose(); }}
+              disabled={(!isAdd && !groupName.trim()) || selected.length < 1}
+              onClick={() => {
+                if (isAdd) onAddMembers?.(selected);
+                else onCreateGroup?.(groupName, selected);
+                onClose();
+              }}
               className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Users className="w-4 h-4" />
-              Create Group ({selected.length} {selected.length === 1 ? 'member' : 'members'})
+              {isAdd ? <UserPlus className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+              {isAdd ? 'Add' : 'Create Group'} ({selected.length} {selected.length === 1 ? 'member' : 'members'})
             </button>
           </div>
         )}
@@ -270,13 +277,16 @@ const NewChatModal = ({
 //  Conversation Sidebar
 // ─────────────────────────────────────────────────────────────────────────────
 const ConversationSidebar = ({
-  conversations, selectedId, onSelect, onNewChat
+  conversations, selectedId, onSelect, onNewChat, headerActions, compact = false
 }: {
   conversations: ConversationSummary[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   onNewChat: () => void;
+  headerActions?: ReactNode;
+  compact?: boolean;
 }) => {
+  const { isOnline, connectionState } = useChat();
   const [search, setSearch] = useState('');
   const filtered = conversations.filter(c =>
     c.displayName.toLowerCase().includes(search.toLowerCase())
@@ -284,7 +294,7 @@ const ConversationSidebar = ({
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
   return (
-    <div className="flex flex-col h-full w-full bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800">
+    <div className={`flex flex-col h-full w-full bg-white dark:bg-slate-950 ${compact ? '' : 'border-r border-slate-200 dark:border-slate-800'}`}>
       <div className="px-4 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -295,13 +305,16 @@ const ConversationSidebar = ({
               </span>
             )}
           </div>
-          <button
-            onClick={onNewChat}
-            title="New chat"
-            className="w-9 h-9 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 transition"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onNewChat}
+              title="New chat"
+              className="w-9 h-9 bg-blue-600 hover:bg-blue-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 transition"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            {headerActions}
+          </div>
         </div>
         <div className="relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -313,6 +326,13 @@ const ConversationSidebar = ({
           />
         </div>
       </div>
+
+      {connectionState !== 'connected' && connectionState !== 'connecting' && (
+        <div className="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-b border-amber-500/20">
+          <WifiOff className="w-3.5 h-3.5" />
+          {connectionState === 'reconnecting' ? 'Reconnecting…' : 'Offline — new messages may be delayed'}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {filtered.length === 0 && (
@@ -338,7 +358,9 @@ const ConversationSidebar = ({
               <div className="relative flex-shrink-0">
                 <Avatar name={conv.displayName} size="md" isGroup={conv.type === 'Group'} />
                 {conv.type === 'Direct' && (
-                  <div className="absolute -bottom-0.5 -right-0.5"><OnlineDot /></div>
+                  <div className="absolute -bottom-0.5 -right-0.5">
+                    <OnlineDot status={isOnline(conv.otherUserId) ? 'Online' : 'Offline'} />
+                  </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -377,8 +399,9 @@ const ConversationSidebar = ({
 //  Message Bubble
 // ─────────────────────────────────────────────────────────────────────────────
 const MessageBubble = ({
-  message, isOwn, currentUserId, onReply, onEdit, onDelete, onReact
+  message, isOwn, currentUserId, onReply, onEdit, onDelete, onReact, compact = false
 }: {
+  compact?: boolean;
   message: ChatMessage;
   isOwn: boolean;
   currentUserId: number;
@@ -426,7 +449,7 @@ const MessageBubble = ({
           </div>
         </div>
       )}
-      <div className={`relative max-w-[78%] sm:max-w-md xl:max-w-lg ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
+      <div className={`relative ${compact ? 'max-w-[82%]' : 'max-w-[78%] sm:max-w-md xl:max-w-lg'} ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
         {!isOwn && <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1 px-1">{message.senderName}</p>}
 
         {message.replyTo && (
@@ -532,8 +555,9 @@ const MessageBubble = ({
 //  Group Info Panel
 // ─────────────────────────────────────────────────────────────────────────────
 const GroupInfoPanel = ({
-  detail, currentUserId, onClose, onLeave, onAddMembers, onRemoveMember
+  detail, currentUserId, onClose, onLeave, onAddMembers, onRemoveMember, overlay = false
 }: {
+  overlay?: boolean;
   detail: ConversationDetail;
   currentUserId: number;
   onClose: () => void;
@@ -543,7 +567,7 @@ const GroupInfoPanel = ({
 }) => {
   const isAdmin = detail.myRole === 'Admin';
   return (
-    <div className="w-72 flex-shrink-0 bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 flex flex-col">
+    <div className={`${overlay ? 'absolute inset-0 z-10' : 'w-72 flex-shrink-0 border-l border-slate-200 dark:border-slate-800'} bg-white dark:bg-slate-950 flex flex-col`}>
       <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200 dark:border-slate-800">
         <p className="text-sm font-bold text-slate-900 dark:text-white">Group Info</p>
         <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Close group info">
@@ -608,8 +632,9 @@ const GroupInfoPanel = ({
 //  Message Input Bar
 // ─────────────────────────────────────────────────────────────────────────────
 const MessageInput = ({
-  onSend, onTyping, onStopTyping, replyTo, onCancelReply, editingMessage, onCancelEdit, disabled = false
+  onSend, onTyping, onStopTyping, replyTo, onCancelReply, editingMessage, onCancelEdit, disabled = false, compact = false
 }: {
+  compact?: boolean;
   onSend: (content: string, replyToId?: number) => void;
   onTyping: () => void;
   onStopTyping: () => void;
@@ -701,7 +726,7 @@ const MessageInput = ({
           {editingMessage ? <Check className="w-5 h-5" /> : <SendHorizontal className="w-5 h-5" />}
         </button>
       </div>
-      <p className="hidden sm:block text-[11px] text-slate-400 dark:text-slate-600 mt-1.5 text-center">
+      <p className={`${compact ? 'hidden' : 'hidden sm:block'} text-[11px] text-slate-400 dark:text-slate-600 mt-1.5 text-center`}>
         Enter to send · Shift+Enter for new line · Esc to cancel
       </p>
     </div>
@@ -719,6 +744,8 @@ const ConversationView = ({
   setMessages,
   typingUsers,
   onBack,
+  compact = false,
+  headerActions,
 }: {
   conversationId: number;
   currentUserId: number;
@@ -726,6 +753,9 @@ const ConversationView = ({
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   typingUsers: Set<number>;
   onBack: () => void;
+  /** Single-column layout for the floating chat panel */
+  compact?: boolean;
+  headerActions?: ReactNode;
 }) => {
   const qc = useQueryClient();
   const { confirm } = useConfirm();
@@ -734,10 +764,11 @@ const ConversationView = ({
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showAddMembers, setShowAddMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  const { sendTyping, stopTyping, markRead } = useChatHubActions();
+  const { sendTyping, stopTyping, isOnline } = useChat();
 
   const { data: detail } = useQuery<ConversationDetail>({
     queryKey: ['convDetail', conversationId],
@@ -752,12 +783,6 @@ const ConversationView = ({
       setMessages(msgs);
       setHasMore(msgs.length === 50);
     });
-    markRead(conversationId);
-    qc.setQueryData(['conversations'], (old: any) =>
-      old?.map((c: any) =>
-        c.id === conversationId ? { ...c, unreadCount: 0 } : c
-      )
-    );
     setReplyTo(null);
     setEditingMessage(null);
     setShowGroupInfo(false);
@@ -804,11 +829,8 @@ const ConversationView = ({
             unreadCount: 0,
           };
         });
-        return [...updated].sort((a, b) => {
-          const ta = a.lastMessageAt ? parseUtcDate(a.lastMessageAt).getTime() : 0;
-          const tb = b.lastMessageAt ? parseUtcDate(b.lastMessageAt).getTime() : 0;
-          return tb - ta;
-        });
+        return [...updated].sort((a, b) =>
+          parseUtcDate(b.lastMessageAt).getTime() - parseUtcDate(a.lastMessageAt).getTime());
       });
     },
   });
@@ -875,30 +897,44 @@ const ConversationView = ({
       .then(() => qc.invalidateQueries({ queryKey: ['convDetail', conversationId] }));
   };
 
+  const addMembersMutation = useMutation({
+    mutationFn: (userIds: number[]) => chatApi.addMembers(conversationId, userIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['convDetail', conversationId] }),
+  });
+
   const isGroup = detail?.type === 'Group';
+  const otherMember = detail?.members.find(m => m.userId !== currentUserId);
+  const otherOnline = !isGroup && isOnline(otherMember?.userId);
   const conversationTitle = isGroup
     ? detail?.groupName ?? 'Group Chat'
-    : detail?.members.find(m => m.userId !== currentUserId)?.fullName ?? '';
+    : otherMember?.fullName ?? '';
 
   const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <div className="flex flex-1 min-w-0 h-full">
+    <div className="relative flex flex-1 min-w-0 h-full">
       <div className="flex flex-col flex-1 min-w-0 h-full">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex-shrink-0">
           <button
             onClick={onBack}
-            className="md:hidden p-1.5 -ml-1 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className={`${compact ? '' : 'md:hidden'} p-1.5 -ml-1 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition`}
             aria-label="Back to conversations"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Avatar name={conversationTitle || '?'} isGroup={isGroup} size="md" />
+          <div className="relative flex-shrink-0">
+            <Avatar name={conversationTitle || '?'} isGroup={isGroup} size="md" />
+            {!isGroup && (
+              <div className="absolute -bottom-0.5 -right-0.5">
+                <OnlineDot status={otherOnline ? 'Online' : 'Offline'} />
+              </div>
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{conversationTitle}</p>
-            <p className={`text-xs ${typingUsers.size > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
-              {typingUsers.size > 0 ? 'Typing…' : isGroup ? `${detail?.members.length ?? '?'} members` : 'Direct message'}
+            <p className={`text-xs ${typingUsers.size > 0 || otherOnline ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
+              {typingUsers.size > 0 ? 'Typing…' : isGroup ? `${detail?.members.length ?? '?'} members` : otherOnline ? 'Online' : 'Offline'}
             </p>
           </div>
           {isGroup && (
@@ -914,12 +950,13 @@ const ConversationView = ({
               <Users className="w-4 h-4" />
             </button>
           )}
+          {headerActions}
         </div>
 
         {/* Messages */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900/40"
+          className={`flex-1 overflow-y-auto ${compact ? 'px-3' : 'px-3 sm:px-6'} py-4 bg-slate-50 dark:bg-slate-900/40`}
           onScroll={e => { if ((e.target as HTMLDivElement).scrollTop < 100) loadMore(); }}
         >
           {loadingMore && (
@@ -955,6 +992,7 @@ const ConversationView = ({
                   onEdit={setEditingMessage}
                   onDelete={handleDelete}
                   onReact={(id, emoji) => reactMutation.mutate({ id, emoji })}
+                  compact={compact}
                 />
               ))}
             </div>
@@ -981,6 +1019,7 @@ const ConversationView = ({
           onCancelReply={() => setReplyTo(null)}
           editingMessage={editingMessage}
           onCancelEdit={() => setEditingMessage(null)}
+          compact={compact}
         />
       </div>
 
@@ -991,8 +1030,18 @@ const ConversationView = ({
           currentUserId={currentUserId}
           onClose={() => setShowGroupInfo(false)}
           onLeave={handleLeave}
-          onAddMembers={() => { /* TODO: open add members modal */ }}
+          onAddMembers={() => setShowAddMembers(true)}
           onRemoveMember={handleRemoveMember}
+          overlay={compact}
+        />
+      )}
+
+      {showAddMembers && detail && (
+        <NewChatModal
+          mode="add"
+          excludeIds={detail.members.map(m => m.userId)}
+          onClose={() => setShowAddMembers(false)}
+          onAddMembers={ids => addMembersMutation.mutate(ids)}
         />
       )}
     </div>
@@ -1000,32 +1049,30 @@ const ConversationView = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  ChatHubActionsContext
-//  Lets ConversationView call sendTyping/stopTyping/markRead
-//  without having its own useChatHub connection.
+//  ChatWorkspace — conversation list + open conversation
+//  variant 'page' → full /chat page (two columns on desktop)
+//  variant 'dock' → floating chat panel (always single column)
+//  Real-time events come from the app-wide ChatContext connection.
 // ─────────────────────────────────────────────────────────────────────────────
-interface ChatHubActions {
-  sendTyping: (conversationId: number) => void;
-  stopTyping: (conversationId: number) => void;
-  markRead: (conversationId: number) => void;
-}
-
-const ChatHubActionsContext = createContext<ChatHubActions>({
-  sendTyping: () => {},
-  stopTyping: () => {},
-  markRead: () => {},
-});
-
-const useChatHubActions = () => useContext(ChatHubActionsContext);
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  MAIN CHAT PAGE — the single source of truth
-//  ✅ useChatHub is called ONCE here only.
-//  ✅ messages + typingUsers state live here.
-// ─────────────────────────────────────────────────────────────────────────────
-export const ChatPage = () => {
+export const ChatWorkspace = ({
+  variant = 'page',
+  initialConversationId = null,
+  onConversationChange,
+  headerActions,
+}: {
+  variant?: 'page' | 'dock';
+  initialConversationId?: number | null;
+  onConversationChange?: (id: number | null) => void;
+  /** Extra header buttons (expand / close) for the dock */
+  headerActions?: ReactNode;
+}) => {
   const qc = useQueryClient();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? 0;
+  const { conversations, conversationsLoading: isLoading, setActiveConversation } = useChat();
+  const compact = variant === 'dock';
+
+  const [selectedId, setSelectedId] = useState<number | null>(initialConversationId);
   const [showNewChat, setShowNewChat] = useState(false);
 
   // messages keyed by conversationId so switching convs is instant
@@ -1042,62 +1089,36 @@ export const ChatPage = () => {
       });
     };
 
-  const { data: currentUser } = useQuery({
-    queryKey: ['me'],
-    queryFn: authApi.me,
-  });
-  const currentUserId = currentUser?.id ?? 0;
+  useEffect(() => { setSelectedId(initialConversationId); }, [initialConversationId]);
 
-  const { data: conversations = [], isLoading } = useQuery<ConversationSummary[]>({
-    queryKey: ['conversations'],
-    queryFn: chatApi.getConversations,
-    refetchInterval: 30000,
-  });
+  // The open conversation is "active": its messages never count as unread
+  useEffect(() => {
+    setActiveConversation(selectedId);
+    setTypingUsers(new Set());
+    onConversationChange?.(selectedId);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Single SignalR connection for the entire ChatPage ───────────────────
-  const { sendTyping, stopTyping, markRead, joinConversation } = useChatHub({
+  useEffect(() => () => setActiveConversation(null), [setActiveConversation]);
 
-    // De-duplicates by id (sendMutation.onSuccess may have added it already)
+  useChatHub({
+    // Unread counts / previews are handled centrally in ChatContext;
+    // here we only keep the loaded message lists in sync.
     onMessage: (msg) => {
       setMessagesMap(prev => {
-        const current = prev[msg.conversationId] ?? [];
-        if (current.some(m => m.id === msg.id)) return prev;
+        const current = prev[msg.conversationId];
+        if (!current || current.some(m => m.id === msg.id)) return prev;
         return { ...prev, [msg.conversationId]: [...current, msg] };
       });
-
-      // Patch the conversations cache directly instead of invalidating it.
-      // A refetch would replace sidebar <button> nodes mid-click and swallow
-      // the click. Only brand-new conversations need a full refetch.
-      const cachedConvs = qc.getQueryData<ConversationSummary[]>(['conversations']);
-      const existsInCache = cachedConvs?.some(c => c.id === msg.conversationId);
-
-      if (existsInCache) {
-        qc.setQueryData<ConversationSummary[]>(['conversations'], (old) => {
-          if (!old) return old;
-          const updated = old.map(c => {
-            if (c.id !== msg.conversationId) return c;
-            return {
-              ...c,
-              lastMessageAt: msg.sentAt,
-              lastMessagePreview: msg.isDeleted ? 'This message was deleted.' : (msg.content ?? ''),
-              // Don't increment unread badge if this conversation is currently open
-              unreadCount: selectedId === msg.conversationId ? c.unreadCount : c.unreadCount + 1,
-            };
-          });
-          return [...updated].sort((a, b) => {
-            const ta = a.lastMessageAt ? parseUtcDate(a.lastMessageAt).getTime() : 0;
-            const tb = b.lastMessageAt ? parseUtcDate(b.lastMessageAt).getTime() : 0;
-            return tb - ta;
-          });
-        });
-      } else {
-        qc.invalidateQueries({ queryKey: ['conversations'] });
-      }
+      setTypingUsers(prev => {
+        if (!prev.has(msg.senderId)) return prev;
+        const s = new Set(prev); s.delete(msg.senderId); return s;
+      });
     },
 
     onMessageEdited: (msg) => {
       setMessagesMap(prev => {
-        const current = prev[msg.conversationId] ?? [];
+        const current = prev[msg.conversationId];
+        if (!current) return prev;
         return { ...prev, [msg.conversationId]: current.map(m => m.id === msg.id ? msg : m) };
       });
     },
@@ -1130,22 +1151,20 @@ export const ChatPage = () => {
       });
     },
 
+    // Read receipts (✓✓): the reader has seen everything they didn't send
     onConversationRead: ({ conversationId: cid, userId }) => {
       setMessagesMap(prev => {
-        const current = prev[cid] ?? [];
+        const current = prev[cid];
+        if (!current) return prev;
         return {
           ...prev,
-          [cid]: current.map(m => ({
-            ...m,
-            readByUserIds: m.readByUserIds.includes(userId)
-              ? m.readByUserIds
-              : [...m.readByUserIds, userId]
-          }))
+          [cid]: current.map(m =>
+            m.senderId === userId || m.readByUserIds.includes(userId)
+              ? m
+              : { ...m, readByUserIds: [...m.readByUserIds, userId] }
+          ),
         };
       });
-      qc.setQueryData(['conversations'], (old: any) =>
-        old?.map((c: any) => c.id === cid ? { ...c, unreadCount: 0 } : c)
-      );
     },
 
     onUserTyping: ({ conversationId: cid, userId }) => {
@@ -1163,23 +1182,10 @@ export const ChatPage = () => {
       }
     },
 
-    onAddedToGroup: () => {
-      qc.invalidateQueries({ queryKey: ['conversations'] });
-    },
-
     onRemovedFromGroup: (data) => {
       if (data.conversationId === selectedId) setSelectedId(null);
-      qc.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
-
-  // When user selects a conversation, join its SignalR group
-  useEffect(() => {
-    if (selectedId) {
-      joinConversation(selectedId);
-      setTypingUsers(new Set());
-    }
-  }, [selectedId]);
 
   const openDirectMutation = useMutation({
     mutationFn: chatApi.openDirect,
@@ -1198,70 +1204,98 @@ export const ChatPage = () => {
     },
   });
 
-  const hubActions: ChatHubActions = { sendTyping, stopTyping, markRead };
+  // page: list + conversation side by side from md up; dock: one at a time
+  const listCls = compact
+    ? `${selectedId ? 'hidden' : 'flex'} w-full`
+    : `${selectedId ? 'hidden md:flex' : 'flex'} w-full md:w-80`;
+  const mainCls = compact
+    ? `${selectedId ? 'flex' : 'hidden'}`
+    : `${selectedId ? 'flex' : 'hidden md:flex'}`;
 
   return (
-    <ChatHubActionsContext.Provider value={hubActions}>
-      <div className="flex h-full bg-white dark:bg-slate-950">
-        {/* Sidebar */}
-        <div className={`w-full md:w-80 flex-shrink-0 ${selectedId ? 'hidden md:flex' : 'flex'} flex-col h-full`}>
-          {isLoading ? (
-            <div className="p-4 space-y-3 border-r border-slate-200 dark:border-slate-800 h-full">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800/60 rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <ConversationSidebar
-              conversations={conversations}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onNewChat={() => setShowNewChat(true)}
-            />
-          )}
-        </div>
-
-        {/* Main area */}
-        <div className={`flex-1 min-w-0 ${!selectedId ? 'hidden md:flex' : 'flex'} h-full`}>
-          {selectedId ? (
-            <ConversationView
-              key={selectedId}
-              conversationId={selectedId}
-              currentUserId={currentUserId}
-              messages={getMessages(selectedId)}
-              setMessages={setMessages(selectedId)}
-              typingUsers={typingUsers}
-              onBack={() => setSelectedId(null)}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-900/40 p-6">
-              <div className="text-center max-w-sm">
-                <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
-                  <MessagesSquare className="w-10 h-10" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-5">Your Messages</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                  Select a conversation from the sidebar or start a new one.
-                </p>
-                <button
-                  onClick={() => setShowNewChat(true)}
-                  className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-500/20 transition"
-                >
-                  <Plus className="w-4 h-4" /> Start a New Chat
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {showNewChat && (
-          <NewChatModal
-            onClose={() => setShowNewChat(false)}
-            onOpenDirect={uid => openDirectMutation.mutate(uid)}
-            onCreateGroup={(name, members) => createGroupMutation.mutate({ name, members })}
+    <div className="flex h-full min-h-0 bg-white dark:bg-slate-950">
+      {/* Conversation list */}
+      <div className={`${listCls} flex-shrink-0 flex-col h-full`}>
+        {isLoading ? (
+          <div className="p-4 space-y-3 border-r border-slate-200 dark:border-slate-800 h-full w-full">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-16 bg-slate-100 dark:bg-slate-800/60 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <ConversationSidebar
+            conversations={conversations}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onNewChat={() => setShowNewChat(true)}
+            headerActions={headerActions}
+            compact={compact}
           />
         )}
       </div>
-    </ChatHubActionsContext.Provider>
+
+      {/* Open conversation */}
+      <div className={`flex-1 min-w-0 ${mainCls} h-full`}>
+        {selectedId ? (
+          <ConversationView
+            key={selectedId}
+            conversationId={selectedId}
+            currentUserId={currentUserId}
+            messages={getMessages(selectedId)}
+            setMessages={setMessages(selectedId)}
+            typingUsers={typingUsers}
+            onBack={() => setSelectedId(null)}
+            compact={compact}
+            headerActions={headerActions}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-slate-50 dark:bg-slate-900/40 p-6">
+            <div className="text-center max-w-sm">
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                <MessagesSquare className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-5">Your Messages</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                Select a conversation from the sidebar or start a new one.
+              </p>
+              <button
+                onClick={() => setShowNewChat(true)}
+                className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-500/20 transition"
+              >
+                <Plus className="w-4 h-4" /> Start a New Chat
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showNewChat && (
+        <NewChatModal
+          onClose={() => setShowNewChat(false)}
+          onOpenDirect={uid => openDirectMutation.mutate(uid)}
+          onCreateGroup={(name, members) => createGroupMutation.mutate({ name, members })}
+        />
+      )}
+    </div>
   );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  /chat page — the open conversation is kept in the URL (?c=12) so the
+//  chat panel's "expand" button and page refreshes land on the same chat.
+// ─────────────────────────────────────────────────────────────────────────────
+export const ChatPage = () => {
+  const [params, setParams] = useSearchParams();
+  const fromUrl = Number(params.get('c'));
+  const [initialId] = useState<number | null>(Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : null);
+
+  const syncUrl = useCallback((id: number | null) => {
+    setParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (id) next.set('c', String(id)); else next.delete('c');
+      return next;
+    }, { replace: true });
+  }, [setParams]);
+
+  return <ChatWorkspace variant="page" initialConversationId={initialId} onConversationChange={syncUrl} />;
 };

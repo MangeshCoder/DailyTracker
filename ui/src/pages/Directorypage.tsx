@@ -4,9 +4,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { profileApi } from '../services/api';
+import { chatApi, profileApi } from '../services/api';
+import { useAuth } from '../context/Authcontext';
+import { useChat } from '../context/ChatContext';
 import type { DirectoryUser } from '../types';
 import { UserAvatar, RoleBadge } from './ProfilePage';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -56,6 +58,26 @@ interface EmployeeModalProps {
 
 const EmployeeModal: React.FC<EmployeeModalProps> = ({ userId, onClose }) => {
   const navigate = useNavigate();
+  const { user: me } = useAuth();
+  const { openDock } = useChat();
+  const qc = useQueryClient();
+  const [openingChat, setOpeningChat] = useState(false);
+
+  // Open (or create) the DM with this person in the chat panel
+  const startChat = async () => {
+    setOpeningChat(true);
+    try {
+      const conv = await chatApi.openDirect(userId);
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      onClose();
+      openDock(conv.id);
+    } catch {
+      onClose();
+      navigate('/chat');
+    } finally {
+      setOpeningChat(false);
+    }
+  };
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['employeeProfile', userId],
@@ -236,16 +258,14 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ userId, onClose }) => {
                 <span>Send Email</span>
               </a>
 
-              <button
-                onClick={() => {
-                  onClose();
-                  navigate('/chat');
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition flex items-center justify-center gap-2"
+              {me?.id !== userId && <button
+                onClick={startChat}
+                disabled={openingChat}
+                className="flex-1 disabled:opacity-60 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition flex items-center justify-center gap-2"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Direct Message</span>
-              </button>
+                <span>{openingChat ? 'Opening…' : 'Direct Message'}</span>
+              </button>}
             </div>
           </>
         ) : (

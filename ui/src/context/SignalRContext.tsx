@@ -35,7 +35,7 @@ const SignalRContext = createContext<SignalRContextType>({
 // ── Derive hub base URL from the same VITE_API_URL used in api.ts ────────────
 // VITE_API_URL = 'http://192.168.1.244:5053/api'  →  hubBase = 'http://192.168.1.244:5053'
 // VITE_API_URL not set (desktop)                  →  hubBase = 'https://localhost:7096'
-function getHubBaseUrl(): string {
+export function getHubBaseUrl(): string {
   const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
   if (apiUrl) {
     // Strip the trailing /api to get the server root

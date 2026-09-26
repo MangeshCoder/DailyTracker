@@ -12,8 +12,10 @@ import { SkeletonDashboard } from '../Skeleton';
 import { announcementsApi, notifApi } from '../../services/api';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { ChatProvider } from '../../context/ChatContext';
+import { ChatDock } from '../chat/ChatDock';
 
-export const Layout = () => {
+const LayoutShell = () => {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -84,7 +86,6 @@ export const Layout = () => {
         { to: '/', label: 'Dashboard', icon: '🏠', exact: true },
         { to: '/analytics', label: 'Analytics', icon: '📊' },
         { to: '/history', label: 'History', icon: '📅' },
-        { to: '/chat', label: 'Messages', icon: '💬' },
         { to: '/kudos', label: 'Kudos', icon: '🏆' },
         { to: '/face-setup', label: 'Face Setup', icon: '📷' },
         { to: '/announcements', label: 'Announcements', icon: '📢', badge: announcementUnread },
@@ -713,3 +714,11 @@ export const Layout = () => {
     </div>
   );
 };
+
+// Chat lives app-wide: one connection + the floating chat bubble / panel
+export const Layout = () => (
+  <ChatProvider>
+    <LayoutShell />
+    <ChatDock />
+  </ChatProvider>
+);

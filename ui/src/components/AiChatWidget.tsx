@@ -44,6 +44,7 @@ import {
 import type { Message, MessageHistory, SuggestedAction } from "../types/chat";
 import { aiChatApi, dailyLogApi } from "../services/api";
 import { useToast } from "../context/ToastContext";
+import { AI_WIDGET_EVENT, CHAT_DOCK_EVENT } from "../context/ChatContext";
 import { FaceVerifyModal } from "./FaceVerifyModal";
 import { useGeolocation } from "../context/useGeolocation";
 import type { FaceVerifyResult } from "../hooks/useFaceRecognition";
@@ -762,6 +763,7 @@ export const AiChatWidget = () => {
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [chatDockOpen, setChatDockOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -807,7 +809,20 @@ export const AiChatWidget = () => {
       fetchSummary();
       inputRef.current?.focus();
     }
+    // Tell the chat bubble so the two panels never overlap
+    window.dispatchEvent(new CustomEvent(AI_WIDGET_EVENT, { detail: isOpen }));
   }, [isOpen]);
+
+  // Hide (and close) the assistant while the chat panel is open
+  useEffect(() => {
+    const onChatDock = (e: Event) => {
+      const open = !!(e as CustomEvent<boolean>).detail;
+      setChatDockOpen(open);
+      if (open) setIsOpen(false);
+    };
+    window.addEventListener(CHAT_DOCK_EVENT, onChatDock);
+    return () => window.removeEventListener(CHAT_DOCK_EVENT, onChatDock);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1180,10 +1195,10 @@ export const AiChatWidget = () => {
   return (
     <>
       {/* Floating Trigger Button */}
-      {!isOpen && (
+      {!isOpen && !chatDockOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2"
+          className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2"
           aria-label="Open AI Assistant"
         >
           <Sparkles size={18} />
