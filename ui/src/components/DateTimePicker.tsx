@@ -1,10 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  frontend/src/components/DateTimePicker.tsx
-//  ACTION: REPLACE (same portal fix as DatePicker)
+//  FILE: ui/src/components/DateTimePicker.tsx
+//  Date + time picker — light/dark theme upgrade
+//
+//  Unchanged behaviour: portal popup (same fix as DatePicker), Date / Time
+//  tabs, 5-minute steps, Today / Clear, Confirm → 'YYYY-MM-DDTHH:mm'.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { CalendarClock, CalendarDays, Clock, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 interface DateTimePickerProps {
   value:        string;
@@ -20,6 +24,11 @@ const MONTHS     = ['January','February','March','April','May','June','July','Au
 const DAYS_SHORT = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 const HOURS      = Array.from({ length: 24 }, (_, i) => String(i).padStart(2,'0'));
 const MINUTES    = Array.from({ length: 12 }, (_, i) => String(i*5).padStart(2,'0'));
+
+const NAV_BTN =
+  'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white ' +
+  'hover:bg-slate-100 dark:hover:bg-slate-800 transition';
+const HOVER_CELL = 'hover:bg-slate-100 dark:hover:bg-slate-800';
 
 function toYMD(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -43,7 +52,7 @@ function buildValue(datePart: string, timePart: string) {
 }
 
 export function DateTimePicker({
-  value, onChange, min, max,
+  value, onChange,
   placeholder = 'Select date & time',
   className = '', disabled = false,
 }: DateTimePickerProps) {
@@ -145,18 +154,27 @@ export function DateTimePicker({
     setTab('time');
   };
 
+  const listBtn = (active: boolean) =>
+    `w-full py-2 text-sm font-semibold transition rounded-lg ${
+      active ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+    }`;
+
   const popup = open && (
     <div ref={popupRef} style={popupStyle}
-      className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/50 p-4 select-none">
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/10 dark:shadow-black/50 p-4 select-none">
 
       {/* Date / Time tabs */}
-      <div className="flex gap-1 mb-3 bg-slate-800 rounded-xl p-1">
+      <div className="grid grid-cols-2 gap-1 mb-3 p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
         {(['date','time'] as const).map(t => (
           <button key={t} type="button" onClick={() => setTab(t)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${tab===t?'bg-blue-600 text-white':'text-slate-400 hover:text-white'}`}>
-            {t==='date'?'📅 Date':'🕐 Time'}
-            {t==='date' && selDate && <span className="ml-1 opacity-70">{selDate.slice(8)}/{selDate.slice(5,7)}</span>}
-            {t==='time' && <span className="ml-1 opacity-70">{selHour}:{selMin}</span>}
+            className={`inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+              tab===t
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+            {t==='date' ? <CalendarDays className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+            {t==='date' ? 'Date' : 'Time'}
+            {t==='date' && selDate && <span className="opacity-70">{selDate.slice(8)}/{selDate.slice(5,7)}</span>}
+            {t==='time' && <span className="opacity-70">{selHour}:{selMin}</span>}
           </button>
         ))}
       </div>
@@ -165,26 +183,32 @@ export function DateTimePicker({
       {tab==='date' && (showYearGrid ? (
         <>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={()=>setViewYear(y=>y-12)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">‹</button>
-            <span className="text-white text-sm font-semibold">{yearRange[0]} – {yearRange[11]}</span>
-            <button onClick={()=>setViewYear(y=>y+12)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">›</button>
+            <button type="button" onClick={()=>setViewYear(y=>y-12)} className={NAV_BTN} aria-label="Previous years"><ChevronLeft className="w-4 h-4" /></button>
+            <span className="text-sm font-bold text-slate-900 dark:text-white">{yearRange[0]} – {yearRange[11]}</span>
+            <button type="button" onClick={()=>setViewYear(y=>y+12)} className={NAV_BTN} aria-label="Next years"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-4 gap-1">
             {yearRange.map(y=>(
-              <button key={y} onClick={()=>{setViewYear(y);setShowYearGrid(false);}}
-                className={`py-2 rounded-lg text-xs font-medium transition ${y===viewYear?'bg-blue-600 text-white':y===new Date().getFullYear()?'text-blue-400 hover:bg-slate-800':'text-slate-300 hover:bg-slate-800'}`}>{y}</button>
+              <button key={y} type="button" onClick={()=>{setViewYear(y);setShowYearGrid(false);}}
+                className={`py-2 rounded-lg text-xs font-semibold transition ${
+                  y===viewYear ? 'bg-blue-600 text-white'
+                  : y===new Date().getFullYear() ? `text-blue-600 dark:text-blue-400 ${HOVER_CELL}`
+                  : `text-slate-700 dark:text-slate-300 ${HOVER_CELL}`}`}>{y}</button>
             ))}
           </div>
         </>
       ) : (
         <>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={prevMonth} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">‹</button>
-            <button onClick={()=>setShowYearGrid(true)} className="text-white text-sm font-semibold hover:text-blue-400 transition px-2 py-1 rounded-lg hover:bg-slate-800">{MONTHS[viewMonth]} {viewYear}</button>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">›</button>
+            <button type="button" onClick={prevMonth} className={NAV_BTN} aria-label="Previous month"><ChevronLeft className="w-4 h-4" /></button>
+            <button type="button" onClick={()=>setShowYearGrid(true)}
+              className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+              {MONTHS[viewMonth]} {viewYear}
+            </button>
+            <button type="button" onClick={nextMonth} className={NAV_BTN} aria-label="Next month"><ChevronRight className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-7 mb-1">
-            {DAYS_SHORT.map(d=><div key={d} className="text-center text-[11px] font-medium text-slate-500 py-1">{d}</div>)}
+            {DAYS_SHORT.map(d=><div key={d} className="text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 py-1">{d}</div>)}
           </div>
           <div className="grid grid-cols-7 gap-0.5">
             {cells.map((day,i)=>{
@@ -193,12 +217,20 @@ export function DateTimePicker({
               const isSel=ymd===selDate, isToday=ymd===today;
               const isWknd=[0,6].includes(new Date(viewYear,viewMonth,day).getDay());
               return <button key={day} type="button" onClick={()=>pickDay(day)}
-                className={`aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition ${isSel?'bg-blue-600 text-white':isToday?'ring-1 ring-blue-500 text-blue-400 hover:bg-slate-800':isWknd?'text-slate-500 hover:bg-slate-800':'text-slate-200 hover:bg-slate-800'}`}>{day}</button>;
+                className={`aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition ${
+                  isSel ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                  : isToday ? `ring-1 ring-blue-500 text-blue-600 dark:text-blue-400 font-bold ${HOVER_CELL}`
+                  : isWknd ? `text-slate-400 dark:text-slate-500 ${HOVER_CELL}`
+                  : `text-slate-700 dark:text-slate-200 ${HOVER_CELL}`}`}>{day}</button>;
             })}
           </div>
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800">
-            <button type="button" onClick={()=>{setSelDate(today);setTab('time');}} className="text-xs text-blue-400 hover:text-blue-300 transition font-medium">Today</button>
-            {selDate && <button type="button" onClick={()=>{onChange('');setSelDate('');setOpen(false);}} className="text-xs text-slate-500 hover:text-slate-300 transition">Clear</button>}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button type="button" onClick={()=>{setSelDate(today);setTab('time');}}
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition">Today</button>
+            {selDate && (
+              <button type="button" onClick={()=>{onChange('');setSelDate('');setOpen(false);}}
+                className="text-xs font-medium text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition">Clear</button>
+            )}
           </div>
         </>
       ))}
@@ -208,34 +240,33 @@ export function DateTimePicker({
         <>
           <div className="flex gap-2">
             <div className="flex-1">
-              <p className="text-[10px] text-slate-500 font-medium text-center mb-1">HOUR</p>
-              <div ref={hourRef} className="h-48 overflow-y-auto rounded-xl bg-slate-800/50">
+              <p className="text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 text-center mb-1">HOUR</p>
+              <div ref={hourRef} className="h-48 overflow-y-auto rounded-xl p-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 {HOURS.map(h=>(
-                  <button key={h} type="button" data-selected={h===selHour||undefined} onClick={()=>setSelHour(h)}
-                    className={`w-full py-2 text-sm font-medium transition rounded-lg ${h===selHour?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-700'}`}>{h}</button>
+                  <button key={h} type="button" data-selected={h===selHour||undefined} onClick={()=>setSelHour(h)} className={listBtn(h===selHour)}>{h}</button>
                 ))}
               </div>
             </div>
             <div className="flex items-center text-slate-400 text-2xl font-thin pt-4">:</div>
             <div className="flex-1">
-              <p className="text-[10px] text-slate-500 font-medium text-center mb-1">MIN</p>
-              <div ref={minRef} className="h-48 overflow-y-auto rounded-xl bg-slate-800/50">
+              <p className="text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 text-center mb-1">MIN</p>
+              <div ref={minRef} className="h-48 overflow-y-auto rounded-xl p-1 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 {MINUTES.map(mn=>(
-                  <button key={mn} type="button" data-selected={mn===selMin||undefined} onClick={()=>setSelMin(mn)}
-                    className={`w-full py-2 text-sm font-medium transition rounded-lg ${mn===selMin?'bg-blue-600 text-white':'text-slate-300 hover:bg-slate-700'}`}>{mn}</button>
+                  <button key={mn} type="button" data-selected={mn===selMin||undefined} onClick={()=>setSelMin(mn)} className={listBtn(mn===selMin)}>{mn}</button>
                 ))}
               </div>
             </div>
           </div>
           <div className="mt-3 text-center text-sm">
-            <span className="text-white font-semibold">{selHour}:{selMin}</span>
-            {selDate && <span className="ml-2 text-slate-500 text-xs">on {new Date(selDate+'T00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>}
+            <span className="font-bold text-slate-900 dark:text-white">{selHour}:{selMin}</span>
+            {selDate && <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">on {new Date(selDate+'T00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>}
           </div>
         </>
       )}
 
       <button type="button" disabled={!selDate} onClick={confirmSel}
-        className="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition">
+        className="w-full mt-3 inline-flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+        {selDate && <Check className="w-4 h-4" />}
         {selDate ? `Confirm — ${formatDisplay(buildValue(selDate,`${selHour}:${selMin}`))}` : 'Select a date first'}
       </button>
     </div>
@@ -244,11 +275,13 @@ export function DateTimePicker({
   return (
     <div className="relative">
       <button ref={triggerRef} type="button" disabled={disabled} onClick={openPicker}
-        className={`w-full flex items-center justify-between gap-2 bg-slate-800 border border-slate-700 text-sm rounded-xl px-4 py-3 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ${open?'border-blue-500 ring-2 ring-blue-500/30':'hover:border-slate-600'} ${value?'text-white':'text-slate-500'} ${className}`}>
-        <span>{value ? formatDisplay(value) : placeholder}</span>
-        <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        className={`w-full flex items-center justify-between gap-2 bg-white dark:bg-slate-800/60 border text-sm rounded-xl px-3.5 py-2.5 transition focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed ${
+          open
+            ? 'border-blue-500 ring-2 ring-blue-500/30'
+            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+        } ${value ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'} ${className}`}>
+        <span className="truncate">{value ? formatDisplay(value) : placeholder}</span>
+        <CalendarClock className={`w-4 h-4 shrink-0 ${open ? 'text-blue-500' : 'text-slate-400'}`} />
       </button>
       {typeof document !== 'undefined' && createPortal(popup, document.body)}
     </div>

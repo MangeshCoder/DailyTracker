@@ -1,21 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  frontend/src/components/DatePicker.tsx
-//  ACTION: REPLACE (portal fix for overflow-y-auto modals)
+//  FILE: ui/src/components/DatePicker.tsx
+//  Date picker — light/dark theme upgrade
 //
-//  Root cause of the "half calendar" bug:
-//    The popup was `position: absolute` inside a scrollable modal div that has
-//    `overflow-y: auto`. CSS clips absolutely-positioned children that go
-//    outside an overflow container. So the calendar was rendered but clipped.
-//
-//  Fix:
-//    Render the popup via ReactDOM.createPortal() directly into document.body.
-//    Calculate the exact screen position using getBoundingClientRect() on the
-//    trigger button. No overflow container can clip a portal child.
-//    Automatically flips above the trigger if there's not enough space below.
+//  Unchanged behaviour:
+//  ✅ Popup rendered via createPortal into document.body (never clipped by
+//     overflow-y-auto modals), positioned with getBoundingClientRect and
+//     flipped above the trigger when there's no room below
+//  ✅ min / max, Today, Clear, year grid, Escape + outside-click to close
+//  ✅ value / onChange use 'YYYY-MM-DD'
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DatePickerProps {
   value:        string;
@@ -29,6 +26,11 @@ interface DatePickerProps {
 
 const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS_SHORT = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+
+const NAV_BTN =
+  'p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white ' +
+  'hover:bg-slate-100 dark:hover:bg-slate-800 transition';
+const HOVER_CELL = 'hover:bg-slate-100 dark:hover:bg-slate-800';
 
 function toYMD(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -68,8 +70,7 @@ export function DatePicker({
     if (d) { setViewYear(d.getFullYear()); setViewMonth(d.getMonth()); }
   }, [value]);
 
-  // Calculate popup position relative to trigger using getBoundingClientRect
-  // Flip above if not enough room below
+  // Position popup relative to trigger; flip above if not enough room below
   const calcPosition = useCallback(() => {
     if (!triggerRef.current) return;
     const rect       = triggerRef.current.getBoundingClientRect();
@@ -154,39 +155,47 @@ export function DatePicker({
     <div
       ref={popupRef}
       style={popupStyle}
-      className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/50 p-4 select-none"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/10 dark:shadow-black/50 p-4 select-none"
     >
       {showYearGrid ? (
         <>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={() => setViewYear(y=>y-12)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">‹</button>
-            <span className="text-white text-sm font-semibold">{yearRange[0]} – {yearRange[11]}</span>
-            <button onClick={() => setViewYear(y=>y+12)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">›</button>
+            <button type="button" onClick={() => setViewYear(y=>y-12)} className={NAV_BTN} aria-label="Previous years">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-bold text-slate-900 dark:text-white">{yearRange[0]} – {yearRange[11]}</span>
+            <button type="button" onClick={() => setViewYear(y=>y+12)} className={NAV_BTN} aria-label="Next years">
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
           <div className="grid grid-cols-4 gap-1">
             {yearRange.map(y => (
-              <button key={y} onClick={() => { setViewYear(y); setShowYearGrid(false); }}
-                className={`py-2 rounded-lg text-xs font-medium transition ${
+              <button key={y} type="button" onClick={() => { setViewYear(y); setShowYearGrid(false); }}
+                className={`py-2 rounded-lg text-xs font-semibold transition ${
                   y === viewYear ? 'bg-blue-600 text-white'
-                  : y === new Date().getFullYear() ? 'text-blue-400 hover:bg-slate-800'
-                  : 'text-slate-300 hover:bg-slate-800'}`}>{y}</button>
+                  : y === new Date().getFullYear() ? `text-blue-600 dark:text-blue-400 ${HOVER_CELL}`
+                  : `text-slate-700 dark:text-slate-300 ${HOVER_CELL}`}`}>{y}</button>
             ))}
           </div>
         </>
       ) : (
         <>
           <div className="flex items-center justify-between mb-3">
-            <button onClick={prevMonth} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">‹</button>
-            <button onClick={() => setShowYearGrid(true)}
-              className="text-white text-sm font-semibold hover:text-blue-400 transition px-2 py-1 rounded-lg hover:bg-slate-800">
+            <button type="button" onClick={prevMonth} className={NAV_BTN} aria-label="Previous month">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => setShowYearGrid(true)}
+              className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
               {MONTHS[viewMonth]} {viewYear}
             </button>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">›</button>
+            <button type="button" onClick={nextMonth} className={NAV_BTN} aria-label="Next month">
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="grid grid-cols-7 mb-1">
             {DAYS_SHORT.map(d => (
-              <div key={d} className="text-center text-[11px] font-medium text-slate-500 py-1">{d}</div>
+              <div key={d} className="text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 py-1">{d}</div>
             ))}
           </div>
 
@@ -201,21 +210,21 @@ export function DatePicker({
               return (
                 <button key={day} type="button" disabled={!!dis} onClick={() => selectDay(day)}
                   className={`aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition disabled:cursor-not-allowed ${
-                    isSel   ? 'bg-blue-600 text-white'
-                    : isToday ? 'ring-1 ring-blue-500 text-blue-400 hover:bg-slate-800'
-                    : dis     ? 'text-slate-700'
-                    : isWknd  ? 'text-slate-500 hover:bg-slate-800'
-                    : 'text-slate-200 hover:bg-slate-800'}`}>{day}</button>
+                    isSel     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                    : isToday ? `ring-1 ring-blue-500 text-blue-600 dark:text-blue-400 font-bold ${HOVER_CELL}`
+                    : dis     ? 'text-slate-300 dark:text-slate-700'
+                    : isWknd  ? `text-slate-400 dark:text-slate-500 ${HOVER_CELL}`
+                    : `text-slate-700 dark:text-slate-200 ${HOVER_CELL}`}`}>{day}</button>
               );
             })}
           </div>
 
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button type="button" onClick={() => { if (!(min && today < min) && !(max && today > max)) { onChange(today); setOpen(false); } }}
-              className="text-xs text-blue-400 hover:text-blue-300 transition font-medium">Today</button>
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition">Today</button>
             {value && (
               <button type="button" onClick={() => { onChange(''); setOpen(false); }}
-                className="text-xs text-slate-500 hover:text-slate-300 transition">Clear</button>
+                className="text-xs font-medium text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition">Clear</button>
             )}
           </div>
         </>
@@ -232,19 +241,18 @@ export function DatePicker({
         onClick={openPicker}
         className={`
           w-full flex items-center justify-between gap-2
-          bg-slate-800 border border-slate-700 text-sm rounded-xl px-4 py-3
-          transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+          bg-white dark:bg-slate-800/60 border text-sm rounded-xl px-3.5 py-2.5
+          transition focus:outline-none focus:ring-2 focus:ring-blue-500/40
           disabled:opacity-50 disabled:cursor-not-allowed
-          ${open ? 'border-blue-500 ring-2 ring-blue-500/30' : 'hover:border-slate-600'}
-          ${value ? 'text-white' : 'text-slate-500'}
+          ${open
+            ? 'border-blue-500 ring-2 ring-blue-500/30'
+            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}
+          ${value ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}
           ${className}
         `}
       >
-        <span>{value ? formatDisplay(value) : placeholder}</span>
-        <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        <span className="truncate">{value ? formatDisplay(value) : placeholder}</span>
+        <CalendarDays className={`w-4 h-4 shrink-0 ${open ? 'text-blue-500' : 'text-slate-400'}`} />
       </button>
 
       {/* Portal — renders outside any overflow container directly into body */}

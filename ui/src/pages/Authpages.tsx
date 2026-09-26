@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE: ui/src/pages/Authpages.tsx
+//  Login + Register
+//
+//  Design from the 24-Sep login redesign is kept as-is. Changes:
+//  ✅ Light mode added (dark stays the same) + sun/moon toggle top-right
+//  ✅ Showcase copy now describes real features only (no SOC 2 / SLA / TLS claims)
+//  ✅ "Quick Autofill Test Accounts" shows in development builds only
+//  Logic unchanged: password login, email OTP login, TOTP 2FA step,
+//  trusted device, register with email OTP.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -8,8 +20,6 @@ import {
   EyeOff,
   ArrowRight,
   Sparkles,
-  Clock,
-  Users,
   CheckCircle2,
   KeyRound,
   Fingerprint,
@@ -17,38 +27,49 @@ import {
   CalendarCheck,
   AlertCircle,
   RefreshCw,
-  HelpCircle,
   ChevronRight,
   Shield,
   UserCheck,
-  Building2
+  Building2,
+  MessagesSquare,
+  Bot,
 } from 'lucide-react';
 import { authApi, getDeviceToken } from '../services/api';
 import { useAuth } from '../context/Authcontext';
+import { AUTH, AuthBackground, AuthThemeToggle } from '../components/auth/authTheme';
+
+// Demo autofill is a local-testing convenience — never shown in production builds
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
 
 // Showcase features displayed on the split-screen banner
 const SHOWCASE_FEATURES = [
   {
     icon: Fingerprint,
-    title: 'Biometric & Geo Attendance',
-    tagline: 'Precision Check-Ins',
-    desc: 'Facial verification with GPS geofencing ensures transparent, tamper-free workforce timesheets.',
-    badge: 'Hardware & WebRTC Ready'
+    title: 'Face & GPS Check-In',
+    tagline: 'Verified Attendance',
+    desc: 'Optional face verification plus office geofencing keeps check-ins and check-outs honest.',
+    badge: 'Face + Geofence'
   },
   {
     icon: CalendarCheck,
-    title: 'Automated Leave & Shifts',
-    tagline: 'Zero Approval Bottlenecks',
-    desc: 'Smart balance tracking, multi-tier manager approvals, and synchronized team leave calendars.',
-    badge: 'Real-time Sync'
+    title: 'Leave, WFH & Holidays',
+    tagline: 'Simple Approvals',
+    desc: 'Apply for leave or WFH in seconds, track balances, and approve straight from email.',
+    badge: 'Email Approvals'
   },
   {
     icon: Briefcase,
-    title: 'Workforce Intelligence',
-    tagline: 'Continuous Visibility',
-    desc: 'Automated End-Of-Day (EOD) reporting, task burn-down analytics, and peer kudos recognition.',
-    badge: 'Actionable Insights'
+    title: 'Tasks, EOD & Analytics',
+    tagline: 'Daily Visibility',
+    desc: 'Log tasks, submit End-of-Day reports, and see productivity trends, goals and team kudos.',
+    badge: 'Live Dashboards'
   }
+];
+
+const HIGHLIGHTS = [
+  { icon: ShieldCheck,    tone: 'text-emerald-500', title: 'Secure sign-in', text: '2FA, email OTP & trusted devices' },
+  { icon: MessagesSquare, tone: 'text-blue-500',    title: 'Real-time',      text: 'Team chat & instant notifications' },
+  { icon: Bot,            tone: 'text-indigo-500',  title: 'AI Copilot',     text: 'Ask about hours, tasks & leave' },
 ];
 
 export const LoginPage = () => {
@@ -228,11 +249,17 @@ export const LoginPage = () => {
   const currentFeature = SHOWCASE_FEATURES[activeFeatureIndex];
   const FeatureIcon = currentFeature.icon;
 
+  const modeBtn = (active: boolean) =>
+    `py-2 text-xs font-semibold rounded-lg transition-all ${
+      active
+        ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+    }`;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center relative overflow-hidden selection:bg-blue-600 selection:text-white">
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-30 pointer-events-none" />
+    <div className={`${AUTH.page} flex flex-col justify-center`}>
+      <AuthBackground />
+      <AuthThemeToggle />
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
@@ -240,46 +267,46 @@ export const LoginPage = () => {
           {/* LEFT: Desktop Showcase */}
           <div className="hidden lg:flex lg:col-span-7 flex-col justify-between space-y-8 pr-4">
             <div>
-              <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-blue-950/60 border border-blue-800/40 text-blue-400 text-xs font-medium mb-6">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                <span>Enterprise Suite · v2.4</span>
-                <span className="text-blue-600 font-bold">·</span>
-                <span className="text-slate-400">High Reliability EMS</span>
+              <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400 text-xs font-medium mb-6">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Daily Tracker · v2</span>
+                <span className="text-blue-300 dark:text-blue-600 font-bold">·</span>
+                <span className="text-slate-500 dark:text-slate-400">Employee Management Suite</span>
               </div>
 
-              <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-white leading-tight">
-                The Operating System for <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">Modern Workforces</span>
+              <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                One place for your team's <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 dark:from-blue-400 dark:via-sky-300 dark:to-indigo-300">daily work</span>
               </h1>
-              <p className="mt-4 text-base xl:text-lg text-slate-400 leading-relaxed max-w-xl">
-                Seamlessly unify employee attendance, biometric facial verification, smart shift scheduling, and real-time operational analytics in one secure platform.
+              <p className="mt-4 text-base xl:text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
+                Attendance with face and GPS verification, tasks and EOD reports, leave and WFH requests, and live team analytics — all in one app.
               </p>
             </div>
 
-            <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-md relative overflow-hidden transition-all duration-300">
+            <div className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-2xl dark:shadow-black/30 backdrop-blur-md relative overflow-hidden transition-all duration-300">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/10 dark:bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
                     <FeatureIcon className="w-6 h-6" />
                   </div>
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-blue-400">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                       {currentFeature.tagline}
                     </div>
-                    <div className="text-lg font-bold text-white">
+                    <div className="text-lg font-bold text-slate-900 dark:text-white">
                       {currentFeature.title}
                     </div>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-slate-400 bg-slate-800/60 border border-slate-700/50 px-2.5 py-1 rounded-md">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 px-2.5 py-1 rounded-md">
                   {currentFeature.badge}
                 </span>
               </div>
 
-              <p className="text-sm text-slate-300 leading-relaxed mb-5">
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
                 {currentFeature.desc}
               </p>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800/80">
                 <div className="flex items-center gap-1.5">
                   {SHOWCASE_FEATURES.map((_, idx) => (
                     <button
@@ -287,51 +314,34 @@ export const LoginPage = () => {
                       onClick={() => setActiveFeatureIndex(idx)}
                       aria-label={`Show feature ${idx + 1}`}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
-                        idx === activeFeatureIndex ? 'w-8 bg-blue-500' : 'w-2.5 bg-slate-700 hover:bg-slate-600'
+                        idx === activeFeatureIndex ? 'w-8 bg-blue-500' : 'w-2.5 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600'
                       }`}
                     />
                   ))}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-slate-400 dark:text-slate-500">
                   Slide {activeFeatureIndex + 1} of {SHOWCASE_FEATURES.length}
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4 pt-2">
-              <div className="border border-slate-800/60 rounded-xl p-3.5 bg-slate-900/40">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span className="font-semibold text-slate-300">Security</span>
-                </div>
-                <div className="text-xs text-slate-400">
-                  256-Bit SSL & Zero-Trust Access
-                </div>
-              </div>
-
-              <div className="border border-slate-800/60 rounded-xl p-3.5 bg-slate-900/40">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <span className="font-semibold text-slate-300">Uptime</span>
-                </div>
-                <div className="text-xs text-slate-400">
-                  99.98% High Availability SLA
-                </div>
-              </div>
-
-              <div className="border border-slate-800/60 rounded-xl p-3.5 bg-slate-900/40">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <Users className="w-4 h-4 text-indigo-400" />
-                  <span className="font-semibold text-slate-300">Compliance</span>
-                </div>
-                <div className="text-xs text-slate-400">
-                  SOC 2 & Statutory Compliant
-                </div>
-              </div>
+              {HIGHLIGHTS.map(h => {
+                const Icon = h.icon;
+                return (
+                  <div key={h.title} className="border border-slate-200 dark:border-slate-800/60 rounded-xl p-3.5 bg-white/60 dark:bg-slate-900/40">
+                    <div className="flex items-center gap-2 text-xs mb-1">
+                      <Icon className={`w-4 h-4 ${h.tone}`} />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{h.title}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">{h.text}</div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="text-xs text-slate-500 italic border-l-2 border-blue-500/40 pl-3">
-              "Designed for high-growth engineering, management, and field operations teams."
+              "Built for engineering teams, team leads and managers."
             </div>
           </div>
 
@@ -341,65 +351,47 @@ export const LoginPage = () => {
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-3">
                 <Building2 className="w-6 h-6" />
               </div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Daily Tracker EMS</h1>
-              <p className="text-xs text-slate-400 mt-1">Enterprise Employee Management Suite</p>
+              <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>Daily Tracker EMS</h1>
+              <p className={`text-xs mt-1 ${AUTH.muted}`}>Employee Management Suite</p>
             </div>
 
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative">
+            <div className={`${AUTH.card} relative`}>
               <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white shadow-md shadow-blue-600/30">
-                      <Building2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-white tracking-tight">
-                        {twoFactorStep
-                          ? 'Two-Factor Authentication'
-                          : emailOtpStep
-                          ? 'Email Code Verification'
-                          : 'Sign In to Workspace'}
-                      </h2>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {twoFactorStep
-                          ? 'Enter the 6-digit TOTP from your authenticator'
-                          : emailOtpStep
-                          ? 'Check your corporate inbox for the verification code'
-                          : 'Enter your credentials to access your dashboard'}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white shadow-md shadow-blue-600/30">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className={`text-xl font-bold tracking-tight ${AUTH.heading}`}>
+                      {twoFactorStep
+                        ? 'Two-Factor Authentication'
+                        : emailOtpStep
+                        ? 'Email Code Verification'
+                        : 'Sign In to Workspace'}
+                    </h2>
+                    <p className={`text-xs mt-0.5 ${AUTH.muted}`}>
+                      {twoFactorStep
+                        ? 'Enter the 6-digit TOTP from your authenticator'
+                        : emailOtpStep
+                        ? 'Check your inbox for the verification code'
+                        : 'Enter your credentials to access your dashboard'}
+                    </p>
                   </div>
                 </div>
 
                 {!twoFactorStep && !emailOtpStep && (
-                  <div className="mt-5 grid grid-cols-2 p-1 bg-slate-950/80 rounded-xl border border-slate-800/80">
+                  <div className={`mt-5 ${AUTH.segment}`}>
                     <button
                       type="button"
-                      onClick={() => {
-                        setAuthMode('password');
-                        setError('');
-                        setInfoMessage('');
-                      }}
-                      className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                        authMode === 'password'
-                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      onClick={() => { setAuthMode('password'); setError(''); setInfoMessage(''); }}
+                      className={modeBtn(authMode === 'password')}
                     >
                       Password Login
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setAuthMode('otp');
-                        setError('');
-                        setInfoMessage('');
-                      }}
-                      className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                        authMode === 'otp'
-                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
+                      onClick={() => { setAuthMode('otp'); setError(''); setInfoMessage(''); }}
+                      className={modeBtn(authMode === 'otp')}
                     >
                       Email OTP
                     </button>
@@ -408,15 +400,15 @@ export const LoginPage = () => {
               </div>
 
               {error && (
-                <div className="mb-4 flex items-start gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs leading-relaxed">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className={`mb-4 ${AUTH.error}`}>
+                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
               )}
 
               {infoMessage && (
-                <div className="mb-4 flex items-start gap-2.5 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs leading-relaxed">
-                  <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div className={`mb-4 ${AUTH.info}`}>
+                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <span>{infoMessage}</span>
                 </div>
               )}
@@ -424,9 +416,9 @@ export const LoginPage = () => {
               {/* 2FA Form */}
               {twoFactorStep ? (
                 <form onSubmit={handleVerify2FA} className="space-y-5">
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <KeyRound className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                    <label className="block text-xs font-medium text-slate-300 mb-2">
+                  <div className={AUTH.otpBox}>
+                    <KeyRound className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">
                       Enter 6-Digit Authenticator Code
                     </label>
                     <input
@@ -437,36 +429,22 @@ export const LoginPage = () => {
                       placeholder="000000"
                       value={totpCode}
                       onChange={e => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-center text-3xl tracking-[0.4em] py-3 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-600"
+                      className={AUTH.otpInput}
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={verify2FALoading || totpCode.length !== 6}
-                    className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                  >
+                  <button type="submit" disabled={verify2FALoading || totpCode.length !== 6} className={AUTH.primaryBtn}>
                     {verify2FALoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Verifying Security Code...</span>
-                      </>
+                      <><RefreshCw className="w-4 h-4 animate-spin" /><span>Verifying Security Code...</span></>
                     ) : (
-                      <>
-                        <span>Complete Sign In</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
+                      <><span>Complete Sign In</span><ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setTwoFactorStep(false);
-                      setTotpCode('');
-                      setTempToken('');
-                    }}
-                    className="w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors"
+                    onClick={() => { setTwoFactorStep(false); setTotpCode(''); setTempToken(''); }}
+                    className={`w-full py-2 text-xs font-medium ${AUTH.ghostBtn}`}
                   >
                     ← Back to standard login
                   </button>
@@ -474,13 +452,13 @@ export const LoginPage = () => {
               ) : emailOtpStep ? (
                 /* Email OTP Verification Form */
                 <form onSubmit={handleVerifyOtp} className="space-y-5">
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <Mail className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <div className={AUTH.otpBox}>
+                    <Mail className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                       Enter Verification Code
                     </label>
-                    <p className="text-[11px] text-slate-400 mb-3">
-                      Sent to <span className="text-slate-200 font-semibold">{form.email}</span>
+                    <p className={`text-[11px] mb-3 ${AUTH.muted}`}>
+                      Sent to <span className="text-slate-800 dark:text-slate-200 font-semibold">{form.email}</span>
                     </p>
                     <input
                       type="text"
@@ -490,42 +468,27 @@ export const LoginPage = () => {
                       placeholder="000000"
                       value={emailOtp}
                       onChange={e => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-center text-3xl tracking-[0.4em] py-3 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-600"
+                      className={AUTH.otpInput}
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading || emailOtp.length !== 6}
-                    className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                  >
+                  <button type="submit" disabled={loading || emailOtp.length !== 6} className={AUTH.primaryBtn}>
                     {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Verifying Code...</span>
-                      </>
+                      <><RefreshCw className="w-4 h-4 animate-spin" /><span>Verifying Code...</span></>
                     ) : (
-                      <>
-                        <span>Verify & Sign In</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
+                      <><span>Verify & Sign In</span><ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
 
                   <div className="flex items-center justify-between text-xs pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setEmailOtpStep(false)}
-                      className="text-slate-400 hover:text-slate-200 transition-colors"
-                    >
+                    <button type="button" onClick={() => setEmailOtpStep(false)} className={AUTH.ghostBtn}>
                       ← Change email
                     </button>
-
                     <button
                       type="button"
                       disabled={resendCooldown > 0 || loading}
                       onClick={() => handleSendOtp()}
-                      className="text-blue-400 hover:text-blue-300 disabled:text-slate-600 transition-colors font-medium"
+                      className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:text-slate-400 dark:disabled:text-slate-600 transition-colors"
                     >
                       {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                     </button>
@@ -535,13 +498,9 @@ export const LoginPage = () => {
                 /* Standard Password Sign-In */
                 <form onSubmit={handlePasswordSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Work Email Address
-                    </label>
+                    <label className={AUTH.label}>Work Email Address</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <Mail className="w-4 h-4" />
-                      </div>
+                      <div className={AUTH.inputIcon}><Mail className="w-4 h-4" /></div>
                       <input
                         type="email"
                         required
@@ -549,27 +508,22 @@ export const LoginPage = () => {
                         onChange={e => setForm({ ...form, email: e.target.value })}
                         placeholder="you@company.com"
                         autoComplete="email"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className={`${AUTH.input} pl-10 pr-4`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                         Password
                       </label>
-                      <Link
-                        to="/forgot-password"
-                        className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                      >
+                      <Link to="/forgot-password" className={`text-xs ${AUTH.link}`}>
                         Forgot password?
                       </Link>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <Lock className="w-4 h-4" />
-                      </div>
+                      <div className={AUTH.inputIcon}><Lock className="w-4 h-4" /></div>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
@@ -577,13 +531,13 @@ export const LoginPage = () => {
                         onChange={e => setForm({ ...form, password: e.target.value })}
                         placeholder="••••••••••••"
                         autoComplete="current-password"
-                        className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className={`${AUTH.input} pl-10 pr-10`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -596,34 +550,24 @@ export const LoginPage = () => {
                         type="checkbox"
                         checked={rememberDevice}
                         onChange={e => setRememberDevice(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500/20 focus:ring-offset-0 focus:ring-offset-transparent transition"
+                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-blue-600 focus:ring-blue-500/20 focus:ring-offset-0 transition"
                       />
-                      <span className="text-xs text-slate-400 hover:text-slate-300">
+                      <span className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
                         Trust this device (30 days)
                       </span>
                     </label>
 
-                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                       <Shield className="w-3 h-3 text-emerald-500" />
-                      Encrypted session
+                      2FA supported
                     </span>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                  >
+                  <button type="submit" disabled={loading} className={`${AUTH.primaryBtn} mt-2`}>
                     {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Authenticating...</span>
-                      </>
+                      <><RefreshCw className="w-4 h-4 animate-spin" /><span>Authenticating...</span></>
                     ) : (
-                      <>
-                        <span>Sign In</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
+                      <><span>Sign In</span><ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
                 </form>
@@ -631,13 +575,9 @@ export const LoginPage = () => {
                 /* Email OTP Request Form */
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                      Work Email Address
-                    </label>
+                    <label className={AUTH.label}>Work Email Address</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <Mail className="w-4 h-4" />
-                      </div>
+                      <div className={AUTH.inputIcon}><Mail className="w-4 h-4" /></div>
                       <input
                         type="email"
                         required
@@ -645,114 +585,79 @@ export const LoginPage = () => {
                         onChange={e => setForm({ ...form, email: e.target.value })}
                         placeholder="you@company.com"
                         autoComplete="email"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className={`${AUTH.input} pl-10 pr-4`}
                       />
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1.5">
-                      We will dispatch a secure 6-digit one-time code to your registered inbox.
+                    <p className={`text-[11px] mt-1.5 ${AUTH.subtle}`}>
+                      We'll email a 6-digit one-time code to your registered address.
                     </p>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                  >
+                  <button type="submit" disabled={loading} className={`${AUTH.primaryBtn} mt-2`}>
                     {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Sending Code...</span>
-                      </>
+                      <><RefreshCw className="w-4 h-4 animate-spin" /><span>Sending Code...</span></>
                     ) : (
-                      <>
-                        <span>Send Login Code</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
+                      <><span>Send Login Code</span><ArrowRight className="w-4 h-4" /></>
                     )}
                   </button>
                 </form>
               )}
 
-              {/* Quick Demo Accounts Drawer */}
-              <div className="mt-6 pt-5 border-t border-slate-800/80">
-                <button
-                  type="button"
-                  onClick={() => setShowDemoCredentials(!showDemoCredentials)}
-                  className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors py-1"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Quick Autofill Test Accounts</span>
-                  </span>
-                  <ChevronRight
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      showDemoCredentials ? 'rotate-90 text-blue-400' : 'text-slate-500'
-                    }`}
-                  />
-                </button>
+              {/* Quick Demo Accounts — development builds only */}
+              {SHOW_DEMO_ACCOUNTS && (
+                <div className={`mt-6 pt-5 border-t ${AUTH.divider}`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDemoCredentials(!showDemoCredentials)}
+                    className={`w-full flex items-center justify-between text-xs py-1 ${AUTH.ghostBtn}`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Quick Autofill Test Accounts</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">DEV</span>
+                    </span>
+                    <ChevronRight
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                        showDemoCredentials ? 'rotate-90 text-blue-500' : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    />
+                  </button>
 
-                {showDemoCredentials && (
-                  <div className="mt-2.5 grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill('developer@example.com')}
-                      className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-left transition-colors group"
-                    >
-                      <div className="text-[11px] font-semibold text-slate-300 group-hover:text-blue-300">
-                        Developer
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">dev@...</div>
-                    </button>
+                  {showDemoCredentials && (
+                    <div className="mt-2.5 grid grid-cols-3 gap-2">
+                      {[
+                        { email: 'developer@example.com', label: 'Developer', hint: 'dev@...' },
+                        { email: 'teamlead@example.com',  label: 'Team Lead', hint: 'lead@...' },
+                        { email: 'manager@example.com',   label: 'Manager',   hint: 'mgr@...' },
+                      ].map(d => (
+                        <button
+                          key={d.email}
+                          type="button"
+                          onClick={() => handleDemoFill(d.email)}
+                          className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-left transition-colors group"
+                        >
+                          <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-300">
+                            {d.label}
+                          </div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">{d.hint}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill('teamlead@example.com')}
-                      className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-left transition-colors group"
-                    >
-                      <div className="text-[11px] font-semibold text-slate-300 group-hover:text-blue-300">
-                        Team Lead
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">lead@...</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDemoFill('manager@example.com')}
-                      className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-blue-500/50 hover:bg-blue-950/20 text-left transition-colors group"
-                    >
-                      <div className="text-[11px] font-semibold text-slate-300 group-hover:text-blue-300">
-                        Manager
-                      </div>
-                      <div className="text-[10px] text-slate-500 truncate">mgr@...</div>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-5 text-center text-xs text-slate-400">
+              <div className={`mt-5 text-center text-xs ${AUTH.muted}`}>
                 New to the organization?{' '}
-                <Link
-                  to="/register"
-                  className="font-semibold text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-                >
+                <Link to="/register" className={`${AUTH.link} hover:underline`}>
                   Create employee account
                 </Link>
               </div>
             </div>
 
-            <div className="mt-5 text-center flex items-center justify-center gap-4 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Encrypted with TLS 1.3</span>
-              </span>
-              <span>·</span>
-              <a
-                href="mailto:support@company.com"
-                className="hover:text-slate-400 transition-colors flex items-center gap-1"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Contact IT Helpdesk</span>
-              </a>
+            <div className={`mt-5 text-center flex items-center justify-center gap-1.5 text-xs ${AUTH.subtle}`}>
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Protected by 2FA, email OTP & trusted devices</span>
             </div>
           </div>
 
@@ -800,26 +705,25 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden selection:bg-blue-600 selection:text-white">
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-30 pointer-events-none" />
+    <div className={`${AUTH.page} flex items-center justify-center p-4`}>
+      <AuthBackground />
+      <AuthThemeToggle />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-3">
             <Building2 className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Create Employee Account</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            {otpStep ? 'Verify your corporate email address' : 'Join your organization on Daily Tracker EMS'}
+          <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>Create Employee Account</h1>
+          <p className={`text-xs mt-1 ${AUTH.muted}`}>
+            {otpStep ? 'Verify your email address' : 'Join your organization on Daily Tracker EMS'}
           </p>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+        <div className={AUTH.card}>
           {error && (
-            <div className="mb-4 flex items-start gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className={`mb-4 ${AUTH.error}`}>
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -827,73 +731,57 @@ export const RegisterPage = () => {
           {!otpStep ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Full Name
-                </label>
+                <label className={AUTH.label}>Full Name</label>
                 <input
                   required
                   value={form.fullName}
                   onChange={e => setForm({ ...form, fullName: e.target.value })}
                   placeholder="Jane Doe"
-                  className="w-full px-4 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className={`${AUTH.input} px-4`}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Work Email
-                </label>
+                <label className={AUTH.label}>Work Email</label>
                 <input
                   type="email"
                   required
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   placeholder="jane.doe@company.com"
-                  className="w-full px-4 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className={`${AUTH.input} px-4`}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Password
-                </label>
+                <label className={AUTH.label}>Password</label>
                 <input
                   type="password"
                   required
                   value={form.password}
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="Create a strong password"
-                  className="w-full px-4 py-2.5 bg-slate-950/70 border border-slate-700/80 rounded-xl text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className={`${AUTH.input} px-4`}
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={loading} className={`${AUTH.primaryBtn} mt-2`}>
                 {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Sending Verification Code...</span>
-                  </>
+                  <><RefreshCw className="w-4 h-4 animate-spin" /><span>Sending Verification Code...</span></>
                 ) : (
-                  <>
-                    <span>Continue to Verification</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <><span>Continue to Verification</span><ArrowRight className="w-4 h-4" /></>
                 )}
               </button>
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                <Mail className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+              <div className={AUTH.otpBox}>
+                <Mail className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                   Enter 6-Digit Email Code
                 </label>
-                <p className="text-[11px] text-slate-400 mb-3">
-                  Sent to <span className="text-slate-200 font-semibold">{form.email}</span>
+                <p className={`text-[11px] mb-3 ${AUTH.muted}`}>
+                  Sent to <span className="text-slate-800 dark:text-slate-200 font-semibold">{form.email}</span>
                 </p>
                 <input
                   type="text"
@@ -903,44 +791,27 @@ export const RegisterPage = () => {
                   placeholder="000000"
                   value={otp}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-center text-3xl tracking-[0.4em] py-3 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-slate-600"
+                  className={AUTH.otpInput}
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading || otp.length !== 6}
-                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={loading || otp.length !== 6} className={AUTH.primaryBtn}>
                 {loading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Registering Account...</span>
-                  </>
+                  <><RefreshCw className="w-4 h-4 animate-spin" /><span>Registering Account...</span></>
                 ) : (
-                  <>
-                    <span>Verify & Complete Registration</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <><span>Verify & Complete Registration</span><ArrowRight className="w-4 h-4" /></>
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setOtpStep(false)}
-                className="w-full py-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-              >
+              <button type="button" onClick={() => setOtpStep(false)} className={`w-full py-2 text-xs ${AUTH.ghostBtn}`}>
                 ← Back to details
               </button>
             </form>
           )}
 
-          <div className="mt-6 text-center text-xs text-slate-400 pt-4 border-t border-slate-800">
+          <div className={`mt-6 text-center text-xs pt-4 border-t ${AUTH.divider} ${AUTH.muted}`}>
             Already have an account?{' '}
-            <Link
-              to="/login"
-              className="font-semibold text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-            >
+            <Link to="/login" className={`${AUTH.link} hover:underline`}>
               Sign In
             </Link>
           </div>

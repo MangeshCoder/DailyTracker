@@ -1,39 +1,48 @@
-import { useEffect, useState, ReactNode } from 'react';
-import { useToast } from '../context/ToastContext';
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE: ui/src/components/ToastContainer.tsx
+//  App toasts (useToast) — light/dark upgrade
+//  Fix: text was near-white on a pale tint, unreadable in light mode.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Feature 15: Toast Notification UI
-// ═══════════════════════════════════════════════════════════════════════════════
+import { useToast } from '../context/ToastContext';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+
+const STYLES: Record<string, { icon: React.ElementType; accent: string; iconCls: string }> = {
+  success: { icon: CheckCircle2,  accent: 'border-l-emerald-500', iconCls: 'text-emerald-500' },
+  error:   { icon: XCircle,       accent: 'border-l-rose-500',    iconCls: 'text-rose-500' },
+  warning: { icon: AlertTriangle, accent: 'border-l-amber-500',   iconCls: 'text-amber-500' },
+  info:    { icon: Info,          accent: 'border-l-blue-500',    iconCls: 'text-blue-500' },
+};
+
 export const ToastContainer = () => {
   const { toasts, dismiss } = useToast();
-
-  const icons: Record<string, string> = {
-    success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️'
-  };
-
-  const colors: Record<string, string> = {
-    success: 'border-l-4 border-emerald-500 bg-emerald-500/10 text-emerald-100',
-    error: 'border-l-4 border-red-500 bg-red-500/10 text-red-100',
-    warning: 'border-l-4 border-amber-500 bg-amber-500/10 text-amber-100',
-    info: 'border-l-4 border-blue-500 bg-blue-500/10 text-blue-100',
-  };
 
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 max-w-sm w-full">
-      {toasts.map(t => (
-        <div
-          key={t.id}
-          className={`flex items-start gap-3 px-4 py-3 rounded-xl backdrop-blur-md shadow-2xl
-            border border-white/10 animate-slide-in-right ${colors[t.type]}`}
-        >
-          <span className="text-base flex-shrink-0 mt-0.5">{icons[t.type]}</span>
-          <p className="text-sm font-medium flex-1 leading-snug">{t.message}</p>
-          <button onClick={() => dismiss(t.id)}
-            className="text-white/40 hover:text-white/80 transition text-lg leading-none">×</button>
-        </div>
-      ))}
+    <div className="fixed bottom-6 right-4 sm:right-6 z-[9999] flex flex-col gap-2 max-w-sm w-[calc(100%-2rem)] sm:w-full">
+      {toasts.map(t => {
+        const s = STYLES[t.type] ?? STYLES.info;
+        const Icon = s.icon;
+        return (
+          <div
+            key={t.id}
+            role="status"
+            className={`flex items-start gap-3 px-4 py-3 rounded-xl border border-l-4 shadow-xl backdrop-blur-md animate-slide-in-right
+              bg-white/95 dark:bg-slate-900/95 border-slate-200 dark:border-slate-700 ${s.accent}`}
+          >
+            <Icon className={`w-5 h-5 shrink-0 mt-px ${s.iconCls}`} />
+            <p className="text-sm font-medium flex-1 leading-snug text-slate-800 dark:text-slate-100">{t.message}</p>
+            <button
+              onClick={() => dismiss(t.id)}
+              aria-label="Dismiss"
+              className="p-0.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-white transition shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 };

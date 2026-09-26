@@ -518,21 +518,6 @@ export const SupportPage = () => {
                     <Paperclip className="w-3.5 h-3.5" /> Attach Files
                   </label>
                   <SupportFileUpload files={files} setFiles={setFiles} uploadProgress={uploadProgress} />
-                  {files.length > 0 && (
-                    <div className="mt-3 space-y-1.5">
-                      {files.map((file, i) => (
-                        <div
-                          key={i}
-                          className="flex justify-between items-center gap-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs"
-                        >
-                          <span className="flex items-center gap-2 truncate text-slate-700 dark:text-slate-300">
-                            <Paperclip className="w-3.5 h-3.5 shrink-0 text-slate-400" /> {file.name}
-                          </span>
-                          <span className="text-slate-500 dark:text-slate-400 shrink-0">{(file.size / 1024).toFixed(1)} KB</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
 
