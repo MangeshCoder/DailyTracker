@@ -1,18 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  FILE: ui/src/pages/Historyanalyticspages.tsx
-//  History (+ legacy weekly Analytics) - Modern Design System Upgrade
+//  History - Modern Design System Upgrade
 //
 //  HistoryPage (route: /history) — logic unchanged:
 //  ✅ Past daily logs for 7 / 14 / 30 / 90 days
 //  ✅ Click a day → detail panel (times, tasks, support + media, notes)
-//
-//  AnalyticsPage — legacy weekly view (the /analytics route now uses
-//  AdvancedAnalyticsPage). Kept exported and restyled so nothing breaks.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useMemo } from 'react';
-import { dailyLogApi, dashboardApi } from '../services/api';
-import type { DailyLog, WeeklyReport } from '../types';
+import { dailyLogApi } from '../services/api';
+import type { DailyLog } from '../types';
 import { SupportMediaDisplay } from '../components/SupportMediaDisplay';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
@@ -33,8 +30,6 @@ import {
   MousePointerClick,
   Inbox,
   X,
-  BarChart3,
-  Gauge,
 } from 'lucide-react';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -290,112 +285,6 @@ export const HistoryPage = () => {
           )}
         </div>
       </div>
-    </div>
-  );
-};
-
-// ─── Analytics Page (legacy weekly view) ──────────────────────────────────────
-
-export const AnalyticsPage = () => {
-  const [report, setReport] = useState<WeeklyReport | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await dashboardApi.getWeeklyReport();
-        setReport(res.data);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const maxMins = Math.max(...(report?.days.map(d => d.totalWorkMinutes) ?? [1]), 1);
-
-  return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-      <PageHeader
-        title="Weekly Analytics"
-        description="Last 7 days overview."
-        breadcrumbs={[{ label: 'Workspace', href: '/' }, { label: 'Analytics' }]}
-        className="!mb-0"
-      />
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Hours"   value={`${Math.floor((report?.totalWorkMinutes ?? 0) / 60)}h`} subtitle="this week"    icon={Timer}      color="blue"    loading={loading} />
-        <StatCard title="Avg Daily"     value={`${report?.averageDailyHours ?? 0}h`}                  subtitle="per day"      icon={Gauge}      color="emerald" loading={loading} />
-        <StatCard title="Tasks Done"    value={report?.totalTasksCompleted ?? 0}                     subtitle="completed"    icon={ListChecks} color="purple"  loading={loading} />
-        <StatCard title="Support Given" value={report?.totalSupportGiven ?? 0}                       subtitle="times helped" icon={LifeBuoy}   color="amber"   loading={loading} />
-      </div>
-
-      <Card>
-        <CardContent>
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              <BarChart3 className="w-4 h-4" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Daily Work Hours</h3>
-          </div>
-          <div className="flex items-end gap-3 h-56">
-            {report?.days.slice().reverse().map((day) => {
-              const height = maxMins > 0 ? (day.totalWorkMinutes / maxMins) * 100 : 0;
-              const hours = Math.floor(day.totalWorkMinutes / 60);
-              const mins = day.totalWorkMinutes % 60;
-              const isToday = new Date(day.logDate).toDateString() === new Date().toDateString();
-
-              return (
-                <div key={day.id} className="flex-1 flex flex-col items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">{hours}h{mins > 0 ? `${mins}m` : ''}</span>
-                  <div className="w-full flex flex-col justify-end" style={{ height: '160px' }}>
-                    <div
-                      className={`w-full rounded-t-lg transition-all duration-500 ${
-                        isToday ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600'
-                      }`}
-                      style={{ height: `${height}%`, minHeight: '4px' }}
-                    />
-                  </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    {new Date(day.logDate).toLocaleDateString('en-IN', { weekday: 'short' })}
-                  </span>
-                </div>
-              );
-            })}
-            {!loading && (!report?.days || report.days.length === 0) && (
-              <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400 text-sm">
-                No data yet
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {report && report.days.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Day Breakdown</h3>
-          </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-            {report.days.map(day => (
-              <div key={day.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white w-36 flex-shrink-0">
-                  {new Date(day.logDate).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </p>
-                <div className="flex-1 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">{day.workHours}</span>
-                  <span className="inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {day.tasks.filter(t => t.status === 'Completed').length} tasks</span>
-                  <span className="inline-flex items-center gap-1"><Coffee className="w-3.5 h-3.5 text-amber-500" /> {day.totalBreakMinutes}m break</span>
-                  <span className="inline-flex items-center gap-1"><LifeBuoy className="w-3.5 h-3.5 text-violet-500" /> {day.supportLogs.length} support</span>
-                </div>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CHIP[day.dayStatus] ?? STATUS_CHIP.Present}`}>
-                  {day.dayStatus}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   );
 };
