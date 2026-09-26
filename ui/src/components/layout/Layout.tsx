@@ -153,9 +153,9 @@ export const Layout = () => {
     title: 'Manager',
     icon: '👨‍💼',
     items: [
-      { to: '/manager', label: 'Team Dashboard', icon: '📋' },
+      { to: '/manager', label: 'Team Dashboard', icon: '📋', exact: true },
       { to: '/manager/assign-role', label: 'Assign Roles', icon: '👥' },
-      { to: '/manager/face-setup/:userId', label: 'Face Setup', icon: '📷' },
+      { to: '/manager/face-setup', label: 'Face Setup', icon: '📷' },
       { to: '/manager/eod-reviews', label: 'EOD Reviews', icon: '📝' },
       { to: '/manager/wfh-dashboard', label: 'Employee Requests', icon: '🗓️' },
       { to: '/manager/support-assignments', label: 'Support Assignments', icon: '🔧' },

@@ -26,6 +26,10 @@ namespace DailyTrackerAPI.Controllers.Auth
 
         public FaceController(AppDbContext db) => _db = db;
 
+        // Same roles the manager area allows (ManagerController + UI ManagerRoute)
+        private static bool IsManagerRole(string? role) =>
+            role == "Manager" || role == "TeamLead";
+
         // ── Register own face ─────────────────────────────────────────────────
         [HttpPost("register")]
         public async Task<IActionResult> RegisterFace([FromBody] RegisterFaceDto dto)
@@ -41,7 +45,7 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (targetId != callerId)
             {
                 var caller = await _db.Users.FindAsync(callerId);
-                if (caller?.Role != "Manager")
+                if (!IsManagerRole(caller?.Role))
                     return Forbid();
             }
 
@@ -92,7 +96,7 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (callerId != userId)
             {
                 var caller = await _db.Users.FindAsync(callerId);
-                if (caller?.Role != "Manager")
+                if (!IsManagerRole(caller?.Role))
                     return Forbid();
             }
 
@@ -172,7 +176,7 @@ namespace DailyTrackerAPI.Controllers.Auth
         {
             var callerId = User.GetUserId();
             var caller = await _db.Users.FindAsync(callerId);
-            if (caller?.Role != "Manager") return Forbid();
+            if (!IsManagerRole(caller?.Role)) return Forbid();
 
             var from = DateTime.UtcNow.AddDays(-days);
 
@@ -201,7 +205,7 @@ namespace DailyTrackerAPI.Controllers.Auth
         {
             var callerId = User.GetUserId();
             var caller = await _db.Users.FindAsync(callerId);
-            if (caller?.Role != "Manager") return Forbid();
+            if (!IsManagerRole(caller?.Role)) return Forbid();
 
             var todayStart = DateTime.UtcNow.Date;
 

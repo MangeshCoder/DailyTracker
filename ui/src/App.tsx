@@ -55,6 +55,9 @@ const TwoFactorSettingsPage = lazy(() =>
 const FaceSetupPage = lazy(() =>
   import('./pages/FaceSetupPage').then(m => ({ default: m.FaceSetupPage }))
 );
+const FaceSetupTeamPage = lazy(() =>
+  import('./pages/FaceSetupTeamPage').then(m => ({ default: m.FaceSetupTeamPage }))
+);
 
 // EOD Report Pages
 const EODReportPage = lazy(() =>
@@ -510,6 +513,16 @@ const AppRoutes = () => {
               <ManagerRoute>
                 <Suspense fallback={<SkeletonDashboard />}>
                   <AssignRole />
+                </Suspense>
+              </ManagerRoute>
+            }
+          />
+          <Route
+            path="manager/face-setup"
+            element={
+              <ManagerRoute>
+                <Suspense fallback={<SkeletonDashboard />}>
+                  <FaceSetupTeamPage />
                 </Suspense>
               </ManagerRoute>
             }

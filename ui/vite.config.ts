@@ -51,7 +51,7 @@ export default defineConfig({
             type:  'image/png',
           },
           {
-            src:     '/icons/icon-512.png',
+            src:     '/icons/icon-maskable-512.png',  // full-bleed, logo inside the safe zone
             sizes:   '512x512',
             type:    'image/png',
             purpose: 'maskable',  // Android adaptive icon — fills the circle

@@ -34,7 +34,7 @@ namespace DailyTrackerAPI.DTOs
         public string? Department { get; set; }
         public string? Designation { get; set; }
         public string? ProfilePhotoUrl { get; set; }
-
+        public bool FaceRegistered { get; set; }
     }
 
     // Includes all fields plus manager info (denormalized for convenience)
