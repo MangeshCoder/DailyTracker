@@ -5,7 +5,8 @@
 #  api : builds the .NET API and runs tests/DailyTrackerAPI.Tests
 #        (chat, attachments, polls, security) against SQLite in-memory —
 #        no SQL Server, secrets or network needed.
-#  ui  : installs exact package versions, strict TypeScript check, production build.
+#  ui  : installs exact package versions, strict TypeScript check, production build,
+#        then browser tests of the chat (ui/e2e, Playwright) against a fake backend.
 # ─────────────────────────────────────────────────────────────────────────────
 name: CI
 
@@ -59,7 +60,7 @@ jobs:
           retention-days: 14
 
   ui:
-    name: UI · type-check & build
+    name: UI · type-check, build & chat tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -82,3 +83,19 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install browser for chat tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Chat tests (real browser, fake backend)
+        run: npx playwright test
+
+      - name: Upload chat test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-test-report
+          path: |
+            ui/playwright-report
+            ui/test-results
+          retention-days: 14

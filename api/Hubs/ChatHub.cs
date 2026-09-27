@@ -105,6 +105,7 @@ namespace DailyTrackerAPI.Hubs
         public async Task StartTyping(int conversationId)
         {
             var userId = Context.User!.GetUserId();
+            if (!await _chatService.IsActiveMemberAsync(conversationId, userId)) return;
             // Send to everyone in the conversation EXCEPT the caller
             await Clients.OthersInGroup($"conv_{conversationId}")
                 .SendAsync("UserTyping", new
@@ -117,6 +118,7 @@ namespace DailyTrackerAPI.Hubs
         public async Task StopTyping(int conversationId)
         {
             var userId = Context.User!.GetUserId();
+            if (!await _chatService.IsActiveMemberAsync(conversationId, userId)) return;
             await Clients.OthersInGroup($"conv_{conversationId}")
                 .SendAsync("UserStoppedTyping", new
                 {
@@ -133,7 +135,7 @@ namespace DailyTrackerAPI.Hubs
         {
             var userId = Context.User!.GetUserId();
 
-            await _chatService.MarkConversationReadAsync(conversationId, userId);
+            if (!await _chatService.MarkConversationReadAsync(conversationId, userId)) return;
 
             // Notify sender(s) in the conversation that this user has read it
             await Clients.OthersInGroup($"conv_{conversationId}")
@@ -150,6 +152,10 @@ namespace DailyTrackerAPI.Hubs
 
         public async Task JoinConversation(int conversationId)
         {
+            // Only members may listen to a conversation's live messages
+            var userId = Context.User!.GetUserId();
+            if (!await _chatService.IsActiveMemberAsync(conversationId, userId))
+                throw new HubException("You are not a member of this conversation.");
             await Groups.AddToGroupAsync(Context.ConnectionId, $"conv_{conversationId}");
         }
         public async Task LeaveConversation(int conversationId)

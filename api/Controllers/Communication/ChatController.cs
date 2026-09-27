@@ -411,7 +411,8 @@ namespace DailyTrackerAPI.Controllers.Communication
         public async Task<IActionResult> MarkRead(int conversationId)
         {
             var userId = User.GetUserId();
-            await _chatService.MarkConversationReadAsync(conversationId, userId);
+            if (!await _chatService.MarkConversationReadAsync(conversationId, userId))
+                return Forbid();
 
             await _hub.Clients.Group($"conv_{conversationId}")
                 .SendAsync("ConversationRead", new
@@ -444,12 +445,14 @@ namespace DailyTrackerAPI.Controllers.Communication
                 var userId = User.GetUserId();
                 var result = await _chatService.ToggleReactionAsync(messageId, userId, dto.Emoji);
 
-                // Broadcast updated reaction counts to all members
-                await _hub.Clients.All
+                // Broadcast updated reaction counts to the chat's members only
+                await _hub.Clients.Group($"conv_{result.ConversationId}")
                     .SendAsync("ReactionUpdated", result);
 
                 return Ok(result);
             }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
             catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 

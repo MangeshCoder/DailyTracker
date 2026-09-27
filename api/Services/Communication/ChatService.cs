@@ -48,12 +48,14 @@ namespace DailyTrackerAPI.Services.Communication
         Task<ChatMessageDto> ClosePollAsync(int userId, int pollId);
 
         // Read receipts
-        Task MarkConversationReadAsync(int conversationId, int userId);
+        /// <returns>false when the user isn't a member (nothing marked)</returns>
+        Task<bool> MarkConversationReadAsync(int conversationId, int userId);
         Task<int> GetUnreadCountAsync(int conversationId, int userId);
         Task<Dictionary<int, int>> GetAllUnreadCountsAsync(int userId);
 
         // Reactions
         Task<ReactionResult> ToggleReactionAsync(int messageId, int userId, string emoji);
+        Task<bool> IsActiveMemberAsync(int conversationId, int userId);
 
         // Group management
         Task AddMembersToGroupAsync(int conversationId, int requestingUserId, List<int> newMemberIds);
@@ -680,22 +682,21 @@ namespace DailyTrackerAPI.Services.Communication
         // READ RECEIPTS
         // ══════════════════════════════════════════════════════════════════════
 
-        public async Task MarkConversationReadAsync(int conversationId, int userId)
+        public async Task<bool> MarkConversationReadAsync(int conversationId, int userId)
         {
             // Update member's LastReadAt to now
             var member = await _db.ConversationMembers
                 .FirstOrDefaultAsync(m => m.ConversationId == conversationId && m.UserId == userId);
 
+            // Not a member (or has left): nothing to mark
+            if (member == null || member.HasLeft) return false;
+
             // Earlier messages already got receipts the last time this chat was read,
             // so only look at what came after (a minute of slack for clock skew)
-            var previousRead = member?.LastReadAt;
-            var since = previousRead.HasValue ? previousRead.Value.AddMinutes(-1) : DateTime.MinValue;
+            var since = member.LastReadAt?.AddMinutes(-1) ?? DateTime.MinValue;
 
-            if (member != null)
-            {
-                member.LastReadAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-            }
+            member.LastReadAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
 
             // Create read receipts for all unread messages
             var unreadMessages = await _db.ChatMessages
@@ -717,6 +718,7 @@ namespace DailyTrackerAPI.Services.Communication
             }
 
             await _db.SaveChangesAsync();
+            return true;
         }
 
         public async Task<int> GetUnreadCountAsync(int conversationId, int userId)
@@ -758,8 +760,21 @@ namespace DailyTrackerAPI.Services.Communication
         /// Toggle: if the user already has this emoji on this message, remove it.
         /// Otherwise add it (replacing any existing emoji from this user on this message).
         /// </summary>
+        public Task<bool> IsActiveMemberAsync(int conversationId, int userId) =>
+            _db.ConversationMembers.AnyAsync(m => m.ConversationId == conversationId && m.UserId == userId
+                                               && !m.HasLeft && m.Conversation.IsActive);
+
         public async Task<ReactionResult> ToggleReactionAsync(int messageId, int userId, string emoji)
         {
+            // Only members of the chat can react (and only to messages that still exist)
+            var conversationId = await _db.ChatMessages
+                .Where(m => m.Id == messageId && !m.IsDeleted)
+                .Select(m => (int?)m.ConversationId)
+                .FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException("Message not found.");
+            if (!await IsActiveMemberAsync(conversationId, userId))
+                throw new UnauthorizedAccessException("You are not a member of this conversation.");
+
             var existingReaction = await _db.MessageReactions
                 .FirstOrDefaultAsync(r => r.MessageId == messageId && r.UserId == userId);
 
@@ -802,6 +817,7 @@ namespace DailyTrackerAPI.Services.Communication
 
             return new ReactionResult
             {
+                ConversationId = conversationId,
                 MessageId = messageId,
                 Emoji = emoji,
                 Added = added,

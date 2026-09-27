@@ -1056,6 +1056,7 @@ namespace DailyTrackerAPI.DTOs
 
     public class ReactionResult
     {
+        public int ConversationId { get; set; }
         public int MessageId { get; set; }
         public string Emoji { get; set; } = "";
         public bool Added { get; set; }
