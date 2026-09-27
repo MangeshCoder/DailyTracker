@@ -25,6 +25,7 @@ namespace DailyTrackerAPI.Services.Communication
         Task<ConversationDto> GetOrCreateDirectConversationAsync(int userId, int otherUserId);
         Task<ConversationDto> CreateGroupConversationAsync(int creatorId, CreateGroupDto dto);
         Task<List<ConversationSummaryDto>> GetMyConversationsAsync(int userId);
+        Task<List<int>> GetMyConversationIdsAsync(int userId);
         Task<ConversationDetailDto> GetConversationDetailAsync(int conversationId, int userId);
 
         // Messages
@@ -176,62 +177,63 @@ namespace DailyTrackerAPI.Services.Communication
         /// <summary>Get all conversations for the sidebar, sorted by most recent message.</summary>
         public async Task<List<ConversationSummaryDto>> GetMyConversationsAsync(int userId)
         {
-            var conversations = await _db.Conversations
-                .Where(c => c.IsActive && c.Members.Any(m => m.UserId == userId && !m.HasLeft))
-                .Include(c => c.Members).ThenInclude(m => m.User)
-                .OrderByDescending(c => c.LastMessageAt ?? c.CreatedAt)
+            // One round trip: membership + members + unread count + @mention flag are
+            // computed by the database (was 2 queries per conversation).
+            var rows = await _db.ConversationMembers
+                .Where(me => me.UserId == userId && !me.HasLeft && me.Conversation.IsActive)
+                .Select(me => new
+                {
+                    me.Conversation.Id,
+                    me.Conversation.Type,
+                    me.Conversation.GroupName,
+                    me.Conversation.GroupAvatar,
+                    me.Conversation.CreatedAt,
+                    me.Conversation.LastMessageAt,
+                    me.Conversation.LastMessagePreview,
+                    me.IsMuted,
+                    MemberCount = me.Conversation.Members.Count(m => !m.HasLeft),
+                    Other = me.Conversation.Members
+                        .Where(m => m.UserId != userId)
+                        .Select(m => new { m.UserId, m.User.FullName })
+                        .FirstOrDefault(),
+                    Unread = me.Conversation.Messages.Count(m =>
+                        m.SenderId != userId && !m.IsDeleted
+                        && m.SentAt > (me.LastReadAt ?? DateTime.MinValue)),
+                    UnreadMention = me.Conversation.Messages.Any(m =>
+                        m.SenderId != userId && !m.IsDeleted
+                        && m.SentAt > (me.LastReadAt ?? DateTime.MinValue)
+                        && m.Mentions.Any(x => x.UserId == userId)),
+                })
                 .AsNoTracking()
                 .ToListAsync();
 
-            var result = new List<ConversationSummaryDto>();
-
-            foreach (var conv in conversations)
-            {
-                var myMembership = conv.Members.First(m => m.UserId == userId);
-                int unread = await GetUnreadCountAsync(conv.Id, userId);
-                var lastRead = myMembership.LastReadAt ?? DateTime.MinValue;
-                bool unreadMention = unread > 0 && await _db.ChatMessageMentions.AnyAsync(x =>
-                    x.UserId == userId && x.Message.ConversationId == conv.Id
-                    && !x.Message.IsDeleted && x.Message.SentAt > lastRead);
-
-                // For Direct chats, show the other person's name as the conversation title
-                string displayName;
-                string? avatarUrl = null;
-
-                if (conv.Type == "Direct")
+            return rows
+                .OrderByDescending(r => r.LastMessageAt ?? r.CreatedAt)
+                .Select(r => new ConversationSummaryDto
                 {
-                    var other = conv.Members.FirstOrDefault(m => m.UserId != userId)?.User;
-                    displayName = other?.FullName ?? "Unknown";
-                }
-                else
-                {
-                    displayName = conv.GroupName ?? "Group Chat";
-                    avatarUrl = conv.GroupAvatar;
-                }
-
-                result.Add(new ConversationSummaryDto
-                {
-                    Id = conv.Id,
-                    Type = conv.Type,
-                    DisplayName = displayName,
-                    AvatarUrl = avatarUrl,
-                    LastMessagePreview = conv.LastMessagePreview,
-                    LastMessageAt = conv.LastMessageAt,
-                    UnreadCount = unread,
-                    HasUnreadMention = unreadMention,
-                    MemberCount = conv.Members.Count(m => !m.HasLeft),
-                    IsMuted = myMembership.IsMuted,
-                    // For Direct: is the other person online? (could integrate with UserPresence)
-                    OtherUserId = conv.Type == "Direct"
-                        ? conv.Members.FirstOrDefault(m => m.UserId != userId)?.UserId
-                        : null,
-                });
-            }
-
-            return result;
+                    Id = r.Id,
+                    Type = r.Type,
+                    // Direct chats are titled with the other person's name
+                    DisplayName = r.Type == "Direct" ? r.Other?.FullName ?? "Unknown" : r.GroupName ?? "Group Chat",
+                    AvatarUrl = r.Type == "Direct" ? null : r.GroupAvatar,
+                    LastMessagePreview = r.LastMessagePreview,
+                    LastMessageAt = r.LastMessageAt,
+                    UnreadCount = r.Unread,
+                    HasUnreadMention = r.UnreadMention,
+                    MemberCount = r.MemberCount,
+                    IsMuted = r.IsMuted,
+                    OtherUserId = r.Type == "Direct" ? r.Other?.UserId : null,
+                })
+                .ToList();
         }
 
-        /// <summary>Get full conversation detail including member list (for the chat header).</summary>
+        /// <summary>Ids of my active conversations (for joining SignalR groups)</summary>
+        public Task<List<int>> GetMyConversationIdsAsync(int userId) =>
+            _db.ConversationMembers
+                .Where(m => m.UserId == userId && !m.HasLeft && m.Conversation.IsActive)
+                .Select(m => m.ConversationId)
+                .ToListAsync();
+
         public async Task<ConversationDetailDto> GetConversationDetailAsync(int conversationId, int userId)
         {
             var conv = await _db.Conversations
@@ -325,8 +327,8 @@ namespace DailyTrackerAPI.Services.Communication
 
             var messages = await query
                 .Include(m => m.Sender)
-                .Include(m => m.Reactions).ThenInclude(r => r.User)
-                .Include(m => m.ReadReceipts).ThenInclude(r => r.User)
+                .Include(m => m.Reactions)          // only UserId/Emoji are used —
+                .Include(m => m.ReadReceipts)       // no need to load whole users
                 .Include(m => m.ReplyToMessage).ThenInclude(r => r!.Sender)
                 .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
                 .Include(m => m.Mentions)
@@ -730,15 +732,17 @@ namespace DailyTrackerAPI.Services.Communication
 
         public async Task<Dictionary<int, int>> GetAllUnreadCountsAsync(int userId)
         {
-            var members = await _db.ConversationMembers
-                .Where(m => m.UserId == userId && !m.HasLeft)
-                .ToListAsync();
-
-            var result = new Dictionary<int, int>();
-            foreach (var m in members)
-                result[m.ConversationId] = await GetUnreadCountAsync(m.ConversationId, userId);
-
-            return result;
+            // One round trip (was 2 queries per conversation)
+            return await _db.ConversationMembers
+                .Where(me => me.UserId == userId && !me.HasLeft)
+                .Select(me => new
+                {
+                    me.ConversationId,
+                    Unread = me.Conversation.Messages.Count(m =>
+                        m.SenderId != userId && !m.IsDeleted
+                        && m.SentAt > (me.LastReadAt ?? DateTime.MinValue)),
+                })
+                .ToDictionaryAsync(x => x.ConversationId, x => x.Unread);
         }
 
         // ══════════════════════════════════════════════════════════════════════

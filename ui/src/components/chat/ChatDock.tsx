@@ -15,9 +15,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { MessageCircle, Maximize2, X, Loader2 } from 'lucide-react';
 import { useChat, AI_WIDGET_EVENT } from '../../context/ChatContext';
 
-const ChatWorkspace = lazy(() =>
-  import('../../pages/Chatpage').then(m => ({ default: m.ChatWorkspace }))
-);
+const loadChatPage = () => import('../../pages/Chatpage');
+const ChatWorkspace = lazy(() => loadChatPage().then(m => ({ default: m.ChatWorkspace })));
+
+/** Download the chat code ahead of time so the panel opens without waiting */
+const preloadChat = () => { loadChatPage().catch(() => {}); };
 
 const iconBtn =
   'w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 ' +
@@ -37,6 +39,12 @@ export const ChatDock = () => {
     const onAi = (e: Event) => setAiOpen(!!(e as CustomEvent<boolean>).detail);
     window.addEventListener(AI_WIDGET_EVENT, onAi);
     return () => window.removeEventListener(AI_WIDGET_EVENT, onAi);
+  }, []);
+
+  // Fetch the chat code a few seconds after the app settles
+  useEffect(() => {
+    const t = window.setTimeout(preloadChat, 4000);
+    return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -74,6 +82,9 @@ export const ChatDock = () => {
         <button
           type="button"
           onClick={() => openDock()}
+          onMouseEnter={preloadChat}
+          onFocus={preloadChat}
+          onTouchStart={preloadChat}
           className="fixed z-50 right-4 bottom-36 md:right-6 md:bottom-[5.5rem] w-14 h-14 rounded-full
                      bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white
                      shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200

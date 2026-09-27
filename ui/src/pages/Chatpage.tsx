@@ -27,6 +27,9 @@ import {
   MessageText, MentionPicker, findMentionQuery, filterCandidates, PinnedBar, SearchPanel,
   DesktopNotifyToggle, type MentionCandidate,
 } from '../components/chat/ChatExtras';
+import {
+  mergeMessages, getCachedMessages, setCachedMessages, loadLatest, prefetchMessages, isFresh,
+} from '../components/chat/chatMessageCache';
 import { useConfirm } from '../hooks/useConfirm';
 import {
   MessageSquare,
@@ -69,18 +72,6 @@ const formatDate = (iso: string) => {
   if (d.toDateString() === today.toDateString()) return 'Today';
   if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-/**
- * Merge a freshly fetched page with what's already on screen. Messages that
- * arrived live while the request was in flight are kept (the server snapshot
- * may be older than them); fetched copies win for everything else.
- */
-const mergeMessages = (fetched: ChatMessage[], current: ChatMessage[]) => {
-  const byId = new Map<number, ChatMessage>();
-  for (const m of current) byId.set(m.id, m);
-  for (const m of fetched) byId.set(m.id, m);
-  return [...byId.values()].sort((a, b) => a.id - b.id);
 };
 
 const groupMessagesByDate = (messages: ChatMessage[]) => {
@@ -376,6 +367,9 @@ const ConversationSidebar = ({
             <button
               key={conv.id}
               onClick={() => onSelect(conv.id)}
+              onMouseEnter={() => prefetchMessages(conv.id)}
+              onFocus={() => prefetchMessages(conv.id)}
+              onTouchStart={() => prefetchMessages(conv.id)}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition ${
                 active
                   ? 'bg-blue-500/10 ring-1 ring-blue-500/30'
@@ -952,7 +946,7 @@ const ConversationView = ({
   // Live connection came back: fetch anything sent while it was down
   useChatHub({
     onReconnected: () => {
-      chatApi.getMessages(conversationId, 50)
+      loadLatest(conversationId)
         .then(msgs => setMessages(prev => mergeMessages(msgs, prev)))
         .catch(() => { /* next reconnect / reopen will catch up */ });
     },
@@ -1065,10 +1059,17 @@ const ConversationView = ({
   useEffect(() => {
     let cancelled = false;
     setLoadState('loading');
+    // Show what we already know instantly (cache / prefetch), then refresh
+    const cached = getCachedMessages(conversationId);
+    if (cached?.length) setMessages(prev => mergeMessages(cached, prev));
+    if (cached && isFresh(conversationId) && loadAttempt === 0) {
+      setLoadState('ready');
+      return;
+    }
     (async () => {
       for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
         try {
-          const msgs = await chatApi.getMessages(conversationId, 50);
+          const msgs = await loadLatest(conversationId);
           if (cancelled) return;
           setMessages(prev => mergeMessages(msgs, prev));
           setHasMore(msgs.length === 50);
@@ -1085,7 +1086,6 @@ const ConversationView = ({
 
   // Reset per-conversation UI when switching chats
   useEffect(() => {
-    setMessages([]);
     setHasMore(true);
     scrollReady.current = false;
     setReplyTo(null);
@@ -1533,6 +1533,15 @@ export const ChatWorkspace = ({
   const { user } = useAuth();
   const currentUserId = user?.id ?? 0;
   const { conversations, conversationsLoading: isLoading, setActiveConversation } = useChat();
+
+  // Warm the cache for the chats you're most likely to open (unread first)
+  const prefetched = useRef(false);
+  useEffect(() => {
+    if (prefetched.current || conversations.length === 0) return;
+    prefetched.current = true;
+    const likely = [...conversations].sort((a, b) => Number(b.unreadCount > 0) - Number(a.unreadCount > 0)).slice(0, 3);
+    likely.forEach(c => prefetchMessages(c.id));
+  }, [conversations]);
   const compact = variant === 'dock';
 
   const [selectedId, setSelectedId] = useState<number | null>(initialConversationId);
@@ -1542,12 +1551,13 @@ export const ChatWorkspace = ({
   const [messagesMap, setMessagesMap] = useState<Record<number, ChatMessage[]>>({});
   const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
 
-  const getMessages = (convId: number): ChatMessage[] => messagesMap[convId] ?? [];
+  const getMessages = (convId: number): ChatMessage[] => messagesMap[convId] ?? getCachedMessages(convId) ?? [];
   const setMessages = (convId: number) =>
     (updater: React.SetStateAction<ChatMessage[]>) => {
       setMessagesMap(prev => {
-        const current = prev[convId] ?? [];
+        const current = prev[convId] ?? getCachedMessages(convId) ?? [];
         const next = typeof updater === 'function' ? updater(current) : updater;
+        setCachedMessages(convId, next);   // reopening this chat is instant
         return { ...prev, [convId]: next };
       });
     };
@@ -1568,9 +1578,11 @@ export const ChatWorkspace = ({
     // here we only keep the loaded message lists in sync.
     onMessage: (msg) => {
       setMessagesMap(prev => {
-        const current = prev[msg.conversationId];
-        if (!current || current.some(m => m.id === msg.id)) return prev;
-        return { ...prev, [msg.conversationId]: [...current, msg] };
+        const current = prev[msg.conversationId] ?? getCachedMessages(msg.conversationId);
+        if (!current) return prev;
+        const next = mergeMessages([msg], current);
+        setCachedMessages(msg.conversationId, next);
+        return { ...prev, [msg.conversationId]: next };
       });
       setTypingUsers(prev => {
         if (!prev.has(msg.senderId)) return prev;

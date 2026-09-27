@@ -29,6 +29,7 @@ import { useAuth } from './Authcontext';
 import { useToast } from './ToastContext';
 import { getHubBaseUrl } from './SignalRContext';
 import { showDesktopNotification } from '../components/chat/chatNotifications';
+import { applyLiveMessage, applyDeletedMessage, clearChatCache } from '../components/chat/chatMessageCache';
 
 export type ChatConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
@@ -186,7 +187,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Hub connection lifecycle ──────────────────────────────────────────────
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) { clearChatCache(); return; }
     let disposed = false;
 
     (async () => {
@@ -234,11 +235,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             showDesktopNotification(title, short, `chat-${msg.conversationId}`, () => openChatRef.current(msg.conversationId));
           }
         }
+        applyLiveMessage(msg);   // keep cached chats current while they're closed
         emit('onMessage', msg);
       });
 
-      conn.on('MessageEdited', (msg: ChatMessage) => emit('onMessageEdited', msg));
-      conn.on('MessageDeleted', (d) => emit('onMessageDeleted', d));
+      conn.on('MessageEdited', (msg: ChatMessage) => { applyLiveMessage(msg); emit('onMessageEdited', msg); });
+      conn.on('MessageDeleted', (d: { messageId: number }) => { applyDeletedMessage(d.messageId); emit('onMessageDeleted', d); });
       conn.on('ReactionUpdated', (d) => emit('onReactionUpdated', d));
       conn.on('UserTyping', (d) => emit('onUserTyping', d));
       conn.on('UserStoppedTyping', (d) => emit('onUserStoppedTyping', d));

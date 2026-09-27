@@ -127,3 +127,42 @@ public class ChatSearchTests : IDisposable
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _db.Service().SearchMessagesAsync(1, 3, "release"));
     }
 }
+
+public class ChatConversationListTests : IDisposable
+{
+    private readonly ChatTestDb _db = new();
+    public void Dispose() => _db.Dispose();
+
+    [Fact]
+    public async Task List_has_names_unread_counts_and_newest_first()
+    {
+        // conversation 1 = group "Dev" (users 1, 2) from the seed; add a DM 1 ↔ 3
+        var dm = await _db.Service().GetOrCreateDirectConversationAsync(1, 3);
+        await _db.Service().SendMessageAsync(2, new SendMessageDto { ConversationId = 1, Content = "one" });
+        await _db.Service().SendMessageAsync(2, new SendMessageDto { ConversationId = 1, Content = "two" });
+        await Task.Delay(20);
+        await _db.Service().SendMessageAsync(3, new SendMessageDto { ConversationId = dm.Id, Content = "hey" });
+        await _db.Service().SendMessageAsync(1, new SendMessageDto { ConversationId = dm.Id, Content = "my own" });
+
+        var list = await _db.Service().GetMyConversationsAsync(1);
+
+        Assert.Equal(new[] { dm.Id, 1 }, list.Select(c => c.Id));            // newest activity first
+        var direct = list[0];
+        Assert.Equal("Outsider", direct.DisplayName);                        // the other person's name
+        Assert.Equal(3, direct.OtherUserId);
+        Assert.Equal(1, direct.UnreadCount);                                 // my own message doesn't count
+        var group = list[1];
+        Assert.Equal("Dev", group.DisplayName);
+        Assert.Null(group.OtherUserId);
+        Assert.Equal(2, group.UnreadCount);
+        Assert.Equal(2, group.MemberCount);
+
+        var counts = await _db.Service().GetAllUnreadCountsAsync(1);
+        Assert.Equal(2, counts[1]);
+        Assert.Equal(1, counts[dm.Id]);
+
+        await _db.Service().MarkConversationReadAsync(1, 1);
+        Assert.Equal(0, (await _db.Service().GetMyConversationsAsync(1)).Single(c => c.Id == 1).UnreadCount);
+        Assert.Equal(new[] { 1, dm.Id }.OrderBy(x => x), (await _db.Service().GetMyConversationIdsAsync(1)).OrderBy(x => x));
+    }
+}

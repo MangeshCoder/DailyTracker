@@ -64,9 +64,9 @@ namespace DailyTrackerAPI.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
 
             // Join all conversation groups for this user
-            var conversations = await _chatService.GetMyConversationsAsync(userId);
-            foreach (var conv in conversations)
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"conv_{conv.Id}");
+            // (ids only — building the full conversation list here was wasted work)
+            foreach (var conversationId in await _chatService.GetMyConversationIdsAsync(userId))
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"conv_{conversationId}");
 
             // Notify others that this user is online
             await Clients.Others.SendAsync("UserOnline", new { UserId = userId });
