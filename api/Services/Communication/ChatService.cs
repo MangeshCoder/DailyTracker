@@ -686,6 +686,11 @@ namespace DailyTrackerAPI.Services.Communication
             var member = await _db.ConversationMembers
                 .FirstOrDefaultAsync(m => m.ConversationId == conversationId && m.UserId == userId);
 
+            // Earlier messages already got receipts the last time this chat was read,
+            // so only look at what came after (a minute of slack for clock skew)
+            var previousRead = member?.LastReadAt;
+            var since = previousRead.HasValue ? previousRead.Value.AddMinutes(-1) : DateTime.MinValue;
+
             if (member != null)
             {
                 member.LastReadAt = DateTime.UtcNow;
@@ -693,9 +698,9 @@ namespace DailyTrackerAPI.Services.Communication
             }
 
             // Create read receipts for all unread messages
-            var lastReadAt = member?.LastReadAt ?? DateTime.MinValue;
             var unreadMessages = await _db.ChatMessages
                 .Where(m => m.ConversationId == conversationId
+                    && m.SentAt > since
                     && m.SenderId != userId
                     && !_db.MessageReadReceipts.Any(r => r.MessageId == m.Id && r.UserId == userId))
                 .Select(m => m.Id)

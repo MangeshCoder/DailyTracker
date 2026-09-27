@@ -165,4 +165,20 @@ public class ChatConversationListTests : IDisposable
         Assert.Equal(0, (await _db.Service().GetMyConversationsAsync(1)).Single(c => c.Id == 1).UnreadCount);
         Assert.Equal(new[] { 1, dm.Id }.OrderBy(x => x), (await _db.Service().GetMyConversationIdsAsync(1)).OrderBy(x => x));
     }
+
+    [Fact]
+    public async Task Reading_again_adds_receipts_only_for_new_messages()
+    {
+        await _db.Service().SendMessageAsync(2, new SendMessageDto { ConversationId = 1, Content = "first" });
+        await _db.Service().SendMessageAsync(2, new SendMessageDto { ConversationId = 1, Content = "second" });
+        await _db.Service().MarkConversationReadAsync(1, 1);
+        await _db.Service().SendMessageAsync(2, new SendMessageDto { ConversationId = 1, Content = "third" });
+        await _db.Service().MarkConversationReadAsync(1, 1);
+        await _db.Service().MarkConversationReadAsync(1, 1);   // nothing new: no duplicates
+
+        using var db = _db.NewContext();
+        var receipts = db.MessageReadReceipts.Where(r => r.UserId == 1).Select(r => r.MessageId).ToList();
+        Assert.Equal(3, receipts.Count);
+        Assert.Equal(3, receipts.Distinct().Count());
+    }
 }

@@ -246,8 +246,13 @@ namespace DailyTrackerAPI.Data
 
             // ── AppNotification
             mb.Entity<AppNotification>(e =>
+            {
+                // bell list (newest first) + unread badge, both per user
+                e.HasIndex(n => new { n.UserId, n.CreatedAt });
+                e.HasIndex(n => n.UserId, "IX_Notifications_UserId_Unread").HasFilter("[IsRead] = 0");
                 e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId)
-                 .OnDelete(DeleteBehavior.Cascade));
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
 
             // ── Holiday - unique per date
             mb.Entity<Holiday>(e => e.HasIndex(h => h.Date).IsUnique());
@@ -352,7 +357,11 @@ namespace DailyTrackerAPI.Data
             // ── ChatMessage
             mb.Entity<ChatMessage>(e =>
             {
-                e.HasIndex(m => new { m.ConversationId, m.SentAt });
+                // history pages + unread counts (covering: no row lookups per message)
+                e.HasIndex(m => new { m.ConversationId, m.SentAt })
+                 .IncludeProperties(m => new { m.SenderId, m.IsDeleted });
+                // pinned bar (only a handful of rows)
+                e.HasIndex(m => m.ConversationId, "IX_ChatMessages_Pinned").HasFilter("[IsPinned] = 1");
                 e.HasOne(m => m.Conversation)
                  .WithMany(c => c.Messages)
                  .HasForeignKey(m => m.ConversationId)
