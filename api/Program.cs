@@ -71,6 +71,19 @@ app.UseExceptionHandler(errorApp =>
         await context.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
     }));
 
+// ─── Slow request log ─────────────────────────────────────────────────────────
+// Any API call over 1 s is logged as a warning (e.g. a slow database query).
+// SignalR hubs are long-lived connections, so they're skipped.
+app.Use(async (context, next) =>
+{
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    await next();
+    if (watch.ElapsedMilliseconds > 1000 && !context.Request.Path.StartsWithSegments("/hubs"))
+        app.Logger.LogWarning("Slow request: {Method} {Path}{Query} took {Ms} ms (status {Status})",
+            context.Request.Method, context.Request.Path, context.Request.QueryString,
+            watch.ElapsedMilliseconds, context.Response.StatusCode);
+});
+
 // ─── Swagger (Development only) ───────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {

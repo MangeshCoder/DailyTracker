@@ -45,6 +45,8 @@ export interface ChatHubCallbacks {
   onMembersAdded?: (data: { conversationId: number; addedUserIds: number[] }) => void;
   onMemberLeft?: (data: { conversationId: number; userId: number }) => void;
   onGroupInfoUpdated?: (data: { conversationId: number; groupName?: string }) => void;
+  /** live connection restored after a drop — refetch anything missed */
+  onReconnected?: (data: void) => void;
 }
 
 type Listener = { current: ChatHubCallbacks };
@@ -286,6 +288,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setConnectionState('connected');
         // Catch up on anything missed while offline
         qc.invalidateQueries({ queryKey: ['conversations'] });
+        emit('onReconnected', undefined);
       });
       conn.onclose(() => setConnectionState('disconnected'));
 

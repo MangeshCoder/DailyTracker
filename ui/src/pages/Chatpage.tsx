@@ -71,6 +71,18 @@ const formatDate = (iso: string) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+/**
+ * Merge a freshly fetched page with what's already on screen. Messages that
+ * arrived live while the request was in flight are kept (the server snapshot
+ * may be older than them); fetched copies win for everything else.
+ */
+const mergeMessages = (fetched: ChatMessage[], current: ChatMessage[]) => {
+  const byId = new Map<number, ChatMessage>();
+  for (const m of current) byId.set(m.id, m);
+  for (const m of fetched) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+};
+
 const groupMessagesByDate = (messages: ChatMessage[]) => {
   const groups: { date: string; messages: ChatMessage[] }[] = [];
   for (const msg of messages) {
@@ -937,6 +949,15 @@ const ConversationView = ({
   const { sendTyping, stopTyping, isOnline } = useChat();
   const { toast } = useToast();
 
+  // Live connection came back: fetch anything sent while it was down
+  useChatHub({
+    onReconnected: () => {
+      chatApi.getMessages(conversationId, 50)
+        .then(msgs => setMessages(prev => mergeMessages(msgs, prev)))
+        .catch(() => { /* next reconnect / reopen will catch up */ });
+    },
+  });
+
   // ── Attachments & polls ────────────────────────────────────────────────
   const [queued, setQueued] = useState<File[]>([]);
   const [uploads, setUploads] = useState<{ key: string; name: string; size: number; progress: number }[]>([]);
@@ -1036,14 +1057,37 @@ const ConversationView = ({
   const scrollReady = useRef(false);
   const pendingPrepend = useRef<{ height: number; top: number } | null>(null);
 
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
+  // Latest page of history. Retries a failed request (3 tries), ignores
+  // answers for a chat you've already left, and never drops live messages.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadState('loading');
+    (async () => {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const msgs = await chatApi.getMessages(conversationId, 50);
+          if (cancelled) return;
+          setMessages(prev => mergeMessages(msgs, prev));
+          setHasMore(msgs.length === 50);
+          setLoadState('ready');
+          return;
+        } catch {
+          if (attempt < 2) await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+        }
+      }
+      if (!cancelled) setLoadState('error');
+    })();
+    return () => { cancelled = true; };
+  }, [conversationId, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset per-conversation UI when switching chats
   useEffect(() => {
     setMessages([]);
     setHasMore(true);
     scrollReady.current = false;
-    chatApi.getMessages(conversationId, 50).then(msgs => {
-      setMessages(msgs);
-      setHasMore(msgs.length === 50);
-    });
     setReplyTo(null);
     setEditingMessage(null);
     setShowGroupInfo(false);
@@ -1318,7 +1362,25 @@ const ConversationView = ({
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading earlier messages…
             </div>
           )}
-          {groupedMessages.length === 0 && !loadingMore && (
+          {groupedMessages.length === 0 && loadState === 'loading' && (
+            <div className="h-full flex flex-col items-center justify-center gap-2 text-slate-400 py-12" role="status">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <p className="text-xs">Loading messages…</p>
+            </div>
+          )}
+          {loadState === 'error' && (
+            <div className={`flex flex-col items-center justify-center text-center gap-2 ${groupedMessages.length === 0 ? 'h-full py-12' : 'py-3'}`} role="alert">
+              <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">Couldn't load earlier messages</p>
+              <button
+                type="button"
+                onClick={() => setLoadAttempt(a => a + 1)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {groupedMessages.length === 0 && !loadingMore && loadState === 'ready' && (
             <div className="h-full flex flex-col items-center justify-center text-center py-12">
               <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                 <MessageSquare className="w-7 h-7 text-blue-500" />
