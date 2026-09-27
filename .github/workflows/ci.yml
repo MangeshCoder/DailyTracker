@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  CI — runs on every push / pull request to main (and manually from the
+#  Actions tab). A red ❌ on a commit means something below broke.
+#
+#  api : builds the .NET API and runs tests/DailyTrackerAPI.Tests
+#        (chat, attachments, polls, security) against SQLite in-memory —
+#        no SQL Server, secrets or network needed.
+#  ui  : installs exact package versions, strict TypeScript check, production build.
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch cancels the older, still-running check
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API · build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore tests/DailyTrackerAPI.Tests/DailyTrackerAPI.Tests.csproj
+
+      - name: Build (API + tests)
+        run: dotnet build tests/DailyTrackerAPI.Tests/DailyTrackerAPI.Tests.csproj --no-restore -c Release
+
+      - name: Test
+        run: >
+          dotnet test tests/DailyTrackerAPI.Tests/DailyTrackerAPI.Tests.csproj
+          --no-build -c Release
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: TestResults
+          retention-days: 14
+
+  ui:
+    name: UI · type-check & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install (exact versions from package-lock.json)
+        run: npm ci
+
+      - name: Type-check (strict)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Build
+        run: npm run build
