@@ -13,7 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Secrets live in .NET User Secrets (run api/setup-secrets.ps1), never in
 // appsettings.json. Fail fast with a clear message instead of a cryptic crash.
 var jwtKeyValue = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKeyValue) || System.Text.Encoding.UTF8.GetByteCount(jwtKeyValue) < 32)
+// (Skipped for `dotnet ef` design-time runs — creating migrations needs no signing key.)
+if (!EF.IsDesignTime && (string.IsNullOrWhiteSpace(jwtKeyValue) || System.Text.Encoding.UTF8.GetByteCount(jwtKeyValue) < 32))
     throw new InvalidOperationException(
         "Jwt:Key is missing or shorter than 32 characters. Run  api/setup-secrets.ps1  once " +
         "(or: dotnet user-secrets set \"Jwt:Key\" \"<random 64+ characters>\") and start the API again.");

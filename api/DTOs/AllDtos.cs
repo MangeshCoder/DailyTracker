@@ -937,6 +937,8 @@ namespace DailyTrackerAPI.DTOs
         public string? AttachmentUrl { get; set; }
         public string? AttachmentName { get; set; }
         public int? ReplyToMessageId { get; set; }
+        /// <summary>Members @mentioned in the text (must be in the conversation)</summary>
+        public List<int>? MentionedUserIds { get; set; }
     }
 
     public class ConversationDto
@@ -954,6 +956,8 @@ namespace DailyTrackerAPI.DTOs
 
     public class ConversationSummaryDto : ConversationDto
     {
+        /// <summary>Someone @mentioned me in a message I haven't read yet</summary>
+        public bool HasUnreadMention { get; set; }
         public bool IsMuted { get; set; }
         public string? AvatarUrl { get; set; }
     }
@@ -992,6 +996,10 @@ namespace DailyTrackerAPI.DTOs
         public long? AttachmentSize { get; set; }
         public string? AttachmentContentType { get; set; }
         public ChatPollDto? Poll { get; set; }
+        public List<int> MentionedUserIds { get; set; } = new();
+        public bool IsPinned { get; set; }
+        public DateTime? PinnedAt { get; set; }
+        public int? PinnedByUserId { get; set; }
         public bool IsDeleted { get; set; }
         public bool IsEdited { get; set; }
         public DateTime SentAt { get; set; }

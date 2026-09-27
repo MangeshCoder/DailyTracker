@@ -285,6 +285,8 @@ export interface ConversationSummary {
   lastMessagePreview?: string;
   lastMessageAt?: string;
   unreadCount: number;
+  /** someone @mentioned me in an unread message */
+  hasUnreadMention?: boolean;
   memberCount: number;
   isMuted: boolean;
 }
@@ -321,6 +323,11 @@ export interface ChatMessage {
   attachmentSize?: number;
   attachmentContentType?: string;
   poll?: ChatPoll;
+  /** @mentioned members (user ids) */
+  mentionedUserIds: number[];
+  isPinned: boolean;
+  pinnedAt?: string;
+  pinnedByUserId?: number;
   isDeleted: boolean;
   isEdited: boolean;
   sentAt: string;
@@ -374,6 +381,7 @@ export interface SendMessagePayload {
   attachmentUrl?: string;
   attachmentName?: string;
   replyToMessageId?: number;
+  mentionedUserIds?: number[];
 }
 
 //Announcement Types

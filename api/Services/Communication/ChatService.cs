@@ -37,6 +37,10 @@ namespace DailyTrackerAPI.Services.Communication
         Task<ChatMessageDto> SendAttachmentAsync(int senderId, int conversationId, IFormFile file, string? caption, int? replyToMessageId);
         Task<ChatAttachmentFile> GetAttachmentAsync(int messageId, int userId);
 
+        // Pinned messages
+        Task<ChatMessageDto> SetPinnedAsync(int messageId, int userId, bool pinned);
+        Task<List<ChatMessageDto>> GetPinnedMessagesAsync(int conversationId, int userId);
+
         // Polls
         Task<ChatMessageDto> CreatePollAsync(int userId, int conversationId, CreatePollDto dto);
         Task<ChatMessageDto> VotePollAsync(int userId, int pollId, List<int> optionIds);
@@ -185,6 +189,10 @@ namespace DailyTrackerAPI.Services.Communication
             {
                 var myMembership = conv.Members.First(m => m.UserId == userId);
                 int unread = await GetUnreadCountAsync(conv.Id, userId);
+                var lastRead = myMembership.LastReadAt ?? DateTime.MinValue;
+                bool unreadMention = unread > 0 && await _db.ChatMessageMentions.AnyAsync(x =>
+                    x.UserId == userId && x.Message.ConversationId == conv.Id
+                    && !x.Message.IsDeleted && x.Message.SentAt > lastRead);
 
                 // For Direct chats, show the other person's name as the conversation title
                 string displayName;
@@ -210,6 +218,7 @@ namespace DailyTrackerAPI.Services.Communication
                     LastMessagePreview = conv.LastMessagePreview,
                     LastMessageAt = conv.LastMessageAt,
                     UnreadCount = unread,
+                    HasUnreadMention = unreadMention,
                     MemberCount = conv.Members.Count(m => !m.HasLeft),
                     IsMuted = myMembership.IsMuted,
                     // For Direct: is the other person online? (could integrate with UserPresence)
@@ -287,6 +296,11 @@ namespace DailyTrackerAPI.Services.Communication
                 SentAt = DateTime.UtcNow
             };
 
+            // @mentions: only current members, never yourself (unknown ids are ignored)
+            var memberIds = conv.Members.Where(m => !m.HasLeft).Select(m => m.UserId).ToHashSet();
+            foreach (var uid in (dto.MentionedUserIds ?? new()).Distinct().Where(id => id != senderId && memberIds.Contains(id)).Take(50))
+                message.Mentions.Add(new ChatMessageMention { UserId = uid });
+
             return await SaveNewMessageAsync(conv, message);
         }
 
@@ -315,6 +329,7 @@ namespace DailyTrackerAPI.Services.Communication
                 .Include(m => m.ReadReceipts).ThenInclude(r => r.User)
                 .Include(m => m.ReplyToMessage).ThenInclude(r => r!.Sender)
                 .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
+                .Include(m => m.Mentions)
                 .OrderByDescending(m => m.SentAt)
                 .Take(pageSize)
                 .AsSplitQuery()
@@ -368,6 +383,9 @@ namespace DailyTrackerAPI.Services.Communication
 
             message.IsDeleted = true;
             message.Content = "This message was deleted.";
+            message.IsPinned = false;
+            message.PinnedAt = null;
+            message.PinnedByUserId = null;
 
             // Deleted attachments are removed from disk, not just hidden
             if (!string.IsNullOrEmpty(message.AttachmentUrl))
@@ -493,6 +511,65 @@ namespace DailyTrackerAPI.Services.Communication
                 fullPath,
                 message.AttachmentContentType ?? "application/octet-stream",
                 message.AttachmentName ?? Path.GetFileName(fullPath));
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // PINNED MESSAGES — any member can pin; at most MaxPinned per chat
+        // ══════════════════════════════════════════════════════════════════════
+
+        public const int MaxPinned = 10;
+
+        public async Task<ChatMessageDto> SetPinnedAsync(int messageId, int userId, bool pinned)
+        {
+            var message = await _db.ChatMessages
+                .Include(m => m.Conversation).ThenInclude(c => c.Members)
+                .FirstOrDefaultAsync(m => m.Id == messageId)
+                ?? throw new KeyNotFoundException("Message not found.");
+
+            AssertMembership(message.Conversation, userId);
+            if (message.IsDeleted) throw new InvalidOperationException("Deleted messages can't be pinned.");
+            if (message.MessageType == "System") throw new InvalidOperationException("System messages can't be pinned.");
+
+            if (pinned && !message.IsPinned)
+            {
+                var count = await _db.ChatMessages.CountAsync(m => m.ConversationId == message.ConversationId && m.IsPinned);
+                if (count >= MaxPinned)
+                    throw new InvalidOperationException($"A chat can have at most {MaxPinned} pinned messages. Unpin one first.");
+                message.IsPinned = true;
+                message.PinnedAt = DateTime.UtcNow;
+                message.PinnedByUserId = userId;
+            }
+            else if (!pinned && message.IsPinned)
+            {
+                message.IsPinned = false;
+                message.PinnedAt = null;
+                message.PinnedByUserId = null;
+            }
+
+            await _db.SaveChangesAsync();
+            return await LoadMessageDtoAsync(message.Id);
+        }
+
+        public async Task<List<ChatMessageDto>> GetPinnedMessagesAsync(int conversationId, int userId)
+        {
+            var conv = await _db.Conversations.Include(c => c.Members)
+                .FirstOrDefaultAsync(c => c.Id == conversationId)
+                ?? throw new KeyNotFoundException("Conversation not found.");
+            AssertMembership(conv, userId);
+
+            var pinned = await _db.ChatMessages
+                .Where(m => m.ConversationId == conversationId && m.IsPinned && !m.IsDeleted)
+                .Include(m => m.Sender)
+                .Include(m => m.Reactions)
+                .Include(m => m.ReadReceipts)
+                .Include(m => m.ReplyToMessage).ThenInclude(r => r!.Sender)
+                .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
+                .Include(m => m.Mentions)
+                .OrderByDescending(m => m.PinnedAt)
+                .AsSplitQuery()
+                .AsNoTracking()
+                .ToListAsync();
+            return pinned.Select(MapToMessageDto).ToList();
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -858,6 +935,8 @@ namespace DailyTrackerAPI.Services.Communication
                 .Include(m => m.Sender)
                 .Include(m => m.Reactions)
                 .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
+                .Include(m => m.Mentions)
+                .Include(m => m.ReplyToMessage).ThenInclude(r => r!.Sender)
                 .OrderByDescending(m => m.SentAt)
                 .Take(50)
                 .AsSplitQuery()
@@ -990,6 +1069,7 @@ namespace DailyTrackerAPI.Services.Communication
                 .Include(x => x.ReadReceipts)
                 .Include(x => x.ReplyToMessage).ThenInclude(r => r!.Sender)
                 .Include(x => x.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
+                .Include(x => x.Mentions)
                 .AsSplitQuery()
                 .AsNoTracking()
                 .FirstAsync(x => x.Id == messageId);
@@ -1107,6 +1187,10 @@ namespace DailyTrackerAPI.Services.Communication
                     VoterIds = o.Votes.Select(v => v.UserId).ToList()
                 }).ToList()
             },
+            MentionedUserIds = m.IsDeleted ? new() : m.Mentions?.Select(x => x.UserId).ToList() ?? new(),
+            IsPinned = m.IsPinned && !m.IsDeleted,
+            PinnedAt = m.IsPinned ? m.PinnedAt : null,
+            PinnedByUserId = m.IsPinned ? m.PinnedByUserId : null,
             IsDeleted = m.IsDeleted,
             IsEdited = m.IsEdited,
             SentAt = m.SentAt,

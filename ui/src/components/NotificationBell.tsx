@@ -158,7 +158,11 @@ export const NotificationBell = () => {
                 return (
                   <div
                     key={n.id}
-                    onClick={() => { if (!n.isRead) markRead.mutate(n.id); }}
+                    onClick={() => {
+                      if (!n.isRead) markRead.mutate(n.id);
+                      // e.g. "/chat?c=12" for @mentions — open the linked page
+                      if (n.actionUrl?.startsWith('/')) { setOpen(false); navigate(n.actionUrl); }
+                    }}
                     className={`flex gap-3 px-4 py-3 cursor-pointer transition ${
                       n.isRead
                         ? 'opacity-60 hover:bg-slate-50 dark:hover:bg-slate-800/40'

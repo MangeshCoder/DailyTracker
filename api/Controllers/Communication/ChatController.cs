@@ -34,12 +34,15 @@ namespace DailyTrackerAPI.Controllers.Communication
         private readonly IChatService _chatService;
         private readonly IHubContext<ChatHub> _hub;
         private readonly AppDbContext _db;
+        private readonly IAppNotificationService _notifications;
 
-        public ChatController(IChatService chatService, IHubContext<ChatHub> hub, AppDbContext db)
+        public ChatController(IChatService chatService, IHubContext<ChatHub> hub, AppDbContext db,
+            IAppNotificationService notifications)
         {
             _chatService = chatService;
             _hub = hub;
             _db = db;
+            _notifications = notifications;
         }
 
         // ── CONVERSATIONS ─────────────────────────────────────────────────────
@@ -165,6 +168,18 @@ namespace DailyTrackerAPI.Controllers.Communication
                 await _hub.Clients.Group($"conv_{dto.ConversationId}")
                     .SendAsync("ReceiveMessage", message);
 
+                // 🔔 @mentions also land in the notification bell (with a link to the chat)
+                if (message.MentionedUserIds.Count > 0)
+                {
+                    var preview = message.Content.Length > 120 ? message.Content[..117] + "..." : message.Content;
+                    await _notifications.CreateForUsersAsync(
+                        message.MentionedUserIds,
+                        $"💬 {message.SenderName} mentioned you",
+                        preview,
+                        "Info",
+                        $"/chat?c={message.ConversationId}");
+                }
+
                 return Ok(message);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
@@ -282,6 +297,39 @@ namespace DailyTrackerAPI.Controllers.Communication
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        }
+
+        // ── PINNED MESSAGES ───────────────────────────────────────────────────
+
+        /// <summary>Pinned messages of a conversation (newest pin first)</summary>
+        [HttpGet("conversations/{conversationId}/pinned")]
+        public async Task<IActionResult> GetPinned(int conversationId)
+        {
+            try { return Ok(await _chatService.GetPinnedMessagesAsync(conversationId, User.GetUserId())); }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        }
+
+        /// <summary>Pin a message (any member)</summary>
+        [HttpPost("messages/{messageId}/pin")]
+        public Task<IActionResult> Pin(int messageId) => SetPinned(messageId, true);
+
+        /// <summary>Unpin a message (any member)</summary>
+        [HttpDelete("messages/{messageId}/pin")]
+        public Task<IActionResult> Unpin(int messageId) => SetPinned(messageId, false);
+
+        private async Task<IActionResult> SetPinned(int messageId, bool pinned)
+        {
+            try
+            {
+                var message = await _chatService.SetPinnedAsync(messageId, User.GetUserId(), pinned);
+                await _hub.Clients.Group($"conv_{message.ConversationId}")
+                    .SendAsync("MessageEdited", message);
+                return Ok(message);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
         // ── POLLS ─────────────────────────────────────────────────────────────

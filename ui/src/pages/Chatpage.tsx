@@ -10,7 +10,7 @@
 //  UI: native window.confirm() replaced with the themed useConfirm dialog.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, type KeyboardEvent, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import type { ChatMessage, ConversationSummary, UserChatProfile, ConversationDetail } from '../types/index';
@@ -23,6 +23,10 @@ import {
   AttachMenu, QueuedFiles, ImageAttachment, FileAttachment, PollCard, PollComposer,
   validateChatFile, formatBytes,
 } from '../components/chat/ChatAttachments';
+import {
+  MessageText, MentionPicker, findMentionQuery, filterCandidates, PinnedBar, SearchPanel,
+  DesktopNotifyToggle, type MentionCandidate,
+} from '../components/chat/ChatExtras';
 import { useConfirm } from '../hooks/useConfirm';
 import {
   MessageSquare,
@@ -47,6 +51,10 @@ import {
   Info,
   WifiOff,
   Paperclip,
+  Pin,
+  PinOff,
+  Copy,
+  Search as SearchIcon,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,6 +320,7 @@ const ConversationSidebar = ({
             )}
           </div>
           <div className="flex items-center gap-1">
+            <DesktopNotifyToggle />
             <button
               onClick={onNewChat}
               title="New chat"
@@ -386,6 +395,11 @@ const ConversationSidebar = ({
                   <p className={`text-xs truncate flex-1 ${unread ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'}`}>
                     {conv.lastMessagePreview ?? (conv.type === 'Group' ? `${conv.memberCount} members` : 'No messages yet')}
                   </p>
+                  {unread && conv.hasUnreadMention && (
+                    <span title="You were mentioned" className="w-5 h-5 text-[11px] bg-amber-500 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                      @
+                    </span>
+                  )}
                   {unread && (
                     <span className="min-w-[20px] h-5 px-1.5 text-[11px] bg-blue-600 text-white rounded-full flex items-center justify-center font-bold flex-shrink-0">
                       {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
@@ -407,8 +421,15 @@ const ConversationSidebar = ({
 const MessageBubble = ({
   message, isOwn, currentUserId, onReply, onEdit, onDelete, onReact, compact = false,
   memberNames, onVote, onClosePoll, canClosePoll = false,
+  onTogglePin, highlighted = false, highlightTerm, seenBy,
 }: {
   compact?: boolean;
+  onTogglePin: (msg: ChatMessage) => void;
+  /** briefly outlined after jumping to it (search / pinned) */
+  highlighted?: boolean;
+  highlightTerm?: string;
+  /** names of people who have read my message (groups) */
+  seenBy?: string[];
   memberNames: Record<number, string>;
   onVote: (pollId: number, optionIds: number[]) => void;
   onClosePoll: (pollId: number) => void;
@@ -451,8 +472,21 @@ const MessageBubble = ({
     'w-7 h-7 rounded-full flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 ' +
     'text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition';
 
+  const mentionNames = (message.mentionedUserIds ?? []).map(id => memberNames[id]).filter(Boolean);
+  const mentionsMe = !isOwn && (message.mentionedUserIds ?? []).includes(currentUserId);
+
+  const copyText = () => {
+    navigator.clipboard?.writeText(message.content).catch(() => {});
+    setShowMenu(false);
+  };
+
   return (
-    <div className={`flex items-end gap-2 group ${isOwn ? 'flex-row-reverse' : 'flex-row'} mb-1.5`}>
+    <div
+      id={`msg-${message.id}`}
+      className={`flex items-end gap-2 group ${isOwn ? 'flex-row-reverse' : 'flex-row'} mb-1.5 rounded-2xl transition-colors duration-700 ${
+        highlighted ? 'bg-amber-300/25 dark:bg-amber-400/10' : ''
+      }`}
+    >
       {!isOwn && (
         <div className="flex-shrink-0 mb-5">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white">
@@ -495,9 +529,13 @@ const MessageBubble = ({
           } ${
             isOwn
               ? 'bg-blue-600 text-white rounded-br-md shadow-md shadow-blue-500/20'
-              : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200 dark:border-slate-700 shadow-sm'
+              : mentionsMe
+                ? 'bg-amber-50 dark:bg-amber-500/10 text-slate-800 dark:text-slate-100 rounded-bl-md border border-amber-300 dark:border-amber-500/40 shadow-sm'
+                : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200 dark:border-slate-700 shadow-sm'
           } ${message.isDeleted ? 'opacity-60 italic' : ''}`}>
-            {message.content}
+            {message.isDeleted
+              ? message.content
+              : <MessageText text={message.content} mentionNames={mentionNames} myName={memberNames[currentUserId]} onDark={isOwn} highlight={highlightTerm} />}
             {message.isEdited && !message.isDeleted && (
               <span className="text-[11px] opacity-60 ml-2">(edited)</span>
             )}
@@ -523,9 +561,13 @@ const MessageBubble = ({
         )}
 
         <p className={`inline-flex items-center gap-1 text-[11px] mt-1 px-1 ${isOwn ? 'self-end text-slate-400 dark:text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
+          {message.isPinned && <Pin className="w-3 h-3 -rotate-45 text-amber-500" aria-label="Pinned" />}
           {formatTime(message.sentAt)}
           {isOwn && (message.readByUserIds.length > 1
-            ? <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+            ? <span title={seenBy?.length ? `Seen by ${seenBy.join(', ')}` : 'Seen'} className="inline-flex items-center gap-0.5">
+                <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                {seenBy && seenBy.length > 0 && <span className="text-[10px] text-blue-500">{seenBy.length > 2 ? `Seen by ${seenBy.length}` : `Seen by ${seenBy.join(', ')}`}</span>}
+              </span>
             : <Check className="w-3.5 h-3.5" />)}
         </p>
 
@@ -555,14 +597,29 @@ const MessageBubble = ({
             <button onClick={() => onReply(message)} className={actionBtn} title="Reply">
               <Reply className="w-3.5 h-3.5" />
             </button>
-            {isOwn && (
+            {(
               <div className="relative">
                 <button onClick={() => setShowMenu(p => !p)} className={actionBtn} title="More">
                   <MoreVertical className="w-3.5 h-3.5" />
                 </button>
                 {showMenu && (
-                  <div className="absolute right-0 bottom-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xl z-10 w-32 py-1">
-                    {message.messageType !== 'Poll' && (
+                  <div className={`absolute ${isOwn ? 'right-0' : 'left-0'} bottom-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xl z-10 w-36 py-1`}>
+                    <button
+                      onClick={() => { onTogglePin(message); setShowMenu(false); }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    >
+                      {message.isPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                      {message.isPinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    {message.content && message.messageType !== 'Poll' && (
+                      <button
+                        onClick={copyText}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                      >
+                        <Copy className="w-3.5 h-3.5" /> Copy text
+                      </button>
+                    )}
+                    {isOwn && message.messageType !== 'Poll' && (
                       <button
                         onClick={() => { onEdit(message); setShowMenu(false); }}
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
@@ -570,12 +627,14 @@ const MessageBubble = ({
                         <Pencil className="w-3.5 h-3.5" /> {message.messageType === 'Text' ? 'Edit' : 'Edit caption'}
                       </button>
                     )}
-                    <button
-                      onClick={() => { onDelete(message.id); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
+                    {isOwn && (
+                      <button
+                        onClick={() => { onDelete(message.id); setShowMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -669,16 +728,18 @@ const GroupInfoPanel = ({
 // ─────────────────────────────────────────────────────────────────────────────
 const MessageInput = ({
   onSend, onTyping, onStopTyping, replyTo, onCancelReply, editingMessage, onCancelEdit, disabled = false, compact = false,
-  queued, onAddFiles, onRemoveQueued, onSendFiles, onOpenPoll,
+  queued, onAddFiles, onRemoveQueued, onSendFiles, onOpenPoll, mentionCandidates = [],
 }: {
   compact?: boolean;
+  /** people who can be @mentioned (conversation members except me) */
+  mentionCandidates?: MentionCandidate[];
   /** files waiting to be sent (picked, dropped or pasted) */
   queued: File[];
   onAddFiles: (files: File[]) => void;
   onRemoveQueued: (index: number) => void;
   onSendFiles: (caption: string, replyToId?: number) => void;
   onOpenPoll: () => void;
-  onSend: (content: string, replyToId?: number) => void;
+  onSend: (content: string, replyToId?: number, mentionedUserIds?: number[]) => void;
   onTyping: () => void;
   onStopTyping: () => void;
   replyTo: ChatMessage | null;
@@ -691,6 +752,34 @@ const MessageInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── @mention autocomplete ──
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const picked = useRef(new Map<number, string>());   // userId → name inserted as "@name"
+  const suggestions = mention && !editingMessage ? filterCandidates(mentionCandidates, mention.query) : [];
+
+  const updateMention = (text: string, caret: number) => {
+    const m = findMentionQuery(text, caret);
+    setMention(m);
+    setMentionIndex(0);
+  };
+
+  const insertMention = (c: MentionCandidate) => {
+    const el = textareaRef.current;
+    if (!mention || !el) return;
+    const caret = el.selectionStart ?? value.length;
+    const next = value.slice(0, mention.start) + `@${c.name} ` + value.slice(caret);
+    const pos = mention.start + c.name.length + 2;
+    setValue(next);
+    picked.current.set(c.id, c.name);
+    setMention(null);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(pos, pos); });
+  };
+
+  /** ids whose "@Name" is still in the text */
+  const mentionedIds = (text: string) =>
+    [...picked.current].filter(([, name]) => text.includes(`@${name}`)).map(([id]) => id);
+
   useEffect(() => {
     if (editingMessage) {
       setValue(editingMessage.content);
@@ -700,12 +789,19 @@ const MessageInput = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setValue(e.target.value);
+    updateMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
     onTyping();
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(onStopTyping, 2000);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestions.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % suggestions.length); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + suggestions.length) % suggestions.length); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(suggestions[mentionIndex]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMention(null); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
     if (e.key === 'Escape') { onCancelReply(); onCancelEdit(); }
   };
@@ -717,8 +813,10 @@ const MessageInput = ({
       onSendFiles(trimmed, replyTo?.id);   // text becomes the caption
     } else {
       if (!trimmed) return;
-      onSend(trimmed, replyTo?.id);
+      onSend(trimmed, replyTo?.id, editingMessage ? undefined : mentionedIds(trimmed));
     }
+    picked.current.clear();
+    setMention(null);
     setValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     onStopTyping();
@@ -752,11 +850,17 @@ const MessageInput = ({
         {!editingMessage && (
           <AttachMenu onFiles={onAddFiles} onPoll={onOpenPoll} disabled={disabled} />
         )}
+        <div className="relative flex-1 min-w-0 flex">
+        {suggestions.length > 0 && (
+          <MentionPicker items={suggestions} activeIndex={mentionIndex} onPick={insertMention} onHover={setMentionIndex} />
+        )}
         <textarea
           ref={textareaRef}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          onClick={e => updateMention(value, (e.target as HTMLTextAreaElement).selectionStart ?? value.length)}
+          onBlur={() => setTimeout(() => setMention(null), 150)}
           onPaste={e => {
             const files = Array.from(e.clipboardData.files ?? []);
             if (files.length && !editingMessage) { e.preventDefault(); onAddFiles(files); }
@@ -774,6 +878,7 @@ const MessageInput = ({
             el.style.height = Math.min(el.scrollHeight, 128) + 'px';
           }}
         />
+        </div>
         <button
           onClick={handleSubmit}
           disabled={(!value.trim() && (queued.length === 0 || !!editingMessage)) || disabled}
@@ -822,6 +927,10 @@ const ConversationView = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [highlight, setHighlight] = useState<{ id: number; term?: string } | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -921,9 +1030,16 @@ const ConversationView = ({
   });
 
   // Load initial messages when conversation changes
+  // Older pages load only after the first jump to the bottom (otherwise the list
+  // starts at the top and keeps loading the whole history), and keep the
+  // reader's position when they're prepended.
+  const scrollReady = useRef(false);
+  const pendingPrepend = useRef<{ height: number; top: number } | null>(null);
+
   useEffect(() => {
     setMessages([]);
     setHasMore(true);
+    scrollReady.current = false;
     chatApi.getMessages(conversationId, 50).then(msgs => {
       setMessages(msgs);
       setHasMore(msgs.length === 50);
@@ -936,15 +1052,36 @@ const ConversationView = ({
 
   // Scroll to bottom when a NEW message arrives (not when older ones load)
   const lastMessageId = messages[messages.length - 1]?.id;
+  const lastIsMine = messages[messages.length - 1]?.senderId === currentUserId;
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [lastMessageId, uploads.length]);
+    if (!lastMessageId) return;
+    const el = messagesContainerRef.current;
+    if (!scrollReady.current) {
+      if (el) el.scrollTop = el.scrollHeight;              // first load: jump, no animation
+      requestAnimationFrame(() => { scrollReady.current = true; });
+      return;
+    }
+    const nearBottom = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 300;
+    if (nearBottom || lastIsMine || uploads.length > 0)     // don't yank someone reading history
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [lastMessageId, uploads.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const firstMessageId = messages[0]?.id;
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (el && pendingPrepend.current) {
+      el.scrollTop = el.scrollHeight - pendingPrepend.current.height + pendingPrepend.current.top;
+      pendingPrepend.current = null;
+    }
+  }, [firstMessageId]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || messages.length === 0) return;
     setLoadingMore(true);
     const oldest = messages[0]?.id;
     const older = await chatApi.getMessages(conversationId, 50, oldest);
+    const el = messagesContainerRef.current;
+    if (el && older.length) pendingPrepend.current = { height: el.scrollHeight, top: el.scrollTop };
     setMessages(prev => [...older, ...prev]);
     setHasMore(older.length === 50);
     setLoadingMore(false);
@@ -952,11 +1089,12 @@ const ConversationView = ({
 
   // Add the API-returned message immediately (SignalR echo is de-duplicated)
   const sendMutation = useMutation({
-    mutationFn: (data: { content: string; replyToId?: number }) =>
+    mutationFn: (data: { content: string; replyToId?: number; mentionedUserIds?: number[] }) =>
       chatApi.sendMessage({
         conversationId,
         content: data.content,
         replyToMessageId: data.replyToId,
+        mentionedUserIds: data.mentionedUserIds?.length ? data.mentionedUserIds : undefined,
       }),
     onSuccess: (newMessage: ChatMessage) => {
       setMessages(prev => {
@@ -1013,12 +1151,43 @@ const ConversationView = ({
     },
   });
 
-  const handleSend = (content: string, replyToId?: number) => {
+  const handleSend = (content: string, replyToId?: number, mentionedUserIds?: number[]) => {
     if (editingMessage) {
       editMutation.mutate({ id: editingMessage.id, content });
     } else {
-      sendMutation.mutate({ content, replyToId });
+      sendMutation.mutate({ content, replyToId, mentionedUserIds });
     }
+  };
+
+  // ── Pin / unpin ──
+  const togglePin = async (msg: ChatMessage) => {
+    try {
+      const updated = msg.isPinned ? await chatApi.unpin(msg.id) : await chatApi.pin(msg.id);
+      replaceMessage(updated);
+      qc.invalidateQueries({ queryKey: ['pinned', conversationId] });
+      toast.success(updated.isPinned ? 'Message pinned' : 'Message unpinned', 2000);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Could not update the pin');
+    }
+  };
+
+  // ── Jump to a message (search result / pinned), loading older pages if needed ──
+  const jumpTo = async (id: number, term?: string) => {
+    if (compact) setShowSearch(false);
+    let list = messagesRef.current;
+    for (let page = 0; page < 40 && !list.some(m => m.id === id); page++) {
+      const oldest = list[0]?.id;
+      if (!oldest) break;
+      const older = await chatApi.getMessages(conversationId, 50, oldest);
+      if (older.length === 0) { setHasMore(false); break; }
+      list = [...older, ...list];
+      setMessages(list);
+      setHasMore(older.length === 50);
+    }
+    if (!list.some(m => m.id === id)) { toast.info('That message is no longer available'); return; }
+    setHighlight({ id, term });
+    setTimeout(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+    setTimeout(() => setHighlight(h => (h?.id === id ? null : h)), 2500);
   };
 
   const handleDelete = async (id: number) => {
@@ -1104,9 +1273,21 @@ const ConversationView = ({
               {typingUsers.size > 0 ? 'Typing…' : isGroup ? `${detail?.members.length ?? '?'} members` : otherOnline ? 'Online' : 'Offline'}
             </p>
           </div>
+          <button
+            onClick={() => { setShowSearch(p => !p); setShowGroupInfo(false); }}
+            title="Search in this chat"
+            aria-label="Search in this chat"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition ${
+              showSearch
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <SearchIcon className="w-4 h-4" />
+          </button>
           {isGroup && (
             <button
-              onClick={() => setShowGroupInfo(p => !p)}
+              onClick={() => { setShowGroupInfo(p => !p); setShowSearch(false); }}
               title="Group info"
               className={`w-9 h-9 rounded-xl flex items-center justify-center transition ${
                 showGroupInfo
@@ -1120,11 +1301,17 @@ const ConversationView = ({
           {headerActions}
         </div>
 
+        <PinnedBar
+          conversationId={conversationId}
+          onJump={id => jumpTo(id)}
+          onUnpin={id => { const m = messages.find(x => x.id === id); if (m) togglePin(m); else chatApi.unpin(id).then(() => qc.invalidateQueries({ queryKey: ['pinned', conversationId] })); }}
+        />
+
         {/* Messages */}
         <div
           ref={messagesContainerRef}
           className={`flex-1 overflow-y-auto ${compact ? 'px-3' : 'px-3 sm:px-6'} py-4 bg-slate-50 dark:bg-slate-900/40`}
-          onScroll={e => { if ((e.target as HTMLDivElement).scrollTop < 100) loadMore(); }}
+          onScroll={e => { if (scrollReady.current && (e.target as HTMLDivElement).scrollTop < 100) loadMore(); }}
         >
           {loadingMore && (
             <div className="flex items-center justify-center gap-2 py-2 text-xs text-slate-500 dark:text-slate-400">
@@ -1164,6 +1351,12 @@ const ConversationView = ({
                   onVote={vote}
                   onClosePoll={closePoll}
                   canClosePoll={!!msg.poll && (msg.poll.createdByUserId === currentUserId || isGroupAdmin)}
+                  onTogglePin={togglePin}
+                  highlighted={highlight?.id === msg.id}
+                  highlightTerm={highlight?.id === msg.id ? highlight.term : undefined}
+                  seenBy={isGroup && msg.senderId === currentUserId
+                    ? msg.readByUserIds.filter(id => id !== currentUserId).map(id => memberNames[id]).filter(Boolean)
+                    : undefined}
                 />
               ))}
             </div>
@@ -1211,10 +1404,23 @@ const ConversationView = ({
           onRemoveQueued={i => setQueued(q => q.filter((_, j) => j !== i))}
           onSendFiles={sendFiles}
           onOpenPoll={() => setShowPollComposer(true)}
+          mentionCandidates={(detail?.members ?? [])
+            .filter(m => m.userId !== currentUserId)
+            .map(m => ({ id: m.userId, name: m.fullName }))}
         />
       </div>
 
       {/* Group info panel */}
+      {showSearch && (
+        <SearchPanel
+          conversationId={conversationId}
+          overlay={compact}
+          onClose={() => setShowSearch(false)}
+          onJump={jumpTo}
+          formatTime={iso => `${formatDate(iso)} · ${formatTime(iso)}`}
+        />
+      )}
+
       {showGroupInfo && detail && (
         <GroupInfoPanel
           detail={detail}
@@ -1311,6 +1517,8 @@ export const ChatWorkspace = ({
     },
 
     onMessageEdited: (msg) => {
+      // pins travel as edits — keep the pinned bar in sync
+      qc.invalidateQueries({ queryKey: ['pinned', msg.conversationId] });
       setMessagesMap(prev => {
         const current = prev[msg.conversationId];
         if (!current) return prev;
@@ -1481,8 +1689,9 @@ export const ChatWorkspace = ({
 // ─────────────────────────────────────────────────────────────────────────────
 export const ChatPage = () => {
   const [params, setParams] = useSearchParams();
+  // Follow the URL live, so links like /chat?c=12 (notifications) open that chat
   const fromUrl = Number(params.get('c'));
-  const [initialId] = useState<number | null>(Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : null);
+  const initialId = Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : null;
 
   const syncUrl = useCallback((id: number | null) => {
     setParams(prev => {

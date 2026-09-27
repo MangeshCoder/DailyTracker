@@ -139,6 +139,39 @@ public class ChatApiTests : IDisposable
     }
 
     [Fact]
+    public async Task Mention_creates_a_bell_notification_with_a_link_to_the_chat()
+    {
+        var sent = await _mangesh.PostAsJsonAsync("/api/chat/messages",
+            new { conversationId = 1, content = "@Priya can you check?", mentionedUserIds = new[] { 2, 3 } });
+        Assert.Equal(HttpStatusCode.OK, sent.StatusCode);
+        Assert.Equal(new[] { 2 }, (await Json(sent)).GetProperty("mentionedUserIds").EnumerateArray().Select(e => e.GetInt32()));
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var n = db.Notifications.Single();
+        Assert.Equal(2, n.UserId);                       // not the outsider (3)
+        Assert.Contains("Mangesh mentioned you", n.Title);
+        Assert.Equal("/chat?c=1", n.ActionUrl);
+    }
+
+    [Fact]
+    public async Task Pin_endpoints_and_pinned_list()
+    {
+        var id = (await Json(await _mangesh.PostAsJsonAsync("/api/chat/messages", new { conversationId = 1, content = "pin me" })))
+            .GetProperty("id").GetInt32();
+
+        var pin = await _priya.PostAsync($"/api/chat/messages/{id}/pin", null);
+        Assert.Equal(HttpStatusCode.OK, pin.StatusCode);
+        Assert.True((await Json(pin)).GetProperty("isPinned").GetBoolean());
+        Assert.Single((await _priya.GetFromJsonAsync<JsonElement>("/api/chat/conversations/1/pinned")).EnumerateArray());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _outsider.PostAsync($"/api/chat/messages/{id}/pin", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _outsider.GetAsync("/api/chat/conversations/1/pinned")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await _mangesh.DeleteAsync($"/api/chat/messages/{id}/pin")).StatusCode);
+        Assert.Empty((await _priya.GetFromJsonAsync<JsonElement>("/api/chat/conversations/1/pinned")).EnumerateArray());
+    }
+
+    [Fact]
     public async Task Text_endpoint_ignores_spoofed_fields_and_reports_missing_conversation_as_404()
     {
         var sent = await Json(await _mangesh.PostAsJsonAsync("/api/chat/messages",

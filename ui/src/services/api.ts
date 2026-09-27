@@ -538,6 +538,18 @@ export const chatApi = {
   closePoll: (pollId: number): Promise<ChatMessage> =>
     api.post(`/chat/polls/${pollId}/close`).then(r => r.data),
 
+  // Pinned messages
+  pin: (messageId: number): Promise<ChatMessage> =>
+    api.post(`/chat/messages/${messageId}/pin`).then(r => r.data),
+  unpin: (messageId: number): Promise<ChatMessage> =>
+    api.delete(`/chat/messages/${messageId}/pin`).then(r => r.data),
+  getPinned: (convId: number): Promise<ChatMessage[]> =>
+    api.get(`/chat/conversations/${convId}/pinned`).then(r => r.data),
+
+  /** Search inside one conversation (text + file names, newest first, max 50) */
+  search: (convId: number, q: string): Promise<ChatMessage[]> =>
+    api.get(`/chat/conversations/${convId}/search`, { params: { q } }).then(r => r.data),
+
   searchMessages: (convId: number, q: string) =>
     api.get(`/chat/conversations/${convId}/search`, { params: { q } }),
 

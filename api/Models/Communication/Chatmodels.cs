@@ -74,8 +74,26 @@ namespace DailyTrackerAPI.Models.Communication
 
         public virtual ChatPoll? Poll { get; set; }   // MessageType "Poll"
 
+        // Pinned to the top of the conversation
+        public bool IsPinned { get; set; } = false;
+        public DateTime? PinnedAt { get; set; }
+        public int? PinnedByUserId { get; set; }
+
+        // @mentioned conversation members (text messages)
+        public virtual ICollection<ChatMessageMention> Mentions { get; set; } = new List<ChatMessageMention>();
+
         public virtual ICollection<MessageReaction> Reactions { get; set; } = new List<MessageReaction>();
         public virtual ICollection<MessageReadReceipt> ReadReceipts { get; set; } = new List<MessageReadReceipt>();
+    }
+
+    // ─── @Mentions ────────────────────────────────────────────────────────────
+    public class ChatMessageMention
+    {
+        public int Id { get; set; }
+        public int MessageId { get; set; }
+        public virtual ChatMessage Message { get; set; } = null!;
+        public int UserId { get; set; }
+        public virtual User User { get; set; } = null!;
     }
 
     // ─── Polls ────────────────────────────────────────────────────────────────

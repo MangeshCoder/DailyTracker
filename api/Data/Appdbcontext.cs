@@ -65,6 +65,7 @@ namespace DailyTrackerAPI.Data
         public DbSet<ChatPoll> ChatPolls { get; set; }
         public DbSet<ChatPollOption> ChatPollOptions { get; set; }
         public DbSet<ChatPollVote> ChatPollVotes { get; set; }
+        public DbSet<ChatMessageMention> ChatMessageMentions { get; set; }
 
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
@@ -391,6 +392,21 @@ namespace DailyTrackerAPI.Data
                 e.HasOne(r => r.User)
                  .WithMany()
                  .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── @Mentions (removed with the message)
+            mb.Entity<ChatMessageMention>(e =>
+            {
+                e.HasIndex(x => new { x.MessageId, x.UserId }).IsUnique();
+                e.HasIndex(x => x.UserId);
+                e.HasOne(x => x.Message)
+                 .WithMany(m => m.Mentions)
+                 .HasForeignKey(x => x.MessageId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.User)
+                 .WithMany()
+                 .HasForeignKey(x => x.UserId)
                  .OnDelete(DeleteBehavior.Restrict);
             });
 

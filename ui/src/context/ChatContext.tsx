@@ -22,12 +22,13 @@ import {
 } from 'react';
 import type { HubConnection } from '@microsoft/signalr';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { chatApi } from '../services/api';
 import type { ChatMessage, ConversationSummary, UserChatProfile } from '../types';
 import { useAuth } from './Authcontext';
 import { useToast } from './ToastContext';
 import { getHubBaseUrl } from './SignalRContext';
+import { showDesktopNotification } from '../components/chat/chatNotifications';
 
 export type ChatConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
@@ -112,6 +113,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [connectionState, setConnectionState] = useState<ChatConnectionState>('disconnected');
   const [presence, setPresence] = useState<Record<number, boolean>>({});
@@ -125,6 +127,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const uiRef = useRef({ dockOpen: false, onChatPage: false });
   const toastRef = useRef(toast);   // toast object is re-created every render
   toastRef.current = toast;
+  // Open a conversation from a toast / desktop notification
+  const openChatRef = useRef<(id: number) => void>(() => {});
 
   userIdRef.current = user?.id ?? null;
   uiRef.current = { dockOpen: dock.open, onChatPage: location.pathname.startsWith('/chat') };
@@ -168,7 +172,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Mark as read (REST, debounced per conversation) ──────────────────────
   const markRead = useCallback((conversationId: number) => {
-    patchConversation(conversationId, c => ({ ...c, unreadCount: 0 }));
+    patchConversation(conversationId, c => ({ ...c, unreadCount: 0, hasUnreadMention: false }));
     const timers = readTimers.current;
     clearTimeout(timers.get(conversationId));
     timers.set(conversationId, setTimeout(() => {
@@ -197,6 +201,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       conn.on('ReceiveMessage', (msg: ChatMessage) => {
         const fromOther = msg.senderId !== userIdRef.current;
         const viewing = activeRef.current === msg.conversationId && document.visibilityState === 'visible';
+        const mentionsMe = fromOther && (msg.mentionedUserIds ?? []).includes(userIdRef.current ?? -1);
         const cached = qc.getQueryData<ConversationSummary[]>(['conversations']);
 
         if (cached?.some(c => c.id === msg.conversationId)) {
@@ -206,15 +211,26 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
               lastMessageAt: msg.sentAt,
               lastMessagePreview: previewOf(msg),
               unreadCount: viewing ? 0 : fromOther ? (c.unreadCount || 0) + 1 : c.unreadCount,
+              hasUnreadMention: viewing ? false : (c.hasUnreadMention || mentionsMe),
             })));
         } else {
           qc.invalidateQueries({ queryKey: ['conversations'] });
         }
 
         if (fromOther && viewing) markRead(msg.conversationId);
-        if (fromOther && !viewing && !uiRef.current.dockOpen && !uiRef.current.onChatPage) {
+        if (fromOther && !viewing) {
           const text = previewOf(msg);
-          toastRef.current.info(`💬 ${msg.senderName}: ${text.length > 60 ? text.slice(0, 60) + '…' : text}`, 4000);
+          const short = text.length > 80 ? text.slice(0, 80) + '…' : text;
+          if (!uiRef.current.dockOpen && !uiRef.current.onChatPage)
+            toastRef.current.info(mentionsMe ? `@ ${msg.senderName} mentioned you: ${short}` : `💬 ${msg.senderName}: ${short}`, 4000);
+
+          // Desktop notification only when the user isn't looking at the app
+          if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+            const conv = cached?.find(c => c.id === msg.conversationId);
+            const title = mentionsMe ? `${msg.senderName} mentioned you`
+              : conv?.type === 'Group' ? `${msg.senderName} · ${conv.displayName}` : msg.senderName;
+            showDesktopNotification(title, short, `chat-${msg.conversationId}`, () => openChatRef.current(msg.conversationId));
+          }
         }
         emit('onMessage', msg);
       });
@@ -227,7 +243,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       conn.on('ConversationRead', (d: { conversationId: number; userId: number; readAt: string }) => {
         // Only MY reads (e.g. from another tab/device) clear MY badge
-        if (d.userId === userIdRef.current) patchConversation(d.conversationId, c => ({ ...c, unreadCount: 0 }));
+        if (d.userId === userIdRef.current) patchConversation(d.conversationId, c => ({ ...c, unreadCount: 0, hasUnreadMention: false }));
         emit('onConversationRead', d);
       });
 
@@ -330,6 +346,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setDock(d => ({ ...d, open: false }));
     window.dispatchEvent(new CustomEvent(CHAT_DOCK_EVENT, { detail: false }));
   }, []);
+
+  openChatRef.current = (id: number) => {
+    if (location.pathname.startsWith('/chat')) navigate(`/chat?c=${id}`);
+    else openDock(id);
+  };
 
   // Opening the AI assistant closes the chat panel (they share the corner)
   useEffect(() => {
