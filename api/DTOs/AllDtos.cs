@@ -989,6 +989,9 @@ namespace DailyTrackerAPI.DTOs
         public string MessageType { get; set; } = "Text";
         public string? AttachmentUrl { get; set; }
         public string? AttachmentName { get; set; }
+        public long? AttachmentSize { get; set; }
+        public string? AttachmentContentType { get; set; }
+        public ChatPollDto? Poll { get; set; }
         public bool IsDeleted { get; set; }
         public bool IsEdited { get; set; }
         public DateTime SentAt { get; set; }
@@ -996,6 +999,37 @@ namespace DailyTrackerAPI.DTOs
         public ReplyPreviewDto? ReplyTo { get; set; }
         public List<ReactionDto> Reactions { get; set; } = new();
         public List<int> ReadByUserIds { get; set; } = new();
+    }
+
+    public class ChatPollDto
+    {
+        public int Id { get; set; }
+        public string Question { get; set; } = "";
+        public bool AllowMultiple { get; set; }
+        public bool IsClosed { get; set; }
+        public int CreatedByUserId { get; set; }
+        public int TotalVoters { get; set; }
+        public List<ChatPollOptionDto> Options { get; set; } = new();
+    }
+
+    public class ChatPollOptionDto
+    {
+        public int Id { get; set; }
+        public string Text { get; set; } = "";
+        public List<int> VoterIds { get; set; } = new();
+    }
+
+    public class CreatePollDto
+    {
+        public string Question { get; set; } = string.Empty;
+        public List<string> Options { get; set; } = new();
+        public bool AllowMultiple { get; set; }
+    }
+
+    public class VotePollDto
+    {
+        /// <summary>Full set of options the user picks (empty = remove my vote)</summary>
+        public List<int> OptionIds { get; set; } = new();
     }
 
     public class ReplyPreviewDto

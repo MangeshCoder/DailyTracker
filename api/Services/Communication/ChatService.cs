@@ -1,6 +1,8 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Communication;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.Communication
@@ -31,6 +33,15 @@ namespace DailyTrackerAPI.Services.Communication
         Task<ChatMessageDto> EditMessageAsync(int messageId, int userId, string newContent);
         Task DeleteMessageAsync(int messageId, int userId);
 
+        // Attachments (images / files)
+        Task<ChatMessageDto> SendAttachmentAsync(int senderId, int conversationId, IFormFile file, string? caption, int? replyToMessageId);
+        Task<ChatAttachmentFile> GetAttachmentAsync(int messageId, int userId);
+
+        // Polls
+        Task<ChatMessageDto> CreatePollAsync(int userId, int conversationId, CreatePollDto dto);
+        Task<ChatMessageDto> VotePollAsync(int userId, int pollId, List<int> optionIds);
+        Task<ChatMessageDto> ClosePollAsync(int userId, int pollId);
+
         // Read receipts
         Task MarkConversationReadAsync(int conversationId, int userId);
         Task<int> GetUnreadCountAsync(int conversationId, int userId);
@@ -55,9 +66,11 @@ namespace DailyTrackerAPI.Services.Communication
     public class ChatService : IChatService
     {
         private readonly AppDbContext _db;
-        public ChatService(AppDbContext db)
+        private readonly IWebHostEnvironment _env;
+        public ChatService(AppDbContext db, IWebHostEnvironment env)
         {
             _db = db;
+            _env = env;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -253,41 +266,28 @@ namespace DailyTrackerAPI.Services.Communication
 
             AssertMembership(conv, senderId);
 
-            // Validate reply-to message belongs to this conversation
-            if (dto.ReplyToMessageId.HasValue)
-            {
-                var replyMsg = await _db.ChatMessages.FindAsync(dto.ReplyToMessageId.Value);
-                if (replyMsg == null || replyMsg.ConversationId != dto.ConversationId)
-                    throw new InvalidOperationException("Invalid reply message.");
-            }
+            var content = (dto.Content ?? "").Trim();
+            if (content.Length == 0)
+                throw new InvalidOperationException("Message cannot be empty.");
+            if (content.Length > 4000)
+                throw new InvalidOperationException("Message is too long (max 4000 characters).");
 
+            await ValidateReplyAsync(dto.ConversationId, dto.ReplyToMessageId);
+
+            // Text only. Client-supplied MessageType / AttachmentUrl are ignored so
+            // nobody can post fake "System" messages or arbitrary links as files —
+            // images/files go through SendAttachmentAsync, polls through CreatePollAsync.
             var message = new ChatMessage
             {
                 ConversationId = dto.ConversationId,
                 SenderId = senderId,
-                Content = dto.Content.Trim(),
-                MessageType = dto.MessageType ?? "Text",
-                AttachmentUrl = dto.AttachmentUrl,
-                AttachmentName = dto.AttachmentName,
+                Content = content,
+                MessageType = "Text",
                 ReplyToMessageId = dto.ReplyToMessageId,
                 SentAt = DateTime.UtcNow
             };
 
-            _db.ChatMessages.Add(message);
-
-            // Update conversation's last message cache
-            conv.LastMessageAt = message.SentAt;
-            conv.LastMessagePreview = TruncatePreview(dto.Content);
-
-            await _db.SaveChangesAsync();
-
-            // Auto-mark as read for the sender
-            await MarkMessageReadAsync(message.Id, senderId);
-
-            // Load sender for the DTO
-            await _db.Entry(message).Reference(m => m.Sender).LoadAsync();
-
-            return MapToMessageDto(message);
+            return await SaveNewMessageAsync(conv, message);
         }
 
         /// <summary>
@@ -313,9 +313,11 @@ namespace DailyTrackerAPI.Services.Communication
                 .Include(m => m.Sender)
                 .Include(m => m.Reactions).ThenInclude(r => r.User)
                 .Include(m => m.ReadReceipts).ThenInclude(r => r.User)
-                .Include(m => m.ReplyToMessage).ThenInclude(r => r.Sender)
+                .Include(m => m.ReplyToMessage).ThenInclude(r => r!.Sender)
+                .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
                 .OrderByDescending(m => m.SentAt)
                 .Take(pageSize)
+                .AsSplitQuery()
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -335,13 +337,21 @@ namespace DailyTrackerAPI.Services.Communication
 
             if (message.IsDeleted)
                 throw new InvalidOperationException("Cannot edit a deleted message.");
+            if (message.MessageType is not ("Text" or "Image" or "File"))
+                throw new InvalidOperationException("This message can't be edited.");
 
-            message.Content = newContent.Trim();
+            var content = (newContent ?? "").Trim();
+            if (content.Length == 0 && message.MessageType == "Text")
+                throw new InvalidOperationException("Message cannot be empty.");
+            if (content.Length > 4000)
+                throw new InvalidOperationException("Message is too long (max 4000 characters).");
+
+            message.Content = content;
             message.IsEdited = true;
             message.EditedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
-            return MapToMessageDto(message);
+            return await LoadMessageDtoAsync(message.Id);
         }
 
         public async Task DeleteMessageAsync(int messageId, int userId)
@@ -358,7 +368,233 @@ namespace DailyTrackerAPI.Services.Communication
 
             message.IsDeleted = true;
             message.Content = "This message was deleted.";
+
+            // Deleted attachments are removed from disk, not just hidden
+            if (!string.IsNullOrEmpty(message.AttachmentUrl))
+            {
+                TryDeleteStoredFile(message.AttachmentUrl);
+                message.AttachmentUrl = null;
+            }
             await _db.SaveChangesAsync();
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ATTACHMENTS
+        //   Stored in <ContentRoot>/App_Data/chat/{conversationId}/ — outside
+        //   wwwroot, so the only way to fetch one is GetAttachmentAsync, which
+        //   checks conversation membership.
+        // ══════════════════════════════════════════════════════════════════════
+
+        public const long MaxAttachmentBytes = 25 * 1024 * 1024;   // 25 MB
+
+        // extension → content type we serve it with (never the client's claim)
+        private static readonly Dictionary<string, string> ImageTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".png"] = "image/png",
+            [".gif"] = "image/gif",  [".webp"] = "image/webp", [".bmp"] = "image/bmp",
+        };
+        private static readonly Dictionary<string, string> FileTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".pdf"] = "application/pdf",
+            [".doc"] = "application/msword",
+            [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            [".xls"] = "application/vnd.ms-excel",
+            [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            [".ppt"] = "application/vnd.ms-powerpoint",
+            [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            [".odt"] = "application/vnd.oasis.opendocument.text",
+            [".ods"] = "application/vnd.oasis.opendocument.spreadsheet",
+            [".rtf"] = "application/rtf",
+            [".txt"] = "text/plain", [".csv"] = "text/csv", [".md"] = "text/markdown",
+            [".json"] = "application/json", [".log"] = "text/plain",
+            [".zip"] = "application/zip", [".rar"] = "application/vnd.rar", [".7z"] = "application/x-7z-compressed",
+            [".mp4"] = "video/mp4", [".webm"] = "video/webm", [".mov"] = "video/quicktime",
+            [".mp3"] = "audio/mpeg", [".wav"] = "audio/wav", [".m4a"] = "audio/mp4",
+        };
+
+        public async Task<ChatMessageDto> SendAttachmentAsync(
+            int senderId, int conversationId, IFormFile file, string? caption, int? replyToMessageId)
+        {
+            var conv = await _db.Conversations
+                .Include(c => c.Members)
+                .FirstOrDefaultAsync(c => c.Id == conversationId && c.IsActive)
+                ?? throw new KeyNotFoundException("Conversation not found.");
+            AssertMembership(conv, senderId);
+
+            if (file == null || file.Length == 0)
+                throw new InvalidOperationException("The file is empty.");
+            if (file.Length > MaxAttachmentBytes)
+                throw new InvalidOperationException("Files can be up to 25 MB.");
+
+            var ext = Path.GetExtension(file.FileName ?? "");
+            var isImage = ImageTypes.TryGetValue(ext, out var contentType);
+            if (!isImage && !FileTypes.TryGetValue(ext, out contentType))
+                throw new InvalidOperationException($"'{(string.IsNullOrEmpty(ext) ? "This" : ext)}' files can't be shared in chat.");
+
+            // Images must really be images (checked by their first bytes)
+            if (isImage && !await LooksLikeImageAsync(file))
+                throw new InvalidOperationException("That file isn't a valid image.");
+
+            var text = (caption ?? "").Trim();
+            if (text.Length > 4000)
+                throw new InvalidOperationException("Caption is too long (max 4000 characters).");
+
+            await ValidateReplyAsync(conversationId, replyToMessageId);
+
+            var key = $"chat/{conversationId}/{Guid.NewGuid():N}{ext.ToLowerInvariant()}";
+            var fullPath = ResolveStoragePath(key);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await using (var stream = new FileStream(fullPath, FileMode.CreateNew))
+                await file.CopyToAsync(stream);
+
+            var message = new ChatMessage
+            {
+                ConversationId = conversationId,
+                SenderId = senderId,
+                Content = text,
+                MessageType = isImage ? "Image" : "File",
+                AttachmentUrl = key,
+                AttachmentName = SafeFileName(file.FileName),
+                AttachmentSize = file.Length,
+                AttachmentContentType = contentType,
+                ReplyToMessageId = replyToMessageId,
+                SentAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                return await SaveNewMessageAsync(conv, message);
+            }
+            catch
+            {
+                TryDeleteStoredFile(key);   // don't leave orphan files behind
+                throw;
+            }
+        }
+
+        public async Task<ChatAttachmentFile> GetAttachmentAsync(int messageId, int userId)
+        {
+            var message = await _db.ChatMessages
+                .Include(m => m.Conversation).ThenInclude(c => c.Members)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == messageId)
+                ?? throw new KeyNotFoundException("Attachment not found.");
+
+            AssertMembership(message.Conversation, userId);
+
+            if (message.IsDeleted || string.IsNullOrEmpty(message.AttachmentUrl))
+                throw new KeyNotFoundException("Attachment not found.");
+
+            var fullPath = ResolveStoragePath(message.AttachmentUrl);
+            if (!File.Exists(fullPath))
+                throw new KeyNotFoundException("Attachment file is missing.");
+
+            return new ChatAttachmentFile(
+                fullPath,
+                message.AttachmentContentType ?? "application/octet-stream",
+                message.AttachmentName ?? Path.GetFileName(fullPath));
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // POLLS
+        // ══════════════════════════════════════════════════════════════════════
+
+        public async Task<ChatMessageDto> CreatePollAsync(int userId, int conversationId, CreatePollDto dto)
+        {
+            var conv = await _db.Conversations
+                .Include(c => c.Members)
+                .FirstOrDefaultAsync(c => c.Id == conversationId && c.IsActive)
+                ?? throw new KeyNotFoundException("Conversation not found.");
+            AssertMembership(conv, userId);
+
+            var question = (dto.Question ?? "").Trim();
+            if (question.Length == 0) throw new InvalidOperationException("Add a question for your poll.");
+            if (question.Length > 300) throw new InvalidOperationException("Poll question is too long (max 300 characters).");
+
+            var options = (dto.Options ?? new())
+                .Select(o => (o ?? "").Trim())
+                .Where(o => o.Length > 0)
+                .ToList();
+            if (options.Count < 2) throw new InvalidOperationException("A poll needs at least 2 options.");
+            if (options.Count > 10) throw new InvalidOperationException("A poll can have at most 10 options.");
+            if (options.Any(o => o.Length > 100)) throw new InvalidOperationException("Options can be up to 100 characters.");
+            if (options.Distinct(StringComparer.OrdinalIgnoreCase).Count() != options.Count)
+                throw new InvalidOperationException("Poll options must be different from each other.");
+
+            var message = new ChatMessage
+            {
+                ConversationId = conversationId,
+                SenderId = userId,
+                Content = question,
+                MessageType = "Poll",
+                SentAt = DateTime.UtcNow,
+                Poll = new ChatPoll
+                {
+                    Question = question,
+                    AllowMultiple = dto.AllowMultiple,
+                    CreatedByUserId = userId,
+                    Options = options.Select((text, i) => new ChatPollOption { Text = text, SortOrder = i }).ToList()
+                }
+            };
+
+            return await SaveNewMessageAsync(conv, message);
+        }
+
+        public async Task<ChatMessageDto> VotePollAsync(int userId, int pollId, List<int> optionIds)
+        {
+            var poll = await LoadPollForMemberAsync(pollId, userId);
+            if (poll.IsClosed) throw new InvalidOperationException("This poll is closed.");
+
+            var chosen = (optionIds ?? new()).Distinct().ToList();
+            if (!poll.AllowMultiple && chosen.Count > 1)
+                throw new InvalidOperationException("This poll allows only one answer.");
+            if (chosen.Any(id => poll.Options.All(o => o.Id != id)))
+                throw new InvalidOperationException("Invalid poll option.");
+
+            // Replace this user's votes with exactly the chosen set
+            foreach (var option in poll.Options)
+            {
+                var mine = option.Votes.FirstOrDefault(v => v.UserId == userId);
+                var wanted = chosen.Contains(option.Id);
+                if (mine != null && !wanted) _db.ChatPollVotes.Remove(mine);
+                if (mine == null && wanted) _db.ChatPollVotes.Add(new ChatPollVote { OptionId = option.Id, UserId = userId });
+            }
+
+            try { await _db.SaveChangesAsync(); }
+            catch (DbUpdateException) { /* double-click race: the unique index kept one vote */ }
+
+            return await LoadMessageDtoAsync(poll.MessageId);
+        }
+
+        public async Task<ChatMessageDto> ClosePollAsync(int userId, int pollId)
+        {
+            var poll = await LoadPollForMemberAsync(pollId, userId);
+            var conv = poll.Message.Conversation;
+            var isGroupAdmin = conv.Members.Any(m => m.UserId == userId && m.Role == "Admin" && !m.HasLeft);
+            if (poll.CreatedByUserId != userId && !isGroupAdmin)
+                throw new UnauthorizedAccessException("Only the poll creator or a group admin can close this poll.");
+
+            if (!poll.IsClosed)
+            {
+                poll.IsClosed = true;
+                poll.ClosedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+            return await LoadMessageDtoAsync(poll.MessageId);
+        }
+
+        private async Task<ChatPoll> LoadPollForMemberAsync(int pollId, int userId)
+        {
+            var poll = await _db.ChatPolls
+                .Include(p => p.Options).ThenInclude(o => o.Votes)
+                .Include(p => p.Message).ThenInclude(m => m.Conversation).ThenInclude(c => c.Members)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(p => p.Id == pollId)
+                ?? throw new KeyNotFoundException("Poll not found.");
+
+            AssertMembership(poll.Message.Conversation, userId);
+            if (poll.Message.IsDeleted) throw new KeyNotFoundException("Poll not found.");
+            return poll;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -618,11 +854,13 @@ namespace DailyTrackerAPI.Services.Communication
             var messages = await _db.ChatMessages
                 .Where(m => m.ConversationId == conversationId
                     && !m.IsDeleted
-                    && m.Content.Contains(query))
+                    && (m.Content.Contains(query) || (m.AttachmentName != null && m.AttachmentName.Contains(query))))
                 .Include(m => m.Sender)
                 .Include(m => m.Reactions)
+                .Include(m => m.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
                 .OrderByDescending(m => m.SentAt)
                 .Take(50)
+                .AsSplitQuery()
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -712,6 +950,96 @@ namespace DailyTrackerAPI.Services.Communication
         private static string TruncatePreview(string content) =>
             content.Length <= 60 ? content : content[..57] + "...";
 
+        /// <summary>One-line summary used for the conversation list and reply quotes</summary>
+        private static string PreviewFor(ChatMessage m) => m.IsDeleted
+            ? "This message was deleted."
+            : m.MessageType switch
+            {
+                "Image" => TruncatePreview(string.IsNullOrWhiteSpace(m.Content) ? "📷 Photo" : "📷 " + m.Content),
+                "File" => TruncatePreview("📎 " + (m.AttachmentName ?? "File")),
+                "Poll" => TruncatePreview("📊 " + (m.Poll?.Question ?? m.Content)),
+                _ => TruncatePreview(m.Content),
+            };
+
+        private async Task ValidateReplyAsync(int conversationId, int? replyToMessageId)
+        {
+            if (!replyToMessageId.HasValue) return;
+            var replyMsg = await _db.ChatMessages.FindAsync(replyToMessageId.Value);
+            if (replyMsg == null || replyMsg.ConversationId != conversationId)
+                throw new InvalidOperationException("Invalid reply message.");
+        }
+
+        /// <summary>Persist a new message, update the conversation preview, return the full DTO</summary>
+        private async Task<ChatMessageDto> SaveNewMessageAsync(Conversation conv, ChatMessage message)
+        {
+            _db.ChatMessages.Add(message);
+            conv.LastMessageAt = message.SentAt;
+            conv.LastMessagePreview = PreviewFor(message);
+            await _db.SaveChangesAsync();
+
+            await MarkMessageReadAsync(message.Id, message.SenderId!.Value);   // sender has read it
+            return await LoadMessageDtoAsync(message.Id);
+        }
+
+        /// <summary>Load one message with everything the client renders (reply, reactions, poll)</summary>
+        private async Task<ChatMessageDto> LoadMessageDtoAsync(int messageId)
+        {
+            var m = await _db.ChatMessages
+                .Include(x => x.Sender)
+                .Include(x => x.Reactions)
+                .Include(x => x.ReadReceipts)
+                .Include(x => x.ReplyToMessage).ThenInclude(r => r!.Sender)
+                .Include(x => x.Poll).ThenInclude(p => p!.Options).ThenInclude(o => o.Votes)
+                .AsSplitQuery()
+                .AsNoTracking()
+                .FirstAsync(x => x.Id == messageId);
+            return MapToMessageDto(m);
+        }
+
+        private string StorageRoot => Path.GetFullPath(Path.Combine(_env.ContentRootPath, "App_Data"));
+
+        private string ResolveStoragePath(string key)
+        {
+            var full = Path.GetFullPath(Path.Combine(StorageRoot, key));
+            if (!full.StartsWith(StorageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                throw new UnauthorizedAccessException("Invalid attachment path.");
+            return full;
+        }
+
+        private void TryDeleteStoredFile(string key)
+        {
+            try { var path = ResolveStoragePath(key); if (File.Exists(path)) File.Delete(path); }
+            catch { /* best effort */ }
+        }
+
+        private static string SafeFileName(string? name)
+        {
+            var clean = Path.GetFileName(name ?? "file");
+            clean = new string(clean.Where(c => !char.IsControl(c) && c != '"').ToArray()).Trim();
+            if (clean.Length == 0) clean = "file";
+            if (clean.Length > 200)
+            {
+                var ext = Path.GetExtension(clean);
+                clean = clean[..(200 - ext.Length)] + ext;
+            }
+            return clean;
+        }
+
+        private static async Task<bool> LooksLikeImageAsync(IFormFile file)
+        {
+            var head = new byte[12];
+            await using var s = file.OpenReadStream();
+            var n = await s.ReadAsync(head.AsMemory(0, head.Length));
+            if (n < 4) return false;
+            bool Starts(params byte[] sig) => n >= sig.Length && head.Take(sig.Length).SequenceEqual(sig);
+            return Starts(0xFF, 0xD8, 0xFF)                                   // jpg
+                || Starts(0x89, 0x50, 0x4E, 0x47)                             // png
+                || Starts(0x47, 0x49, 0x46, 0x38)                             // gif
+                || Starts(0x42, 0x4D)                                         // bmp
+                || (Starts(0x52, 0x49, 0x46, 0x46) && n >= 12
+                    && head[8] == 0x57 && head[9] == 0x45 && head[10] == 0x42 && head[11] == 0x50); // webp
+        }
+
         private async Task<ConversationDto> MapToConversationDto(Conversation conv, int currentUserId)
         {
             int unread = await GetUnreadCountAsync(conv.Id, currentUserId);
@@ -757,8 +1085,28 @@ namespace DailyTrackerAPI.Services.Communication
                 : "?"),
             Content = m.Content,
             MessageType = m.MessageType,
-            AttachmentUrl = m.AttachmentUrl,
-            AttachmentName = m.AttachmentName,
+            // Never expose the storage key — clients use the member-only endpoint
+            AttachmentUrl = !m.IsDeleted && !string.IsNullOrEmpty(m.AttachmentUrl)
+                ? $"/api/chat/messages/{m.Id}/attachment"
+                : null,
+            AttachmentName = m.IsDeleted ? null : m.AttachmentName,
+            AttachmentSize = m.IsDeleted ? null : m.AttachmentSize,
+            AttachmentContentType = m.IsDeleted ? null : m.AttachmentContentType,
+            Poll = m.IsDeleted || m.Poll == null ? null : new ChatPollDto
+            {
+                Id = m.Poll.Id,
+                Question = m.Poll.Question,
+                AllowMultiple = m.Poll.AllowMultiple,
+                IsClosed = m.Poll.IsClosed,
+                CreatedByUserId = m.Poll.CreatedByUserId,
+                TotalVoters = m.Poll.Options.SelectMany(o => o.Votes).Select(v => v.UserId).Distinct().Count(),
+                Options = m.Poll.Options.OrderBy(o => o.SortOrder).Select(o => new ChatPollOptionDto
+                {
+                    Id = o.Id,
+                    Text = o.Text,
+                    VoterIds = o.Votes.Select(v => v.UserId).ToList()
+                }).ToList()
+            },
             IsDeleted = m.IsDeleted,
             IsEdited = m.IsEdited,
             SentAt = m.SentAt,
@@ -767,9 +1115,7 @@ namespace DailyTrackerAPI.Services.Communication
             {
                 Id = m.ReplyToMessage.Id,
                 SenderName = m.ReplyToMessage.Sender?.FullName ?? "",
-                ContentPreview = m.ReplyToMessage.IsDeleted
-                    ? "This message was deleted."
-                    : TruncatePreview(m.ReplyToMessage.Content)
+                ContentPreview = PreviewFor(m.ReplyToMessage)
             },
             Reactions = m.Reactions?
                 .GroupBy(r => r.Emoji)
@@ -784,4 +1130,6 @@ namespace DailyTrackerAPI.Services.Communication
 
 
     }
+
+    public record ChatAttachmentFile(string FullPath, string ContentType, string FileName);
 }

@@ -92,11 +92,16 @@ export const parseUtcDate = (iso?: string): Date => {
 const sortByLatest = (list: ConversationSummary[]) =>
   [...list].sort((a, b) => parseUtcDate(b.lastMessageAt).getTime() - parseUtcDate(a.lastMessageAt).getTime());
 
-const previewOf = (msg: ChatMessage) =>
-  msg.isDeleted ? 'This message was deleted.'
-  : msg.content ? msg.content
-  : msg.attachmentName ? `📎 ${msg.attachmentName}`
-  : '';
+/** One-line summary for the conversation list, reply quotes and toasts */
+export const previewOf = (msg: ChatMessage): string => {
+  if (msg.isDeleted) return 'This message was deleted.';
+  switch (msg.messageType) {
+    case 'Image': return msg.content ? `📷 ${msg.content}` : '📷 Photo';
+    case 'File':  return `📎 ${msg.attachmentName ?? 'File'}`;
+    case 'Poll':  return `📊 ${msg.poll?.question ?? msg.content}`;
+    default:      return msg.content ?? '';
+  }
+};
 
 // Other floating widgets (AI Help) listen to this to avoid overlapping panels
 export const CHAT_DOCK_EVENT = 'chat-dock:toggle';

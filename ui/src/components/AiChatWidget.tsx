@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, type KeyboardEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Mic,
   MicOff,
@@ -760,6 +760,8 @@ const ChatBubble = ({
 export const AiChatWidget = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  // On the full chat page the pill would cover the message box / send button
+  const onChatPage = useLocation().pathname.startsWith("/chat");
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1198,7 +1200,7 @@ export const AiChatWidget = () => {
       {!isOpen && !chatDockOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2"
+          className={`fixed right-4 md:right-6 z-50 ${onChatPage ? "hidden md:flex md:bottom-28" : "bottom-20 md:bottom-6"} pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2`}
           aria-label="Open AI Assistant"
         >
           <Sparkles size={18} />

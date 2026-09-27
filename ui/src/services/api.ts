@@ -506,6 +506,38 @@ export const chatApi = {
   deleteMessage: (messageId: number) =>
     api.delete(`/chat/messages/${messageId}`).then(r => r.data),
 
+  // Attachments (images / files) — multipart upload with progress
+  sendAttachment: (
+    convId: number,
+    file: File,
+    opts: { caption?: string; replyToMessageId?: number; onProgress?: (pct: number) => void } = {}
+  ): Promise<ChatMessage> => {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.caption) form.append('caption', opts.caption);
+    if (opts.replyToMessageId) form.append('replyToMessageId', String(opts.replyToMessageId));
+    return api.post(`/chat/conversations/${convId}/attachments`, form, {
+      onUploadProgress: e => opts.onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0),
+    }).then(r => r.data);
+  },
+
+  /** Download an attachment through the authenticated API (returns a Blob) */
+  getAttachment: (attachmentUrl: string, download = false): Promise<Blob> =>
+    api.get(attachmentUrl.replace(/^\/api/, ''), {
+      params: download ? { download: true } : undefined,
+      responseType: 'blob',
+    }).then(r => r.data),
+
+  // Polls
+  createPoll: (convId: number, data: { question: string; options: string[]; allowMultiple: boolean }): Promise<ChatMessage> =>
+    api.post(`/chat/conversations/${convId}/polls`, data).then(r => r.data),
+
+  votePoll: (pollId: number, optionIds: number[]): Promise<ChatMessage> =>
+    api.post(`/chat/polls/${pollId}/vote`, { optionIds }).then(r => r.data),
+
+  closePoll: (pollId: number): Promise<ChatMessage> =>
+    api.post(`/chat/polls/${pollId}/close`).then(r => r.data),
+
   searchMessages: (convId: number, q: string) =>
     api.get(`/chat/conversations/${convId}/search`, { params: { q } }),
 

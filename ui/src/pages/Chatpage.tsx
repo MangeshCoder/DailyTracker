@@ -17,7 +17,12 @@ import type { ChatMessage, ConversationSummary, UserChatProfile, ConversationDet
 import { chatApi } from '../services/api';
 import { useChatHub } from './useChatHub';
 import { useAuth } from '../context/Authcontext';
-import { useChat, parseUtcDate } from '../context/ChatContext';
+import { useChat, parseUtcDate, previewOf } from '../context/ChatContext';
+import { useToast } from '../context/ToastContext';
+import {
+  AttachMenu, QueuedFiles, ImageAttachment, FileAttachment, PollCard, PollComposer,
+  validateChatFile, formatBytes,
+} from '../components/chat/ChatAttachments';
 import { useConfirm } from '../hooks/useConfirm';
 import {
   MessageSquare,
@@ -41,6 +46,7 @@ import {
   Loader2,
   Info,
   WifiOff,
+  Paperclip,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -399,9 +405,14 @@ const ConversationSidebar = ({
 //  Message Bubble
 // ─────────────────────────────────────────────────────────────────────────────
 const MessageBubble = ({
-  message, isOwn, currentUserId, onReply, onEdit, onDelete, onReact, compact = false
+  message, isOwn, currentUserId, onReply, onEdit, onDelete, onReact, compact = false,
+  memberNames, onVote, onClosePoll, canClosePoll = false,
 }: {
   compact?: boolean;
+  memberNames: Record<number, string>;
+  onVote: (pollId: number, optionIds: number[]) => void;
+  onClosePoll: (pollId: number) => void;
+  canClosePoll?: boolean;
   message: ChatMessage;
   isOwn: boolean;
   currentUserId: number;
@@ -459,16 +470,39 @@ const MessageBubble = ({
           </div>
         )}
 
-        <div className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
-          isOwn
-            ? 'bg-blue-600 text-white rounded-br-md shadow-md shadow-blue-500/20'
-            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200 dark:border-slate-700 shadow-sm'
-        } ${message.isDeleted ? 'opacity-60 italic' : ''}`}>
-          {message.content}
-          {message.isEdited && !message.isDeleted && (
-            <span className="text-[11px] opacity-60 ml-2">(edited)</span>
-          )}
-        </div>
+        {/* Attachment / poll body */}
+        {!message.isDeleted && message.messageType === 'Image' && message.attachmentUrl && (
+          <ImageAttachment message={message} isOwn={isOwn} />
+        )}
+        {!message.isDeleted && message.messageType === 'File' && message.attachmentUrl && (
+          <FileAttachment message={message} isOwn={isOwn} />
+        )}
+        {!message.isDeleted && message.messageType === 'Poll' && message.poll && (
+          <PollCard
+            poll={message.poll}
+            currentUserId={currentUserId}
+            memberNames={memberNames}
+            onVote={ids => onVote(message.poll!.id, ids)}
+            onClosePoll={() => onClosePoll(message.poll!.id)}
+            canClose={canClosePoll}
+          />
+        )}
+
+        {/* Text (or caption under an attachment) */}
+        {(message.isDeleted || (message.messageType !== 'Poll' && message.content)) && (
+          <div className={`relative px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
+            message.messageType === 'Image' || message.messageType === 'File' ? 'mt-1' : ''
+          } ${
+            isOwn
+              ? 'bg-blue-600 text-white rounded-br-md shadow-md shadow-blue-500/20'
+              : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200 dark:border-slate-700 shadow-sm'
+          } ${message.isDeleted ? 'opacity-60 italic' : ''}`}>
+            {message.content}
+            {message.isEdited && !message.isDeleted && (
+              <span className="text-[11px] opacity-60 ml-2">(edited)</span>
+            )}
+          </div>
+        )}
 
         {message.reactions.length > 0 && (
           <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : ''}`}>
@@ -528,12 +562,14 @@ const MessageBubble = ({
                 </button>
                 {showMenu && (
                   <div className="absolute right-0 bottom-9 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-xl z-10 w-32 py-1">
-                    <button
-                      onClick={() => { onEdit(message); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                    >
-                      <Pencil className="w-3.5 h-3.5" /> Edit
-                    </button>
+                    {message.messageType !== 'Poll' && (
+                      <button
+                        onClick={() => { onEdit(message); setShowMenu(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> {message.messageType === 'Text' ? 'Edit' : 'Edit caption'}
+                      </button>
+                    )}
                     <button
                       onClick={() => { onDelete(message.id); setShowMenu(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition"
@@ -632,9 +668,16 @@ const GroupInfoPanel = ({
 //  Message Input Bar
 // ─────────────────────────────────────────────────────────────────────────────
 const MessageInput = ({
-  onSend, onTyping, onStopTyping, replyTo, onCancelReply, editingMessage, onCancelEdit, disabled = false, compact = false
+  onSend, onTyping, onStopTyping, replyTo, onCancelReply, editingMessage, onCancelEdit, disabled = false, compact = false,
+  queued, onAddFiles, onRemoveQueued, onSendFiles, onOpenPoll,
 }: {
   compact?: boolean;
+  /** files waiting to be sent (picked, dropped or pasted) */
+  queued: File[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveQueued: (index: number) => void;
+  onSendFiles: (caption: string, replyToId?: number) => void;
+  onOpenPoll: () => void;
   onSend: (content: string, replyToId?: number) => void;
   onTyping: () => void;
   onStopTyping: () => void;
@@ -669,9 +712,15 @@ const MessageInput = ({
 
   const handleSubmit = () => {
     const trimmed = value.trim();
-    if (!trimmed || disabled) return;
-    onSend(trimmed, replyTo?.id);
+    if (disabled) return;
+    if (queued.length > 0 && !editingMessage) {
+      onSendFiles(trimmed, replyTo?.id);   // text becomes the caption
+    } else {
+      if (!trimmed) return;
+      onSend(trimmed, replyTo?.id);
+    }
     setValue('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     onStopTyping();
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
   };
@@ -686,7 +735,7 @@ const MessageInput = ({
               {editingMessage ? 'Editing message' : `Replying to ${replyTo?.senderName}`}
             </p>
             <p className="text-slate-500 dark:text-slate-400 text-xs truncate">
-              {editingMessage ? editingMessage.content : replyTo?.content}
+              {editingMessage ? editingMessage.content : replyTo ? previewOf(replyTo) : ''}
             </p>
           </div>
           <button
@@ -698,13 +747,21 @@ const MessageInput = ({
           </button>
         </div>
       )}
+      {!editingMessage && <QueuedFiles files={queued} onRemove={onRemoveQueued} />}
       <div className="flex items-end gap-2">
+        {!editingMessage && (
+          <AttachMenu onFiles={onAddFiles} onPoll={onOpenPoll} disabled={disabled} />
+        )}
         <textarea
           ref={textareaRef}
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={disabled ? 'Select a conversation...' : 'Type a message...'}
+          onPaste={e => {
+            const files = Array.from(e.clipboardData.files ?? []);
+            if (files.length && !editingMessage) { e.preventDefault(); onAddFiles(files); }
+          }}
+          placeholder={disabled ? 'Select a conversation...' : queued.length ? 'Add a caption…' : 'Type a message...'}
           disabled={disabled}
           rows={1}
           className="flex-1 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl px-4 py-3 text-sm resize-none
@@ -719,7 +776,7 @@ const MessageInput = ({
         />
         <button
           onClick={handleSubmit}
-          disabled={!value.trim() || disabled}
+          disabled={(!value.trim() && (queued.length === 0 || !!editingMessage)) || disabled}
           title={editingMessage ? 'Save edit' : 'Send'}
           className="w-[46px] h-[46px] flex-shrink-0 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/20 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
         >
@@ -727,7 +784,7 @@ const MessageInput = ({
         </button>
       </div>
       <p className={`${compact ? 'hidden' : 'hidden sm:block'} text-[11px] text-slate-400 dark:text-slate-600 mt-1.5 text-center`}>
-        Enter to send · Shift+Enter for new line · Esc to cancel
+        Enter to send · Shift+Enter for new line · Esc to cancel · drop or paste files to attach
       </p>
     </div>
   );
@@ -769,6 +826,94 @@ const ConversationView = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const { sendTyping, stopTyping, isOnline } = useChat();
+  const { toast } = useToast();
+
+  // ── Attachments & polls ────────────────────────────────────────────────
+  const [queued, setQueued] = useState<File[]>([]);
+  const [uploads, setUploads] = useState<{ key: string; name: string; size: number; progress: number }[]>([]);
+  const [showPollComposer, setShowPollComposer] = useState(false);
+  const [dragDepth, setDragDepth] = useState(0);
+
+  const addMessage = (msg: ChatMessage) => {
+    setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
+    // keep the conversation list preview in sync even if the live echo is late
+    qc.setQueryData<ConversationSummary[]>(['conversations'], old => old && [...old.map(c =>
+      c.id === conversationId ? { ...c, lastMessageAt: msg.sentAt, lastMessagePreview: previewOf(msg), unreadCount: 0 } : c
+    )].sort((a, b) => parseUtcDate(b.lastMessageAt).getTime() - parseUtcDate(a.lastMessageAt).getTime()));
+  };
+  const replaceMessage = (msg: ChatMessage) =>
+    setMessages(prev => prev.map(m => (m.id === msg.id ? msg : m)));
+
+  const addFiles = (files: File[]) => {
+    const ok: File[] = [];
+    for (const f of files) {
+      const err = validateChatFile(f);
+      if (err) toast.error(err); else ok.push(f);
+    }
+    setQueued(prev => {
+      const next = [...prev, ...ok];
+      if (next.length > 10) toast.warning('You can send up to 10 files at a time');
+      return next.slice(0, 10);
+    });
+  };
+
+  // Files go one by one; the caption / reply attach to the first file
+  const sendFiles = async (caption: string, replyToId?: number) => {
+    const files = queued;
+    setQueued([]);
+    setReplyTo(null);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const key = `${Date.now()}-${i}-${file.name}`;
+      setUploads(u => [...u, { key, name: file.name, size: file.size, progress: 0 }]);
+      try {
+        const msg = await chatApi.sendAttachment(conversationId, file, {
+          caption: i === 0 ? caption : undefined,
+          replyToMessageId: i === 0 ? replyToId : undefined,
+          onProgress: pct => setUploads(u => u.map(x => (x.key === key ? { ...x, progress: pct } : x))),
+        });
+        addMessage(msg);
+      } catch (e: any) {
+        toast.error(e?.response?.data?.message ?? `Couldn't send ${file.name}`);
+      } finally {
+        setUploads(u => u.filter(x => x.key !== key));
+      }
+    }
+  };
+
+  const createPoll = async (data: { question: string; options: string[]; allowMultiple: boolean }) => {
+    const msg = await chatApi.createPoll(conversationId, data);
+    addMessage(msg);
+  };
+
+  // Optimistic vote: update the bar immediately, then take the server's result
+  const vote = async (pollId: number, optionIds: number[]) => {
+    const before = messages.find(m => m.poll?.id === pollId);
+    if (!before?.poll) return;
+    const options = before.poll.options.map(o => ({
+      ...o,
+      voterIds: optionIds.includes(o.id)
+        ? [...o.voterIds.filter(id => id !== currentUserId), currentUserId]
+        : o.voterIds.filter(id => id !== currentUserId),
+    }));
+    const totalVoters = new Set(options.flatMap(o => o.voterIds)).size;
+    replaceMessage({ ...before, poll: { ...before.poll, options, totalVoters } });
+    try {
+      replaceMessage(await chatApi.votePoll(pollId, optionIds));
+    } catch (e: any) {
+      replaceMessage(before);
+      toast.error(e?.response?.data?.message ?? 'Could not save your vote');
+    }
+  };
+
+  const closePoll = async (pollId: number) => {
+    const ok = await confirm('No one will be able to vote after this.', { title: 'Close this poll?', confirmText: 'Close poll' });
+    if (!ok) return;
+    try { replaceMessage(await chatApi.closePoll(pollId)); }
+    catch (e: any) { toast.error(e?.response?.data?.message ?? 'Could not close the poll'); }
+  };
+
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
 
   const { data: detail } = useQuery<ConversationDetail>({
     queryKey: ['convDetail', conversationId],
@@ -786,12 +931,14 @@ const ConversationView = ({
     setReplyTo(null);
     setEditingMessage(null);
     setShowGroupInfo(false);
+    setQueued([]);
   }, [conversationId]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when a NEW message arrives (not when older ones load)
+  const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [lastMessageId, uploads.length]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || messages.length === 0) return;
@@ -903,6 +1050,8 @@ const ConversationView = ({
   });
 
   const isGroup = detail?.type === 'Group';
+  const memberNames = Object.fromEntries((detail?.members ?? []).map(m => [m.userId, m.fullName]));
+  const isGroupAdmin = detail?.myRole === 'Admin';
   const otherMember = detail?.members.find(m => m.userId !== currentUserId);
   const otherOnline = !isGroup && isOnline(otherMember?.userId);
   const conversationTitle = isGroup
@@ -912,7 +1061,25 @@ const ConversationView = ({
   const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <div className="relative flex flex-1 min-w-0 h-full">
+    <div
+      className="relative flex flex-1 min-w-0 h-full"
+      onDragEnter={e => { if (hasFiles(e)) { e.preventDefault(); setDragDepth(d => d + 1); } }}
+      onDragOver={e => { if (hasFiles(e)) e.preventDefault(); }}
+      onDragLeave={e => { if (hasFiles(e)) setDragDepth(d => Math.max(0, d - 1)); }}
+      onDrop={e => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        setDragDepth(0);
+        addFiles(Array.from(e.dataTransfer.files));
+      }}
+    >
+      {dragDepth > 0 && (
+        <div className="absolute inset-2 z-20 rounded-3xl border-2 border-dashed border-blue-500 bg-blue-500/10 backdrop-blur-[2px] flex flex-col items-center justify-center gap-2 pointer-events-none">
+          <Paperclip className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          <p className="text-sm font-bold text-blue-700 dark:text-blue-300">Drop files to send</p>
+          <p className="text-xs text-blue-600/80 dark:text-blue-400/80">Images, documents, audio & video · up to 25 MB</p>
+        </div>
+      )}
       <div className="flex flex-col flex-1 min-w-0 h-full">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex-shrink-0">
@@ -993,6 +1160,10 @@ const ConversationView = ({
                   onDelete={handleDelete}
                   onReact={(id, emoji) => reactMutation.mutate({ id, emoji })}
                   compact={compact}
+                  memberNames={memberNames}
+                  onVote={vote}
+                  onClosePoll={closePoll}
+                  canClosePoll={!!msg.poll && (msg.poll.createdByUserId === currentUserId || isGroupAdmin)}
                 />
               ))}
             </div>
@@ -1007,6 +1178,21 @@ const ConversationView = ({
               <p className="text-xs text-slate-500 dark:text-slate-400">Someone is typing…</p>
             </div>
           )}
+          {uploads.map(u => (
+            <div key={u.key} className="flex justify-end mb-2">
+              <div className="w-64 max-w-[82%] rounded-2xl rounded-br-md bg-blue-600/90 text-white p-3 shadow-md">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                  <p className="text-xs font-semibold truncate flex-1">{u.name}</p>
+                  <span className="text-[11px] tabular-nums text-white/80">{u.progress}%</span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-white/25 overflow-hidden">
+                  <div className="h-full bg-white rounded-full transition-all" style={{ width: `${u.progress}%` }} />
+                </div>
+                <p className="text-[10px] text-white/70 mt-1">{formatBytes(u.size)}</p>
+              </div>
+            </div>
+          ))}
           <div ref={messagesEndRef} />
         </div>
 
@@ -1020,6 +1206,11 @@ const ConversationView = ({
           editingMessage={editingMessage}
           onCancelEdit={() => setEditingMessage(null)}
           compact={compact}
+          queued={queued}
+          onAddFiles={addFiles}
+          onRemoveQueued={i => setQueued(q => q.filter((_, j) => j !== i))}
+          onSendFiles={sendFiles}
+          onOpenPoll={() => setShowPollComposer(true)}
         />
       </div>
 
@@ -1034,6 +1225,10 @@ const ConversationView = ({
           onRemoveMember={handleRemoveMember}
           overlay={compact}
         />
+      )}
+
+      {showPollComposer && (
+        <PollComposer onClose={() => setShowPollComposer(false)} onCreate={createPoll} />
       )}
 
       {showAddMembers && detail && (

@@ -62,6 +62,9 @@ namespace DailyTrackerAPI.Data
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<MessageReadReceipt> MessageReadReceipts { get; set; }
         public DbSet<MessageReaction> MessageReactions { get; set; }
+        public DbSet<ChatPoll> ChatPolls { get; set; }
+        public DbSet<ChatPollOption> ChatPollOptions { get; set; }
+        public DbSet<ChatPollVote> ChatPollVotes { get; set; }
 
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
@@ -388,6 +391,35 @@ namespace DailyTrackerAPI.Data
                 e.HasOne(r => r.User)
                  .WithMany()
                  .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── Chat polls (poll → options → votes, all removed with the message)
+            mb.Entity<ChatPoll>(e =>
+            {
+                e.HasIndex(p => p.MessageId).IsUnique();
+                e.HasOne(p => p.Message)
+                 .WithOne(m => m.Poll)
+                 .HasForeignKey<ChatPoll>(p => p.MessageId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+            mb.Entity<ChatPollOption>(e =>
+            {
+                e.HasOne(o => o.Poll)
+                 .WithMany(p => p.Options)
+                 .HasForeignKey(o => o.PollId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+            mb.Entity<ChatPollVote>(e =>
+            {
+                e.HasIndex(v => new { v.OptionId, v.UserId }).IsUnique();
+                e.HasOne(v => v.Option)
+                 .WithMany(o => o.Votes)
+                 .HasForeignKey(v => v.OptionId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(v => v.User)
+                 .WithMany()
+                 .HasForeignKey(v => v.UserId)
                  .OnDelete(DeleteBehavior.Restrict);
             });
 

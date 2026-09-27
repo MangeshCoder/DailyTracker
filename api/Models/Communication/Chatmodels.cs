@@ -65,8 +65,59 @@ namespace DailyTrackerAPI.Models.Communication
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
         public DateTime? EditedAt { get; set; }
 
+        // Attachment metadata (MessageType "Image" / "File").
+        // AttachmentUrl holds the private storage key (App_Data/chat/...);
+        // clients download through GET /api/chat/messages/{id}/attachment.
+        public long? AttachmentSize { get; set; }
+        [MaxLength(100)]
+        public string? AttachmentContentType { get; set; }
+
+        public virtual ChatPoll? Poll { get; set; }   // MessageType "Poll"
+
         public virtual ICollection<MessageReaction> Reactions { get; set; } = new List<MessageReaction>();
         public virtual ICollection<MessageReadReceipt> ReadReceipts { get; set; } = new List<MessageReadReceipt>();
+    }
+
+    // ─── Polls ────────────────────────────────────────────────────────────────
+    // A poll is posted as a ChatMessage (MessageType = "Poll") with one ChatPoll.
+    public class ChatPoll
+    {
+        public int Id { get; set; }
+        public int MessageId { get; set; }
+        public virtual ChatMessage Message { get; set; } = null!;
+
+        [Required, MaxLength(300)]
+        public string Question { get; set; } = string.Empty;
+        public bool AllowMultiple { get; set; } = false;
+        public bool IsClosed { get; set; } = false;
+        public DateTime? ClosedAt { get; set; }
+        public int CreatedByUserId { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public virtual ICollection<ChatPollOption> Options { get; set; } = new List<ChatPollOption>();
+    }
+
+    public class ChatPollOption
+    {
+        public int Id { get; set; }
+        public int PollId { get; set; }
+        public virtual ChatPoll Poll { get; set; } = null!;
+
+        [Required, MaxLength(100)]
+        public string Text { get; set; } = string.Empty;
+        public int SortOrder { get; set; }
+
+        public virtual ICollection<ChatPollVote> Votes { get; set; } = new List<ChatPollVote>();
+    }
+
+    public class ChatPollVote
+    {
+        public int Id { get; set; }
+        public int OptionId { get; set; }
+        public virtual ChatPollOption Option { get; set; } = null!;
+        public int UserId { get; set; }
+        public virtual User User { get; set; } = null!;
+        public DateTime VotedAt { get; set; } = DateTime.UtcNow;
     }
 
     // ─── 4. MessageReadReceipt ────────────────────────────────────────────────

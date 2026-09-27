@@ -314,9 +314,13 @@ export interface ChatMessage {
   senderName: string;
   senderInitial: string;
   content: string;
-  messageType: 'Text' | 'Image' | 'File' | 'System';
+  messageType: 'Text' | 'Image' | 'File' | 'Poll' | 'System';
+  /** member-only API path, e.g. /api/chat/messages/12/attachment */
   attachmentUrl?: string;
   attachmentName?: string;
+  attachmentSize?: number;
+  attachmentContentType?: string;
+  poll?: ChatPoll;
   isDeleted: boolean;
   isEdited: boolean;
   sentAt: string;
@@ -324,6 +328,22 @@ export interface ChatMessage {
   replyTo?: ReplyPreview;
   reactions: Reaction[];
   readByUserIds: number[];
+}
+
+export interface ChatPoll {
+  id: number;
+  question: string;
+  allowMultiple: boolean;
+  isClosed: boolean;
+  createdByUserId: number;
+  totalVoters: number;
+  options: ChatPollOption[];
+}
+
+export interface ChatPollOption {
+  id: number;
+  text: string;
+  voterIds: number[];
 }
 
 export interface ReplyPreview {

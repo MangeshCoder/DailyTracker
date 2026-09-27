@@ -168,6 +168,7 @@ namespace DailyTrackerAPI.Controllers.Communication
                 return Ok(message);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
@@ -187,6 +188,7 @@ namespace DailyTrackerAPI.Controllers.Communication
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
         /// <summary>Delete a message (soft delete — content replaced)</summary>
@@ -225,6 +227,120 @@ namespace DailyTrackerAPI.Controllers.Communication
             {
                 return NotFound(new { message = ex.Message });
             }
+        }
+
+        // ── ATTACHMENTS ───────────────────────────────────────────────────────
+
+        /// <summary>Send an image or file (multipart: file, caption?, replyToMessageId?)</summary>
+        [HttpPost("conversations/{conversationId}/attachments")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(30 * 1024 * 1024)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 30 * 1024 * 1024)]
+        public async Task<IActionResult> UploadAttachment(
+            int conversationId, IFormFile file,
+            [FromForm] string? caption, [FromForm] int? replyToMessageId)
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                var message = await _chatService.SendAttachmentAsync(userId, conversationId, file, caption, replyToMessageId);
+
+                await _hub.Clients.Group($"conv_{conversationId}")
+                    .SendAsync("ReceiveMessage", message);
+
+                return Ok(message);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        /// <summary>Download / view an attachment — conversation members only</summary>
+        [HttpGet("messages/{messageId}/attachment")]
+        public async Task<IActionResult> DownloadAttachment(int messageId, [FromQuery] bool download = false)
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                var file = await _chatService.GetAttachmentAsync(messageId, userId);
+
+                Response.Headers["X-Content-Type-Options"] = "nosniff";
+                Response.Headers["Cache-Control"] = "private, max-age=86400";
+
+                // Only images, PDFs and media open in the browser; everything else downloads
+                var inline = !download && (file.ContentType.StartsWith("image/")
+                    || file.ContentType == "application/pdf"
+                    || file.ContentType.StartsWith("video/")
+                    || file.ContentType.StartsWith("audio/"));
+
+                if (!inline)
+                    return PhysicalFile(file.FullPath, file.ContentType, file.FileName, enableRangeProcessing: true);
+
+                var disposition = new System.Net.Mime.ContentDisposition { Inline = true, FileName = file.FileName };
+                Response.Headers["Content-Disposition"] = disposition.ToString();
+                return PhysicalFile(file.FullPath, file.ContentType, enableRangeProcessing: true);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+        }
+
+        // ── POLLS ─────────────────────────────────────────────────────────────
+
+        /// <summary>Post a poll to a conversation</summary>
+        [HttpPost("conversations/{conversationId}/polls")]
+        public async Task<IActionResult> CreatePoll(int conversationId, [FromBody] CreatePollDto dto)
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                var message = await _chatService.CreatePollAsync(userId, conversationId, dto);
+
+                await _hub.Clients.Group($"conv_{conversationId}")
+                    .SendAsync("ReceiveMessage", message);
+
+                return Ok(message);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        /// <summary>Set my vote(s) on a poll (send the full set; empty = remove my vote)</summary>
+        [HttpPost("polls/{pollId}/vote")]
+        public async Task<IActionResult> VotePoll(int pollId, [FromBody] VotePollDto dto)
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                var message = await _chatService.VotePollAsync(userId, pollId, dto.OptionIds);
+
+                // Everyone in the chat sees the new results live
+                await _hub.Clients.Group($"conv_{message.ConversationId}")
+                    .SendAsync("MessageEdited", message);
+
+                return Ok(message);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        }
+
+        /// <summary>Close a poll (creator or group admin)</summary>
+        [HttpPost("polls/{pollId}/close")]
+        public async Task<IActionResult> ClosePoll(int pollId)
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                var message = await _chatService.ClosePollAsync(userId, pollId);
+
+                await _hub.Clients.Group($"conv_{message.ConversationId}")
+                    .SendAsync("MessageEdited", message);
+
+                return Ok(message);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         }
 
         /// <summary>Search messages within a conversation</summary>
