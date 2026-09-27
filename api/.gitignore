@@ -363,3 +363,6 @@ MigrationBackup/
 FodyWeavers.xsd
 # Private chat attachments (served only through the API)
 App_Data/
+
+# Uploaded files (avatars, documents, support evidence, certificates) are user data, not source code
+wwwroot/uploads/

@@ -9,6 +9,15 @@ using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ─── Secrets check ────────────────────────────────────────────────────────────
+// Secrets live in .NET User Secrets (run api/setup-secrets.ps1), never in
+// appsettings.json. Fail fast with a clear message instead of a cryptic crash.
+var jwtKeyValue = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKeyValue) || System.Text.Encoding.UTF8.GetByteCount(jwtKeyValue) < 32)
+    throw new InvalidOperationException(
+        "Jwt:Key is missing or shorter than 32 characters. Run  api/setup-secrets.ps1  once " +
+        "(or: dotnet user-secrets set \"Jwt:Key\" \"<random 64+ characters>\") and start the API again.");
+
 // ─── Database ─────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(o =>
     o.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -74,7 +83,19 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
-app.UseStaticFiles();       // Serve wwwroot/uploads/*
+// Private uploads (HR documents, support evidence, certificates) are only served
+// through authenticated API endpoints — never as public static files.
+string[] privateUploadDirs = { "/uploads/documents", "/uploads/support", "/uploads/certifications" };
+app.Use(async (context, next) =>
+{
+    if (privateUploadDirs.Any(d => context.Request.Path.StartsWithSegments(d, StringComparison.OrdinalIgnoreCase)))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+    await next();
+});
+app.UseStaticFiles();       // Serve wwwroot/uploads/avatars (public profile photos)
 app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -105,6 +126,12 @@ app.MapHealthChecks("/health/detail", new HealthCheckOptions
         });
     }
 });
+
+// ─── Optional integrations: warn once if not configured ─────────────────────
+if (string.IsNullOrWhiteSpace(app.Configuration["Email:Username"]) || string.IsNullOrWhiteSpace(app.Configuration["Email:Password"]))
+    app.Logger.LogWarning("Email is not configured (Email:Username / Email:Password) — OTP, password reset and approval emails will fail. Run api/setup-secrets.ps1.");
+if (string.IsNullOrWhiteSpace(app.Configuration["Gemini:ApiKey"]))
+    app.Logger.LogWarning("Gemini:ApiKey is not configured — the AI assistant will use its offline fallback. Run api/setup-secrets.ps1.");
 
 // ─── Auto Migrate ─────────────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())

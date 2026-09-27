@@ -426,14 +426,19 @@ namespace DailyTrackerAPI.Services.Auth
 
         private async Task SendEmailAsync(string to, string subject, string body)
         {
+            var username = _config["Email:Username"];
+            var password = _config["Email:Password"];
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                throw new InvalidOperationException(
+                    "Email is not configured. Run api/setup-secrets.ps1 to add Email:Username and Email:Password.");
+
             try
             {
-                using var smtp = new SmtpClient(_config["Email:Smtp"], int.Parse(_config["Email:Port"]))
+                using var smtp = new SmtpClient(
+                    _config["Email:Smtp"] ?? "smtp.gmail.com",
+                    int.TryParse(_config["Email:Port"], out var port) ? port : 587)
                 {
-                    Credentials = new NetworkCredential(
-                        _config["Email:Username"],
-                        _config["Email:Password"]
-                    ),
+                    Credentials = new NetworkCredential(username, password),
                     EnableSsl = true,
                     DeliveryMethod = SmtpDeliveryMethod.Network,
                     UseDefaultCredentials = false
@@ -441,10 +446,7 @@ namespace DailyTrackerAPI.Services.Auth
 
                 using var mail = new MailMessage
                 {
-                    From = new MailAddress(
-                        _config["Email:Username"],
-                        "Employee Management System"
-                    ),
+                    From = new MailAddress(username, "Employee Management System"),
                     Subject = subject,
                     Body = body,
                     IsBodyHtml = true
