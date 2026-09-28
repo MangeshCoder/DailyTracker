@@ -70,6 +70,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>
 
 var app = builder.Build();
 app.UseForwardedHeaders();
+
+// Check the file storage settings now, so a wrong value is one clear line in the
+// log at startup (instead of errors on every upload/download later)
+try { app.Services.GetRequiredService<IFileStorage>(); }
+catch (Exception ex) { app.Logger.LogCritical("File storage is misconfigured: {Message} (check the Storage__S3__* settings)", ex.Message); }
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Global Exception Handler ─────────────────────────────────────────────────

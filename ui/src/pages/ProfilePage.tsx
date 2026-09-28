@@ -8,6 +8,7 @@
 //  ✅ Exports UserAvatar + RoleBadge (also used by Directorypage.tsx)
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { getHubBaseUrl } from '../context/SignalRContext';
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { profileApi } from '../services/api';
@@ -36,7 +37,8 @@ import {
   XCircle,
 } from 'lucide-react';
 
-const BACKEND_ORIGIN = 'https://localhost:7096';
+// Uploaded files live on the API server: the same address when hosted, localhost:7096 on your PC
+const BACKEND_ORIGIN = getHubBaseUrl();
 
 // ─── Avatar component — used here and in DirectoryPage ──────────────────────
 export const UserAvatar = ({

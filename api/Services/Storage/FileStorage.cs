@@ -107,17 +107,26 @@ namespace DailyTrackerAPI.Services.Storage
         public S3FileStorage(IConfiguration config)
         {
             var section = config.GetSection("Storage:S3");
-            _bucket = section["Bucket"] ?? throw new InvalidOperationException("Storage:S3:Bucket is not set.");
+            _bucket = section["Bucket"]?.Trim() is { Length: > 0 } b ? b : throw new InvalidOperationException("Storage:S3:Bucket is not set.");
+            // "s3.us-west-004.backblazeb2.com" is accepted too (https:// is added)
+            var serviceUrl = section["ServiceUrl"]?.Trim().TrimEnd('/');
+            if (string.IsNullOrEmpty(serviceUrl))
+                throw new InvalidOperationException("Storage:S3:ServiceUrl is not set.");
+            if (!serviceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                && !serviceUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                serviceUrl = "https://" + serviceUrl;
+            if (string.IsNullOrWhiteSpace(section["AccessKey"]) || string.IsNullOrWhiteSpace(section["SecretKey"]))
+                throw new InvalidOperationException("Storage:S3:AccessKey / Storage:S3:SecretKey are not set.");
             var s3Config = new AmazonS3Config
             {
-                ServiceURL = section["ServiceUrl"] ?? throw new InvalidOperationException("Storage:S3:ServiceUrl is not set."),
+                ServiceURL = serviceUrl,
                 ForcePathStyle = true,
                 // B2 accepts only the classic request checksums
                 RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
                 ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
             };
-            if (!string.IsNullOrWhiteSpace(section["Region"])) s3Config.AuthenticationRegion = section["Region"];
-            _s3 = new AmazonS3Client(new BasicAWSCredentials(section["AccessKey"], section["SecretKey"]), s3Config);
+            if (!string.IsNullOrWhiteSpace(section["Region"])) s3Config.AuthenticationRegion = section["Region"]!.Trim();
+            _s3 = new AmazonS3Client(new BasicAWSCredentials(section["AccessKey"]!.Trim(), section["SecretKey"]!.Trim()), s3Config);
         }
 
         public string? LocalPath(string key) => null;

@@ -1,3 +1,4 @@
+import { getHubBaseUrl } from '../context/SignalRContext';
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { teamCalendarApi } from '../services/api';
@@ -25,7 +26,8 @@ import {
   CalendarDays
 } from 'lucide-react';
 
-const BACKEND_ORIGIN = 'https://localhost:7096';
+// Uploaded files live on the API server: the same address when hosted, localhost:7096 on your PC
+const BACKEND_ORIGIN = getHubBaseUrl();
 
 // ── STATUS CONFIG ─────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<
