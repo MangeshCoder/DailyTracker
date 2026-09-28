@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Models.Auth;
+using DailyTrackerAPI.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +21,12 @@ namespace DailyTrackerAPI.Controllers.Auth
     public class ProfileController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly IWebHostEnvironment _env;
+        private readonly IFileStorage _files;
 
-        public ProfileController(AppDbContext db, IWebHostEnvironment env)
+        public ProfileController(AppDbContext db, IFileStorage files)
         {
             _db = db;
-            _env = env;
+            _files = files;
         }
 
         [HttpGet("me")]
@@ -77,16 +78,12 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (user == null) return NotFound();
 
             if (!string.IsNullOrEmpty(user.ProfilePhotoUrl))
-                DeleteAvatarFile(user.ProfilePhotoUrl);
+                await DeleteAvatarFileAsync(user.ProfilePhotoUrl);
 
             var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
             if (string.IsNullOrEmpty(ext)) ext = ".jpg";
             var fileName = $"{Guid.NewGuid():N}{ext}";
-            var uploadDir = Path.Combine(GetWebRoot(), "uploads", "avatars");
-            Directory.CreateDirectory(uploadDir);
-
-            await using (var stream = new FileStream(Path.Combine(uploadDir, fileName), FileMode.Create))
-                await photo.CopyToAsync(stream);
+            await _files.SaveAsync($"uploads/avatars/{fileName}", photo);
 
             user.ProfilePhotoUrl = $"/uploads/avatars/{fileName}";
             await _db.SaveChangesAsync();
@@ -103,7 +100,7 @@ namespace DailyTrackerAPI.Controllers.Auth
 
             if (!string.IsNullOrEmpty(user.ProfilePhotoUrl))
             {
-                DeleteAvatarFile(user.ProfilePhotoUrl);
+                await DeleteAvatarFileAsync(user.ProfilePhotoUrl);
                 user.ProfilePhotoUrl = null;
                 await _db.SaveChangesAsync();
             }
@@ -196,15 +193,10 @@ namespace DailyTrackerAPI.Controllers.Auth
             ManagerName = u.Manager?.FullName
         };
 
-        private string GetWebRoot() =>
-            _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-
-        private void DeleteAvatarFile(string relativeUrl)
+        private async Task DeleteAvatarFileAsync(string relativeUrl)
         {
-            var relativePath = relativeUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-            var fullPath = Path.Combine(GetWebRoot(), relativePath);
-            if (System.IO.File.Exists(fullPath))
-                System.IO.File.Delete(fullPath);
+            try { await _files.DeleteAsync(relativeUrl.TrimStart('/')); }
+            catch { /* an old photo that's already gone is fine */ }
         }
     }
 }

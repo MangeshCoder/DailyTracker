@@ -9,6 +9,7 @@
   </PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="AWSSDK.S3" Version="4.0.103.4" />
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
 		<PackageReference Include="DocumentFormat.OpenXml" Version="3.4.1" />
 
@@ -16,7 +17,7 @@
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
 
 		<!-- EF Core -->
-		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.3" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.3">
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>

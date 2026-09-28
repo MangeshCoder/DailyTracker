@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using Microsoft.EntityFrameworkCore;
@@ -30,14 +31,14 @@ namespace DailyTrackerAPI.Services.HR
         Task<TeamTrainingStatsDto> GetTeamStatsAsync();
 
         // ── File ─────────────────────────────────────────────────────────────
-        Task<(string FullPath, string MimeType, string FileName)?> GetCertFileInfoAsync(int certId, int requesterId, string role);
+        Task<(string Key, string MimeType, string FileName)?> GetCertFileInfoAsync(int certId, int requesterId, string role);
     }
 
     // ─── Implementation ───────────────────────────────────────────────────────
     public class TrainingService : ITrainingService
     {
         private readonly AppDbContext _db;
-        private readonly IWebHostEnvironment _env;
+        private readonly IFileStorage _files;
 
         private const string UploadSubdir = "uploads/certifications";
 
@@ -53,10 +54,10 @@ namespace DailyTrackerAPI.Services.HR
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-        public TrainingService(AppDbContext db, IWebHostEnvironment env)
+        public TrainingService(AppDbContext db, IFileStorage files)
         {
             _db = db;
-            _env = env;
+            _files = files;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -221,20 +222,12 @@ namespace DailyTrackerAPI.Services.HR
                 if (!AllowedMimeTypes.Contains(mime))
                     throw new InvalidOperationException("File type not allowed. Use PDF, Word, or Images.");
 
-                // Save to temp dir first
-                var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-                var tempDir = Path.Combine(webRoot, UploadSubdir, "temp_" + Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(tempDir);
-
+                // uploads/certifications/{folder}/{random name}
                 var ext = Path.GetExtension(file.FileName);
-                var safeName = $"{Guid.NewGuid():N}{ext}";
-                var fullPath = Path.Combine(tempDir, safeName);
-                await using (var stream = new FileStream(fullPath, FileMode.Create))
-                    await file.CopyToAsync(stream);
+                filePath = $"{UploadSubdir}/{Guid.NewGuid():N}/{Guid.NewGuid():N}{ext}";
+                await _files.SaveAsync(filePath, file);
 
-                // We'll rename after we have the Id
                 fileName = file.FileName;
-                filePath = $"__temp__{tempDir}||{safeName}";  // placeholder
                 mimeType = mime;
                 fileSize = file.Length;
             }
@@ -255,7 +248,7 @@ namespace DailyTrackerAPI.Services.HR
                 CredentialUrl = dto.CredentialUrl?.Trim(),
                 Status = status,
                 FileName = fileName,
-                FilePath = null,  // set after we have the Id
+                FilePath = filePath,
                 MimeType = mimeType,
                 FileSizeBytes = fileSize,
                 CreatedAt = DateTime.UtcNow,
@@ -263,22 +256,8 @@ namespace DailyTrackerAPI.Services.HR
             };
 
             _db.Certifications.Add(cert);
-            await _db.SaveChangesAsync();
-
-            // Rename temp directory to certId if a file was provided
-            if (filePath != null && filePath.StartsWith("__temp__"))
-            {
-                var parts = filePath.Replace("__temp__", "").Split("||");
-                var tempDir2 = parts[0];
-                var safeName2 = parts[1];
-
-                var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-                var finalDir = Path.Combine(webRoot, UploadSubdir, cert.Id.ToString());
-                Directory.Move(tempDir2, finalDir);
-
-                cert.FilePath = $"{UploadSubdir}/{cert.Id}/{safeName2}";
-                await _db.SaveChangesAsync();
-            }
+            try { await _db.SaveChangesAsync(); }
+            catch { if (filePath != null) await _files.DeleteAsync(filePath); throw; }   // no orphan files
 
             await _db.Entry(cert).Reference(c => c.User).LoadAsync();
             return MapCert(cert);
@@ -313,16 +292,11 @@ namespace DailyTrackerAPI.Services.HR
             if (c == null) return false;
             if (!CanManage(c.UserId, userId, role)) return false;
 
-            // Delete physical file
+            // Delete the stored file (and its now-empty folder)
             if (!string.IsNullOrEmpty(c.FilePath))
             {
-                var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-                var fullPath = Path.Combine(webRoot, c.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                if (File.Exists(fullPath)) File.Delete(fullPath);
-
-                var dir = Path.GetDirectoryName(fullPath);
-                if (dir != null && Directory.Exists(dir) && !Directory.EnumerateFiles(dir).Any())
-                    Directory.Delete(dir);
+                try { await _files.DeleteAsync(c.FilePath); }
+                catch { /* already gone */ }
             }
 
             _db.Certifications.Remove(c);
@@ -399,18 +373,14 @@ namespace DailyTrackerAPI.Services.HR
         //  FILE
         // ══════════════════════════════════════════════════════════════════════
 
-        public async Task<(string FullPath, string MimeType, string FileName)?> GetCertFileInfoAsync(
+        public async Task<(string Key, string MimeType, string FileName)?> GetCertFileInfoAsync(
             int certId, int requesterId, string role)
         {
             var cert = await _db.Certifications.FindAsync(certId);
             if (cert == null || string.IsNullOrEmpty(cert.FilePath)) return null;
             if (!CanAccess(cert.UserId, requesterId, role)) return null;
 
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var fullPath = Path.Combine(webRoot, cert.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-            if (!File.Exists(fullPath)) return null;
-
-            return (fullPath, cert.MimeType ?? "application/octet-stream", cert.FileName ?? "certificate");
+            return (cert.FilePath, cert.MimeType ?? "application/octet-stream", cert.FileName ?? "certificate");
         }
 
         // ─── Helpers ──────────────────────────────────────────────────────────

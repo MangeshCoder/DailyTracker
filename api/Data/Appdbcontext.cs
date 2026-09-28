@@ -47,6 +47,7 @@ namespace DailyTrackerAPI.Data
 
         // ─── Feature 1: Notifications ─────────────────────────────────────────
         public DbSet<AppNotification> Notifications { get; set; }
+        public DbSet<SchedulerRun> SchedulerRuns { get; set; }
 
         // ─── Two-Factor Authentication ───────────────────────────────────────
         public DbSet<UserTwoFactor> UserTwoFactors { get; set; }
@@ -249,9 +250,16 @@ namespace DailyTrackerAPI.Data
             {
                 // bell list (newest first) + unread badge, both per user
                 e.HasIndex(n => new { n.UserId, n.CreatedAt });
-                e.HasIndex(n => n.UserId, "IX_Notifications_UserId_Unread").HasFilter("[IsRead] = 0");
+                e.HasIndex(n => n.UserId, "IX_Notifications_UserId_Unread").HasFilter("\"IsRead\" = FALSE");
                 e.HasOne(n => n.User).WithMany().HasForeignKey(n => n.UserId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── SchedulerRun - each daily job once per day
+            mb.Entity<SchedulerRun>(e =>
+            {
+                e.HasIndex(r => new { r.JobKey, r.RunDate }).IsUnique();
+                e.Property(r => r.JobKey).HasMaxLength(50);
             });
 
             // ── Holiday - unique per date
@@ -361,7 +369,7 @@ namespace DailyTrackerAPI.Data
                 e.HasIndex(m => new { m.ConversationId, m.SentAt })
                  .IncludeProperties(m => new { m.SenderId, m.IsDeleted });
                 // pinned bar (only a handful of rows)
-                e.HasIndex(m => m.ConversationId, "IX_ChatMessages_Pinned").HasFilter("[IsPinned] = 1");
+                e.HasIndex(m => m.ConversationId, "IX_ChatMessages_Pinned").HasFilter("\"IsPinned\" = TRUE");
                 e.HasOne(m => m.Conversation)
                  .WithMany(c => c.Messages)
                  .HasForeignKey(m => m.ConversationId)
@@ -688,6 +696,17 @@ namespace DailyTrackerAPI.Data
                 e.HasOne(a => a.DailyLog).WithMany().HasForeignKey(a => a.DailyLogId)
                  .OnDelete(DeleteBehavior.SetNull);
             });
+
+            // ── PostgreSQL: compare text ignoring upper/lower case, like SQL Server did
+            //    (so "Mangesh@Gmail.com" logs in as "mangesh@gmail.com", searches match any case)
+            if (Database.IsNpgsql())
+            {
+                mb.HasPostgresExtension("citext");
+                foreach (var property in mb.Model.GetEntityTypes()
+                             .SelectMany(t => t.GetProperties())
+                             .Where(p => p.ClrType == typeof(string)))
+                    property.SetColumnType("citext");
+            }
         }
     }
 }

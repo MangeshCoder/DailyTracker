@@ -15,6 +15,7 @@ using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Tasks;
+using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.Services.Team;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,13 +32,16 @@ namespace DailyTrackerAPI.Controllers
         private readonly ISupportAssignmentService _assignmentService;
         private readonly IMediaStorageService _mediaStorage;
         private readonly AppDbContext _db;
+        private readonly IFileStorage _files;
 
         public SupportController(
             ISupportService supportService,
             ISupportAssignmentService assignmentService,
             IMediaStorageService mediaStorage,
-            AppDbContext db)
+            AppDbContext db,
+            IFileStorage files)
         {
+            _files = files;
             _supportService = supportService;
             _assignmentService = assignmentService;
             _mediaStorage = mediaStorage;
@@ -180,8 +184,8 @@ namespace DailyTrackerAPI.Controllers
             var fileInfo = await _mediaStorage.GetMediaFileInfoAsync(mediaId);
             if (fileInfo == null) return NotFound();
 
-            var (fullPath, mimeType, fileName) = fileInfo.Value;
-            return PhysicalFile(fullPath, mimeType, fileName, enableRangeProcessing: true);
+            var (key, mimeType, fileName) = fileInfo.Value;
+            return await this.StoredFileAsync(_files, key, mimeType, fileName);
         }
     }
 }

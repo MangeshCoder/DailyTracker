@@ -15,6 +15,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.HR;
+using DailyTrackerAPI.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,7 +26,13 @@ namespace DailyTrackerAPI.Controllers.HR
     {
         private readonly IDocumentService _svc;
 
-        public DocumentController(IDocumentService svc) => _svc = svc;
+        private readonly IFileStorage _files;
+
+        public DocumentController(IDocumentService svc, IFileStorage files)
+        {
+            _svc = svc;
+            _files = files;
+        }
 
         // ── POST /api/documents ───────────────────────────────────────────────
         /// <summary>
@@ -133,10 +140,8 @@ namespace DailyTrackerAPI.Controllers.HR
 
             if (info == null) return NotFound();
 
-            var (fullPath, mimeType, fileName) = info.Value;
-
-            var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return File(stream, mimeType, fileName);
+            var (key, mimeType, fileName) = info.Value;
+            return await this.StoredFileAsync(_files, key, mimeType, fileName);
         }
     }
 }

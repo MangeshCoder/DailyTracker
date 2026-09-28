@@ -1,0 +1,156 @@
+# Hosting DailyTracker for free
+
+The hosted site is **one Render web service** that serves both the web app and the
+API from the same address. Four free accounts are used, none of which needs a card:
+
+| Service | What it does | Free limit |
+|---|---|---|
+| **Render** | runs the app (UI + API) | 750 hours/month, 512 MB RAM, sleeps after 15 min without visitors |
+| **Neon** | PostgreSQL database | 0.5 GB data, 100 compute-hours/month (sleeps after 5 min idle) |
+| **Backblaze B2** | uploaded files (photos, chat files, documents) | 10 GB |
+| **Brevo** | emails (OTP, password reset, approvals) | 300 emails/day |
+| **UptimeRobot** | keeps the Render server awake | 50 monitors |
+
+> Why not just Render? Render's free server loses its disk on every restart
+> (so files go to Backblaze) and blocks email ports (so emails go through Brevo).
+
+---
+
+## Part A — Your PC now uses PostgreSQL (one time)
+
+The app no longer uses SQL Server. Your PC needs PostgreSQL, like the hosted site.
+
+1. Download **PostgreSQL 17** for Windows: <https://www.postgresql.org/download/windows/>
+   (the "EDB installer").
+2. Run it and keep the defaults (port **5432**). When it asks for a password for the
+   `postgres` user, choose one and remember it. Skip "Stack Builder" at the end.
+3. In PowerShell, from the `api` folder:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\setup-secrets.ps1
+   ```
+   Type the PostgreSQL password when asked (other questions: Enter keeps your
+   current Gmail/Gemini values).
+4. Start the API as usual (`dotnet run --launch-profile https`). On first start it
+   creates the `dailytracker` database and all tables by itself.
+5. Register in the app: the first account on your PC becomes the Manager.
+
+Your old SQL Server data stays where it was; it is not used any more.
+
+### Changing the database later (new tables/columns)
+Same as before, run from the `api` folder:
+```powershell
+dotnet ef migrations add SomeName
+```
+Commit the new files in `api/Migrations`. Your PC applies them when the API starts,
+and so does the hosted site when it deploys.
+
+---
+
+## Part B — Create the free accounts
+
+### 1. Neon (database)
+1. Sign up at <https://neon.tech> (you can use "Continue with GitHub").
+2. **Create project**: name `dailytracker`, Postgres **17**, region **AWS Asia Pacific (Singapore)**.
+3. On the project dashboard click **Connect**. Turn **Connection pooling off**,
+   and copy the connection string. It looks like
+   `postgresql://neondb_owner:xxxx@ep-xxxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require…`
+   You'll paste it exactly as it is (the app understands this format).
+
+### 2. Backblaze B2 (files)
+1. Sign up at <https://www.backblaze.com/sign-up/cloud-storage> (no card for the free 10 GB).
+2. **B2 Cloud Storage → Buckets → Create a Bucket**
+   - Name: something unique, e.g. `dailytracker-files-<your initials><random number>`
+   - Files in bucket: **Private**
+3. Open the bucket details and note its **Endpoint**, e.g. `s3.eu-central-003.backblazeb2.com`.
+   - ServiceUrl = `https://` + endpoint, e.g. `https://s3.eu-central-003.backblazeb2.com`
+   - Region = the middle part, e.g. `eu-central-003`
+4. **Application Keys → Add a New Application Key**
+   - Name: `dailytracker-render`, access: **only this bucket**, **Read and Write**
+   - Copy **keyID** and **applicationKey** now (the key is shown only once).
+
+### 3. Brevo (emails)
+1. Sign up at <https://www.brevo.com> (free plan).
+2. **Settings → Senders, domains & dedicated IPs → Senders → Add a sender**:
+   the email address emails should come from (e.g. your Gmail). Confirm it with the
+   code Brevo sends you.
+3. **Settings → SMTP & API → API Keys → Generate a new API key** and copy it.
+
+> Emails sent "from" a Gmail address through Brevo can land in Spam at first. Ask
+> the team to mark the first one "Not spam". (A custom domain fixes this later.)
+
+---
+
+## Part C — Create the site on Render
+
+1. Sign up at <https://render.com> with **GitHub** and allow access to the
+   `DailyTracker` repository.
+2. **New → Blueprint**, pick `MangeshCoder/DailyTracker`. Render reads
+   [`render.yaml`](../render.yaml) and asks for these values:
+
+   | Setting | Value |
+   |---|---|
+   | `ConnectionStrings__DefaultConnection` | Neon connection string (Part B1) |
+   | `Storage__S3__ServiceUrl` | e.g. `https://s3.eu-central-003.backblazeb2.com` |
+   | `Storage__S3__Region` | e.g. `eu-central-003` |
+   | `Storage__S3__Bucket` | your bucket name |
+   | `Storage__S3__AccessKey` | B2 keyID |
+   | `Storage__S3__SecretKey` | B2 applicationKey |
+   | `Email__BrevoApiKey` | Brevo API key |
+   | `Email__FromAddress` | the sender you verified in Brevo |
+   | `Setup__AdminEmail` | **your** email — only this email can become the first Manager |
+   | `FrontendUrl` | `https://dailytracker.onrender.com` (fix it in step 4 if Render gives another address) |
+   | `Gemini__ApiKey` | optional — your Gemini key for the AI assistant |
+
+   `Jwt__Key` is generated by Render automatically.
+3. Click **Apply**. The first build takes about 10 minutes. When it says **Live**,
+   open the address shown at the top (e.g. `https://dailytracker.onrender.com`).
+4. If the address is different from what you typed in `FrontendUrl`, go to the
+   service → **Environment**, correct `FrontendUrl`, **Save** (it redeploys).
+5. Open the site and **Register with the `Setup__AdminEmail` address** → you become
+   the Manager. Everyone else who registers is "Pending" until you approve them.
+
+## Part D — Keep it awake (UptimeRobot)
+
+A free Render server sleeps after 15 minutes without visitors (the next visit then
+waits ~1 minute) and the 9:00 / 9:30 / 17:00 / 18:00 reminders would not run.
+
+1. Sign up at <https://uptimerobot.com> (free).
+2. **New monitor** → type **HTTP(s)** → URL `https://<your-site>.onrender.com/health`
+   → interval **5 minutes** → Create.
+
+`/health` never touches the database, so this does not use up Neon's free hours.
+It uses about 744 of Render's 750 free hours a month, so **don't create a second
+free Render service**.
+
+---
+
+## Everyday work: change locally → site updates itself
+
+1. Work on your PC exactly as now (`dotnet run` in `api`, `npm run dev` in `ui`).
+2. Push to `main`.
+3. GitHub runs the checks (API tests on SQLite + PostgreSQL, UI build + chat
+   browser tests, Docker image build).
+4. **All green → Render deploys automatically** (about 5–10 minutes).
+   Anything red → nothing is deployed; the site keeps running the last good version.
+5. Database changes (new migrations) are applied automatically when the new version starts.
+
+Something wrong after a deploy? Render → your service → **Events** → pick the
+previous deploy → **Rollback**.
+
+Changing a secret (e.g. a new Brevo key): Render → service → **Environment** → edit → Save.
+Never put secrets in the code — the repository is public.
+
+## Good to know
+
+- **Logs:** Render → service → **Logs** (errors, `Slow request:` warnings, reminders).
+- **Database size:** Neon dashboard shows usage (0.5 GB free). Chat files and photos
+  are *not* in the database (they're in Backblaze), so text data lasts a long time.
+- **Neon compute hours:** 100 per month. The database only runs while people use the
+  app (it sleeps 5 minutes after the last request); a small team on workdays uses
+  roughly 30–60 hours. Leaving the app open on a screen all night keeps it awake —
+  close it when you're done for the day.
+- **Backups:** Neon keeps a short restore history on the free plan. For a copy on your
+  PC (needs PostgreSQL from Part A):
+  ```powershell
+  pg_dump "<Neon connection string>" -Fc -f dailytracker-backup.dump
+  ```

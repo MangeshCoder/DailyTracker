@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Render Blueprint — the free hosted DailyTracker (web app + API in one)
+#
+#  Render → New → Blueprint → pick this repo. It reads this file, asks for the
+#  values marked "sync: false" (see docs/HOSTING.md), then builds the Dockerfile.
+#
+#  Every push to main is deployed automatically — but only after the GitHub
+#  checks (CI) pass, so a broken commit never goes live.
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: dailytracker
+    runtime: docker
+    plan: free
+    region: singapore            # closest Render region to India
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    # Only redeploy when app code changes (not for docs / tests)
+    buildFilter:
+      paths:
+        - api/**
+        - ui/**
+        - Dockerfile
+        - .dockerignore
+    envVars:
+      # ── generated once by Render ──────────────────────────────────────────
+      - key: Jwt__Key
+        generateValue: true
+
+      # ── Neon (database) ───────────────────────────────────────────────────
+      - key: ConnectionStrings__DefaultConnection
+        sync: false              # paste Neon's connection string (postgresql://…)
+
+      # ── Backblaze B2 (uploaded files) ─────────────────────────────────────
+      - key: Storage__Provider
+        value: S3
+      - key: Storage__S3__ServiceUrl
+        sync: false              # e.g. https://s3.eu-central-003.backblazeb2.com
+      - key: Storage__S3__Region
+        sync: false              # e.g. eu-central-003 (the part inside the URL)
+      - key: Storage__S3__Bucket
+        sync: false
+      - key: Storage__S3__AccessKey
+        sync: false              # B2 "keyID"
+      - key: Storage__S3__SecretKey
+        sync: false              # B2 "applicationKey"
+
+      # ── Brevo (emails: OTP, password reset, approvals) ────────────────────
+      - key: Email__BrevoApiKey
+        sync: false
+      - key: Email__FromAddress
+        sync: false              # the sender email you verified in Brevo
+
+      # ── This site ─────────────────────────────────────────────────────────
+      - key: Setup__AdminEmail
+        sync: false              # YOUR email: only it can become the first Manager
+      - key: FrontendUrl
+        sync: false              # e.g. https://dailytracker.onrender.com (links in emails)
+      - key: Gemini__ApiKey
+        sync: false              # optional: AI assistant (leave empty to skip)

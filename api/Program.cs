@@ -1,3 +1,4 @@
+using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.Custom;
 using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Extensions;
@@ -20,8 +21,13 @@ if (!EF.IsDesignTime && (string.IsNullOrWhiteSpace(jwtKeyValue) || System.Text.E
         "(or: dotnet user-secrets set \"Jwt:Key\" \"<random 64+ characters>\") and start the API again.");
 
 // ─── Database ─────────────────────────────────────────────────────────────────
+// PostgreSQL (local install on your PC, Neon when hosted). DateTime columns keep
+// the old SQL Server meaning ("timestamp without time zone") so no code changes.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    o.UseNpgsql(DailyTrackerAPI.Helpers.PostgresConnection.Normalize(builder.Configuration.GetConnectionString("DefaultConnection")),
+        // a hosted database that was asleep can take a moment to answer — retry briefly
+        npgsql => npgsql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(3), null)));
 
 // ─── Cache (Redis with in-memory fallback) ────────────────────────────────────
 builder.Services.AddStackExchangeRedisCache(o =>
@@ -38,8 +44,9 @@ builder.Services.AddControllers()
 
 // ─── All grouped service registrations (see Extensions/ServiceCollectionExtensions.cs)
 builder.Services.AddApplicationServices();
+builder.Services.AddFileStorage(builder.Configuration);   // local folders, or a cloud bucket when hosted
 builder.Services.AddJwtAuthentication(builder.Configuration);
-builder.Services.AddCorsPolicy();
+builder.Services.AddCorsPolicy(builder.Configuration);
 builder.Services.AddSwaggerDocs();
 builder.Services.AddRateLimiting();
 builder.Services.AddHealthMonitoring();
@@ -50,7 +57,19 @@ builder.WebHost.ConfigureKestrel(o =>
     o.Limits.MaxRequestBodySize = 55 * 1024 * 1024);  // 55 MB for file uploads
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─── Behind a hosting proxy (Render) ─────────────────────────────────────────
+// The proxy ends HTTPS and forwards plain HTTP; these headers tell the app the
+// real scheme (https → secure cookies) and the visitor's IP address.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                       | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();   // the proxy's address isn't fixed
+    o.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+app.UseForwardedHeaders();
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── Global Exception Handler ─────────────────────────────────────────────────
@@ -93,7 +112,8 @@ if (app.Environment.IsDevelopment())
 }
 
 // ─── Middleware Pipeline ──────────────────────────────────────────────────────
-if (!app.Environment.IsDevelopment())
+// (the hosting proxy already redirects http → https itself)
+if (!app.Environment.IsDevelopment() && !app.Configuration.GetValue<bool>("Hosting:BehindHttpsProxy"))
 {
     app.UseHttpsRedirection();
 }
@@ -109,19 +129,55 @@ app.Use(async (context, next) =>
     }
     await next();
 });
-app.UseStaticFiles();       // Serve wwwroot/uploads/avatars (public profile photos)
+// wwwroot: the built UI when hosted (+ locally uploaded files on your PC).
+// Vite's /assets/* files have a content hash in their name → cache for a year;
+// index.html and the service worker must always be re-checked.
+app.UseDefaultFiles();      // "/" → index.html (only when the built UI is in wwwroot)
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.Context.Request.Path.Value ?? "";
+        ctx.Context.Response.Headers.CacheControl =
+            path.StartsWith("/assets/", StringComparison.Ordinal) ? "public, max-age=31536000, immutable"
+            : path.EndsWith(".html") || path.EndsWith("sw.js") || path.Contains("workbox-") || path.EndsWith(".webmanifest") ? "no-cache"
+            : ctx.Context.Response.Headers.CacheControl.ToString();
+    }
+});
 app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
 
+// ─── Profile photos (public) ─────────────────────────────────────────────────
+// Answered from file storage: wwwroot/uploads/avatars on your PC, the storage
+// bucket when hosted — same URL either way.
+var avatarTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+{
+    [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".png"] = "image/png",
+    [".webp"] = "image/webp", [".gif"] = "image/gif",
+};
+app.MapGet("/uploads/avatars/{name}", async (string name, IFileStorage files, HttpContext http) =>
+{
+    if (!System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9_-]{1,100}\\.[A-Za-z]{3,4}$")
+        || !avatarTypes.TryGetValue(Path.GetExtension(name), out var type))
+        return Results.NotFound();
+    var stream = await files.OpenReadAsync($"uploads/avatars/{name}", http.RequestAborted);
+    if (stream == null) return Results.NotFound();
+    http.Response.Headers.CacheControl = "public, max-age=604800, immutable";   // names never change
+    http.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    return Results.Stream(stream, type);
+}).AllowAnonymous();
+
 // ─── SignalR Hubs ─────────────────────────────────────────────────────────────
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHub<ChatHub>("/hubs/chat");
 
 // ─── Health Checks ────────────────────────────────────────────────────────────
-app.MapHealthChecks("/health");
+// /health = "is the app up?" — never touches the database, so an uptime pinger
+// can keep the server awake without waking (and using up) the free database
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = check => check.Name == "self" });
 app.MapHealthChecks("/health/detail", new HealthCheckOptions
 {
     ResponseWriter = async (context, report) =>
@@ -142,8 +198,8 @@ app.MapHealthChecks("/health/detail", new HealthCheckOptions
 });
 
 // ─── Optional integrations: warn once if not configured ─────────────────────
-if (string.IsNullOrWhiteSpace(app.Configuration["Email:Username"]) || string.IsNullOrWhiteSpace(app.Configuration["Email:Password"]))
-    app.Logger.LogWarning("Email is not configured (Email:Username / Email:Password) — OTP, password reset and approval emails will fail. Run api/setup-secrets.ps1.");
+if (!DailyTrackerAPI.Services.Auth.EmailService.IsConfigured(app.Configuration))
+    app.Logger.LogWarning("Email is not configured (local: Email:Username / Email:Password via api/setup-secrets.ps1; hosted: Email:BrevoApiKey + Email:FromAddress) — OTP, password reset and approval emails will fail.");
 if (string.IsNullOrWhiteSpace(app.Configuration["Gemini:ApiKey"]))
     app.Logger.LogWarning("Gemini:ApiKey is not configured — the AI assistant will use its offline fallback. Run api/setup-secrets.ps1.");
 
@@ -153,6 +209,16 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider
          .GetRequiredService<AppDbContext>()
          .Database.Migrate();
+}
+
+// ─── The web app (hosted build) ───────────────────────────────────────────────
+// When the UI is built into wwwroot (Docker image), any other page URL
+// (/dashboard, /chat?c=5 …) returns index.html and React shows the page.
+// Real files (/assets/x.js) and API, hub, upload and health URLs never fall back to it.
+if (File.Exists(Path.Combine(app.Environment.WebRootPath ?? "", "index.html")))
+{
+    app.MapFallbackToFile("{*path:nonfile:regex(^(?!api/|hubs/|uploads/|health|swagger).*$)}", "index.html",
+        new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache" });
 }
 
 app.Run();

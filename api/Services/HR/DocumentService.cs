@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Services.Communication;
@@ -17,14 +18,14 @@ namespace DailyTrackerAPI.Services.HR
         Task<DocumentDto?> UpdateAsync(int documentId, int requesterId, string requesterRole, UpdateDocumentDto dto);
         Task<bool> DeleteAsync(int documentId, int requesterId, string requesterRole);
         Task<DocumentSummaryDto> GetSummaryAsync(int userId, string role);
-        Task<(string FullPath, string MimeType, string FileName)?> GetFileInfoAsync(int documentId, int requesterId, string requesterRole);
+        Task<(string Key, string MimeType, string FileName)?> GetFileInfoAsync(int documentId, int requesterId, string requesterRole);
     }
 
     // ─── Implementation ───────────────────────────────────────────────────────
     public class DocumentService : IDocumentService
     {
         private readonly AppDbContext _db;
-        private readonly IWebHostEnvironment _env;
+        private readonly IFileStorage _files;
         private readonly IAppNotificationService _notif;
 
         private const string UploadSubdir = "uploads/documents";
@@ -47,11 +48,11 @@ namespace DailyTrackerAPI.Services.HR
 
         public DocumentService(
             AppDbContext db,
-            IWebHostEnvironment env,
+            IFileStorage files,
             IAppNotificationService notif)
         {
             _db = db;
-            _env = env;
+            _files = files;
             _notif = notif;
         }
 
@@ -78,17 +79,10 @@ namespace DailyTrackerAPI.Services.HR
                 ? dto.OwnerUserId
                 : uploaderId;
 
-            // Save file to wwwroot/uploads/documents/{tempId}/filename
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var tempDir = Path.Combine(webRoot, UploadSubdir, "temp_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDir);
-
+            // Save the file (uploads/documents/{folder}/{random name})
             var ext = Path.GetExtension(file.FileName);
-            var safeName = $"{Guid.NewGuid():N}{ext}";
-            var fullPath = Path.Combine(tempDir, safeName);
-
-            await using (var stream = new FileStream(fullPath, FileMode.Create))
-                await file.CopyToAsync(stream);
+            var relativePath = $"{UploadSubdir}/{Guid.NewGuid():N}/{Guid.NewGuid():N}{ext}";
+            await _files.SaveAsync(relativePath, file);
 
             // Save to DB to get the Id
             var document = new Document
@@ -99,7 +93,7 @@ namespace DailyTrackerAPI.Services.HR
                 Description = dto.Description?.Trim(),
                 Category = dto.Category,
                 FileName = file.FileName,
-                FilePath = "",  // filled after we get the Id
+                FilePath = relativePath,
                 MimeType = mime,
                 FileSizeBytes = file.Length,
                 IsPublic = dto.IsPublic,
@@ -108,15 +102,8 @@ namespace DailyTrackerAPI.Services.HR
             };
 
             _db.Documents.Add(document);
-            await _db.SaveChangesAsync();
-
-            // Rename the temp directory to the real document Id
-            var finalDir = Path.Combine(webRoot, UploadSubdir, document.Id.ToString());
-            Directory.Move(tempDir, finalDir);
-
-            var relativePath = $"{UploadSubdir}/{document.Id}/{safeName}";
-            document.FilePath = relativePath;
-            await _db.SaveChangesAsync();
+            try { await _db.SaveChangesAsync(); }
+            catch { await _files.DeleteAsync(relativePath); throw; }   // no orphan files
 
             // Notify employee if a manager uploaded a doc for them
             if (uploaderId != ownerUserId)
@@ -218,15 +205,9 @@ namespace DailyTrackerAPI.Services.HR
             if (doc == null) return false;
             if (!CanManage(doc, requesterId, requesterRole)) return false;
 
-            // Delete physical file
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var fullPath = Path.Combine(webRoot, doc.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-            if (File.Exists(fullPath)) File.Delete(fullPath);
-
-            // Clean up directory if empty
-            var dir = Path.GetDirectoryName(fullPath);
-            if (dir != null && Directory.Exists(dir) && !Directory.EnumerateFiles(dir).Any())
-                Directory.Delete(dir);
+            // Delete the stored file (and its now-empty folder)
+            try { await _files.DeleteAsync(doc.FilePath); }
+            catch { /* already gone */ }
 
             _db.Documents.Remove(doc);
             await _db.SaveChangesAsync();
@@ -263,19 +244,14 @@ namespace DailyTrackerAPI.Services.HR
         }
 
         // ── File download info (for stream response) ──────────────────────────
-        public async Task<(string FullPath, string MimeType, string FileName)?> GetFileInfoAsync(
+        public async Task<(string Key, string MimeType, string FileName)?> GetFileInfoAsync(
             int documentId, int requesterId, string requesterRole)
         {
             var doc = await _db.Documents.FindAsync(documentId);
             if (doc == null) return null;
             if (!CanAccess(doc, requesterId, requesterRole)) return null;
 
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var fullPath = Path.Combine(webRoot, doc.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-
-            if (!File.Exists(fullPath)) return null;
-
-            return (fullPath, doc.MimeType, doc.FileName);
+            return (doc.FilePath, doc.MimeType, doc.FileName);
         }
 
         // ─── Access helpers ───────────────────────────────────────────────────

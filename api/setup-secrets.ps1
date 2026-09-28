@@ -9,7 +9,9 @@
 #    powershell -ExecutionPolicy Bypass -File .\setup-secrets.ps1
 #
 #  Safe to run again: it always creates a NEW JWT key (everyone signs in again)
-#  and only changes the email / Gemini values you type (Enter = keep current).
+#  and only changes the database / email / Gemini values you type (Enter = keep current).
+#
+#  (Only for YOUR PC. The hosted site's secrets are typed into Render instead.)
 # -----------------------------------------------------------------------------
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
@@ -37,7 +39,15 @@ $bytes = New-Object byte[] 64
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 Set-Secret 'Jwt:Key' ([Convert]::ToBase64String($bytes))
 
-# 2. Gmail used to send OTP / reset / approval emails
+# 2. Local PostgreSQL database (installed on this PC - see docs/HOSTING.md, part A)
+Write-Host ''
+Write-Host 'Local PostgreSQL (the password you chose when installing PostgreSQL)'
+$pgPassword = Read-Hidden '  postgres user password (input hidden, Enter = keep current)'
+if ($pgPassword) {
+    Set-Secret 'ConnectionStrings:DefaultConnection' ("Host=localhost;Port=5432;Database=dailytracker;Username=postgres;Password=" + $pgPassword)
+}
+
+# 3. Gmail used to send OTP / reset / approval emails
 Write-Host ''
 Write-Host 'Gmail sender (create a NEW app password at https://myaccount.google.com/apppasswords)'
 $email = Read-Host '  Gmail address (Enter = keep current)'
@@ -47,7 +57,7 @@ if ($email) {
     if ($appPassword) { Set-Secret 'Email:Password' $appPassword }
 }
 
-# 3. Gemini API key for the AI assistant
+# 4. Gemini API key for the AI assistant
 Write-Host ''
 Write-Host 'Gemini API key (create a NEW key at https://aistudio.google.com/apikey)'
 $gemini = (Read-Hidden '  NEW Gemini API key (input hidden, Enter = keep current)').Trim()

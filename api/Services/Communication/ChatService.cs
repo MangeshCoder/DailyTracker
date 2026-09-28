@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Communication;
 using Microsoft.AspNetCore.Hosting;
@@ -73,11 +74,11 @@ namespace DailyTrackerAPI.Services.Communication
     public class ChatService : IChatService
     {
         private readonly AppDbContext _db;
-        private readonly IWebHostEnvironment _env;
-        public ChatService(AppDbContext db, IWebHostEnvironment env)
+        private readonly IFileStorage _files;
+        public ChatService(AppDbContext db, IFileStorage files)
         {
             _db = db;
-            _env = env;
+            _files = files;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -394,7 +395,7 @@ namespace DailyTrackerAPI.Services.Communication
             // Deleted attachments are removed from disk, not just hidden
             if (!string.IsNullOrEmpty(message.AttachmentUrl))
             {
-                TryDeleteStoredFile(message.AttachmentUrl);
+                await TryDeleteStoredFileAsync(message.AttachmentUrl);
                 message.AttachmentUrl = null;
             }
             await _db.SaveChangesAsync();
@@ -464,10 +465,7 @@ namespace DailyTrackerAPI.Services.Communication
             await ValidateReplyAsync(conversationId, replyToMessageId);
 
             var key = $"chat/{conversationId}/{Guid.NewGuid():N}{ext.ToLowerInvariant()}";
-            var fullPath = ResolveStoragePath(key);
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            await using (var stream = new FileStream(fullPath, FileMode.CreateNew))
-                await file.CopyToAsync(stream);
+            await _files.SaveAsync(key, file);
 
             var message = new ChatMessage
             {
@@ -489,7 +487,7 @@ namespace DailyTrackerAPI.Services.Communication
             }
             catch
             {
-                TryDeleteStoredFile(key);   // don't leave orphan files behind
+                await TryDeleteStoredFileAsync(key);   // don't leave orphan files behind
                 throw;
             }
         }
@@ -507,14 +505,10 @@ namespace DailyTrackerAPI.Services.Communication
             if (message.IsDeleted || string.IsNullOrEmpty(message.AttachmentUrl))
                 throw new KeyNotFoundException("Attachment not found.");
 
-            var fullPath = ResolveStoragePath(message.AttachmentUrl);
-            if (!File.Exists(fullPath))
-                throw new KeyNotFoundException("Attachment file is missing.");
-
             return new ChatAttachmentFile(
-                fullPath,
+                FileStorageKeys.Normalize(message.AttachmentUrl),
                 message.AttachmentContentType ?? "application/octet-stream",
-                message.AttachmentName ?? Path.GetFileName(fullPath));
+                message.AttachmentName ?? Path.GetFileName(message.AttachmentUrl));
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -1101,19 +1095,9 @@ namespace DailyTrackerAPI.Services.Communication
             return MapToMessageDto(m);
         }
 
-        private string StorageRoot => Path.GetFullPath(Path.Combine(_env.ContentRootPath, "App_Data"));
-
-        private string ResolveStoragePath(string key)
+        private async Task TryDeleteStoredFileAsync(string key)
         {
-            var full = Path.GetFullPath(Path.Combine(StorageRoot, key));
-            if (!full.StartsWith(StorageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                throw new UnauthorizedAccessException("Invalid attachment path.");
-            return full;
-        }
-
-        private void TryDeleteStoredFile(string key)
-        {
-            try { var path = ResolveStoragePath(key); if (File.Exists(path)) File.Delete(path); }
+            try { await _files.DeleteAsync(key); }
             catch { /* best effort */ }
         }
 
@@ -1240,5 +1224,6 @@ namespace DailyTrackerAPI.Services.Communication
 
     }
 
-    public record ChatAttachmentFile(string FullPath, string ContentType, string FileName);
+    /// <param name="Key">where the file lives in IFileStorage</param>
+    public record ChatAttachmentFile(string Key, string ContentType, string FileName);
 }

@@ -69,7 +69,7 @@ public class ChatAttachmentTests : IDisposable
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _db.Service().GetAttachmentAsync(msg.Id, 3));
 
         var file = await _db.Service().GetAttachmentAsync(msg.Id, 2);
-        Assert.True(File.Exists(file.FullPath));
+        Assert.True(File.Exists(_db.Files.LocalPath(file.Key)));
         Assert.Equal("image/png", file.ContentType);
         Assert.Equal("a.png", file.FileName);
     }
@@ -78,7 +78,7 @@ public class ChatAttachmentTests : IDisposable
     public async Task Deleting_an_attachment_removes_the_file_from_disk()
     {
         var msg = await _db.Service().SendAttachmentAsync(1, 1, TestFiles.Form("a.png", TestFiles.Png), null, null);
-        var path = (await _db.Service().GetAttachmentAsync(msg.Id, 1)).FullPath;
+        var path = _db.Files.LocalPath((await _db.Service().GetAttachmentAsync(msg.Id, 1)).Key);
 
         await _db.Service().DeleteMessageAsync(msg.Id, 1);
 

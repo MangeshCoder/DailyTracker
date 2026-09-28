@@ -30,7 +30,7 @@ public class ChatHubTests : IAsyncLifetime
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.EnsureCreated();
+        TestDatabase.CreateSchema(db);
         foreach (var (id, name) in new[] { (1, "Mangesh"), (2, "Priya"), (3, "Outsider") })
             _users[id] = new User { Id = id, FullName = name, Email = $"u{id}@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true };
         db.Users.AddRange(_users.Values);
@@ -39,6 +39,7 @@ public class ChatHubTests : IAsyncLifetime
         conv.Members.Add(new ConversationMember { UserId = 2, Role = "Member" });
         db.Conversations.Add(conv);
         db.SaveChanges();
+        TestDatabase.AfterSeed(db);
         return Task.CompletedTask;
     }
 

@@ -32,12 +32,14 @@ namespace DailyTrackerAPI.Services.Auth
         private readonly AppDbContext _db;
         private readonly JwtHelper _jwt;
         private readonly ITwoFactorService _twoFactor;
+        private readonly IConfiguration _config;
 
-        public RefreshTokenService(AppDbContext db, JwtHelper jwt, ITwoFactorService twoFactor)
+        public RefreshTokenService(AppDbContext db, JwtHelper jwt, ITwoFactorService twoFactor, IConfiguration config)
         {
             _db = db;
             _jwt = jwt;
             _twoFactor = twoFactor;
+            _config = config;
         }
 
         //public async Task<AuthResponseV2Dto> RegisterAsync(RegisterDto dto, string? ipAddress)
@@ -87,8 +89,16 @@ namespace DailyTrackerAPI.Services.Auth
             string role = "Pending";   // Default role
             int? managerId = null;
 
-            // ✅ First user becomes Manager automatically
-            if (!anyUserExists)
+            // ✅ The first Manager is created automatically.
+            //    Setup:AdminEmail set (hosted site) → only that email can become it,
+            //    so a stranger can't sign up first on a public URL and take over.
+            //    Not set (your PC) → the very first user, as before.
+            var adminEmail = _config["Setup:AdminEmail"];
+            var makeManager = string.IsNullOrWhiteSpace(adminEmail)
+                ? !anyUserExists
+                : string.Equals(dto.Email.Trim(), adminEmail.Trim(), StringComparison.OrdinalIgnoreCase)
+                  && !await _db.Users.AnyAsync(u => u.Role == "Manager");
+            if (makeManager)
             {
                 role = "Manager";
             }

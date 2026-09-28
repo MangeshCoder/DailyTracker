@@ -2,6 +2,7 @@ using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models;
 using DailyTrackerAPI.Models.Tasks;
+using DailyTrackerAPI.Services.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.Team
@@ -15,21 +16,22 @@ namespace DailyTrackerAPI.Services.Team
         Task<List<MediaEvidenceDto>> SaveSupportMediaAsync(int userId, int supportLogId, IFormFileCollection files);
         string GetMediaUrl(string relativePath);
         string GetSecuredMediaUrl(int mediaId);
-        Task<(string FullPath, string MimeType, string FileName)?> GetMediaFileInfoAsync(int mediaId);
+        /// <summary>Storage key, type and original name of a media file (null if unknown)</summary>
+        Task<(string Key, string MimeType, string FileName)?> GetMediaFileInfoAsync(int mediaId);
     }
 
     public class MediaStorageService : IMediaStorageService
     {
-        private readonly IWebHostEnvironment _env;
+        private readonly IFileStorage _files;
         private readonly AppDbContext _db;
         private const string UploadSubdir = "uploads/support";
         private static readonly string[] AllowedImageTypes = { "image/jpeg", "image/png", "image/gif", "image/webp" };
         private static readonly string[] AllowedVideoTypes = { "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo" };
         private const long MaxFileBytes = 100 * 1024 * 1024; // 100 MB per file
 
-        public MediaStorageService(IWebHostEnvironment env, AppDbContext db)
+        public MediaStorageService(IFileStorage files, AppDbContext db)
         {
-            _env = env;
+            _files = files;
             _db = db;
         }
 
@@ -37,10 +39,6 @@ namespace DailyTrackerAPI.Services.Team
         {
             if (files == null || files.Count == 0)
                 return new List<MediaEvidenceDto>();
-
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var uploadDir = Path.Combine(webRoot, UploadSubdir, supportLogId.ToString());
-            Directory.CreateDirectory(uploadDir);
 
             var results = new List<MediaEvidenceDto>();
 
@@ -57,11 +55,8 @@ namespace DailyTrackerAPI.Services.Team
                 var ext = Path.GetExtension(file.FileName);
                 if (string.IsNullOrEmpty(ext)) ext = GetExtensionFromMime(mime);
                 var safeName = $"{Guid.NewGuid():N}{ext}";
-                var fullPath = Path.Combine(uploadDir, safeName);
                 var relativePath = $"{UploadSubdir}/{supportLogId}/{safeName}";
-
-                await using (var stream = new FileStream(fullPath, FileMode.Create))
-                    await file.CopyToAsync(stream);
+                await _files.SaveAsync(relativePath, file);
 
                 var mediaType = mime.StartsWith("video/") ? "Recording" : (mime.StartsWith("image/") ? "Screenshot" : "File");
 
@@ -100,16 +95,11 @@ namespace DailyTrackerAPI.Services.Team
         /// <summary>Returns API URL for secured access - requires auth.</summary>
         public string GetSecuredMediaUrl(int mediaId) => $"/api/support/media/{mediaId}";
 
-        public async Task<(string FullPath, string MimeType, string FileName)?> GetMediaFileInfoAsync(int mediaId)
+        public async Task<(string Key, string MimeType, string FileName)?> GetMediaFileInfoAsync(int mediaId)
         {
             var evidence = await _db.MediaEvidences.FindAsync(mediaId);
             if (evidence == null) return null;
-
-            var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var fullPath = Path.Combine(webRoot, evidence.FilePath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-            if (!System.IO.File.Exists(fullPath)) return null;
-
-            return (fullPath, evidence.MimeType, evidence.FileName);
+            return (evidence.FilePath.Replace('\\', '/'), evidence.MimeType, evidence.FileName);
         }
 
         private static bool IsAllowedMime(string mime) =>

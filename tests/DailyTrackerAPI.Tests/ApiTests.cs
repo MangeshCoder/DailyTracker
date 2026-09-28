@@ -22,7 +22,7 @@ public class ChatApiTests : IDisposable
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.EnsureCreated();
+            TestDatabase.CreateSchema(db);
             u1 = new User { Id = 1, FullName = "Mangesh", Email = "m@test.dev", PasswordHash = "x", Role = "TeamLead", IsActive = true };
             u2 = new User { Id = 2, FullName = "Priya", Email = "p@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true };
             u3 = new User { Id = 3, FullName = "Outsider", Email = "o@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true };
@@ -32,6 +32,7 @@ public class ChatApiTests : IDisposable
             conv.Members.Add(new ConversationMember { UserId = 2 });
             db.Conversations.Add(conv);
             db.SaveChanges();
+            TestDatabase.AfterSeed(db);
         }
         _mangesh = ClientFor(u1); _priya = ClientFor(u2); _outsider = ClientFor(u3);
     }

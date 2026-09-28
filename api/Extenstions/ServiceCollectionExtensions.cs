@@ -142,14 +142,19 @@ namespace DailyTrackerAPI.Extensions
 
         // ── Called in Program.cs:  builder.Services.AddCorsPolicy(); ──────────
         public static IServiceCollection AddCorsPolicy(
-            this IServiceCollection services)
+            this IServiceCollection services, IConfiguration? config = null)
         {
+            // Hosted, the UI and API share one address, so no extra origin is needed;
+            // Cors:Origins (comma separated) can add more if the UI is ever split out.
+            var extraOrigins = (config?["Cors:Origins"] ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             services.AddCors(options =>
                 options.AddPolicy("AllowReact", policy =>
-                    policy.WithOrigins(
-                        "http://localhost:3000",
-                        "http://192.168.1.244:3000"
-                        )
+                    policy.WithOrigins(new[]
+                        {
+                            "http://localhost:3000",
+                            "http://192.168.1.244:3000",
+                        }.Concat(extraOrigins).ToArray())
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials()

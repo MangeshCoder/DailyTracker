@@ -2,9 +2,11 @@
 #  CI — runs on every push / pull request to main (and manually from the
 #  Actions tab). A red ❌ on a commit means something below broke.
 #
-#  api : builds the .NET API and runs tests/DailyTrackerAPI.Tests
-#        (chat, attachments, polls, security) against SQLite in-memory —
-#        no SQL Server, secrets or network needed.
+#  api    : builds the .NET API and runs tests/DailyTrackerAPI.Tests twice —
+#           on SQLite (quick) and on a real PostgreSQL built by the migrations
+#           (the same database engine as the hosted site on Neon).
+#  docker : builds the hosting image (Dockerfile) so a broken build is caught
+#           here — Render only deploys commits whose checks are all green.
 #  ui  : installs exact package versions, strict TypeScript check, production build,
 #        then browser tests of the chat (ui/e2e, Playwright) against a fake backend.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -29,7 +31,15 @@ jobs:
   api:
     name: API · build & test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +59,15 @@ jobs:
           --no-build -c Release
           --logger "console;verbosity=normal"
           --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Test on PostgreSQL (real migrations)
+        env:
+          TEST_POSTGRES: Host=localhost;Port=5432;Username=postgres;Password=ci-only-password
+        run: >
+          dotnet test tests/DailyTrackerAPI.Tests/DailyTrackerAPI.Tests.csproj
+          --no-build -c Release
+          --logger "trx;LogFileName=test-results-postgres.trx"
           --results-directory TestResults
 
       - name: Upload test results
@@ -99,3 +118,13 @@ jobs:
             ui/playwright-report
             ui/test-results
           retention-days: 14
+
+  docker:
+    name: Hosting image · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the Docker image (not published)
+        run: docker build --tag dailytracker:ci .

@@ -17,11 +17,21 @@ namespace DailyTrackerAPI.Services.Auth
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _config;
+        private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
 
         public EmailService(IConfiguration config)
         {
             _config = config;
         }
+
+        /// <summary>
+        /// Brevo (HTTPS email API) when Email:BrevoApiKey is set — used when hosted,
+        /// because free hosting blocks the SMTP ports. Otherwise Gmail SMTP (your PC).
+        /// </summary>
+        public static bool IsConfigured(IConfiguration config) =>
+            !string.IsNullOrWhiteSpace(config["Email:BrevoApiKey"])
+                ? !string.IsNullOrWhiteSpace(config["Email:FromAddress"] ?? config["Email:Username"])
+                : !string.IsNullOrWhiteSpace(config["Email:Username"]) && !string.IsNullOrWhiteSpace(config["Email:Password"]);
 
         public async Task SendOtpEmailAsync(string email, string code, string purpose)
         {
@@ -426,6 +436,12 @@ namespace DailyTrackerAPI.Services.Auth
 
         private async Task SendEmailAsync(string to, string subject, string body)
         {
+            if (!string.IsNullOrWhiteSpace(_config["Email:BrevoApiKey"]))
+            {
+                await SendWithBrevoAsync(to, subject, body);
+                return;
+            }
+
             var username = _config["Email:Username"];
             var password = _config["Email:Password"];
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
@@ -460,6 +476,36 @@ namespace DailyTrackerAPI.Services.Auth
             {
                 // log error properly in real project
                 throw new Exception("Email sending failed", ex);
+            }
+        }
+
+        // POST https://api.brevo.com/v3/smtp/email — the sender address must be
+        // verified in Brevo (Senders & IP → Senders), e.g. your Gmail address.
+        private async Task SendWithBrevoAsync(string to, string subject, string body)
+        {
+            var from = _config["Email:FromAddress"] ?? _config["Email:Username"];
+            if (string.IsNullOrWhiteSpace(from))
+                throw new InvalidOperationException("Email:FromAddress is not set (the sender address verified in Brevo).");
+
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                _config["Email:BrevoApiUrl"] ?? "https://api.brevo.com/v3/smtp/email")
+            {
+                Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    sender = new { name = _config["Email:FromName"] ?? "Employee Management System", email = from },
+                    to = new[] { new { email = to } },
+                    subject,
+                    htmlContent = body,
+                }), System.Text.Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("api-key", _config["Email:BrevoApiKey"]);
+            request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Email sending failed (Brevo {(int)response.StatusCode}): {detail}");
             }
         }
     }

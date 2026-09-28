@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.Models.Communication;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.Communication
@@ -64,6 +65,8 @@ namespace DailyTrackerAPI.Services.Communication
                 OperatingSystem.IsWindows() ? "India Standard Time" : "Asia/Kolkata");
 
         // Job keys used as prefixes in _firedToday
+        private static readonly TimeSpan MaxLateness = TimeSpan.FromHours(3);
+
         private const string JOB_GOAL = "GOAL_REMINDER";
         private const string JOB_PENDING = "PENDING_APPROVAL";
         private const string JOB_EOD = "EOD_REMINDER";
@@ -117,7 +120,18 @@ namespace DailyTrackerAPI.Services.Communication
                     if (!due) continue;
 
                     _firedToday.Add(fireKey);   // mark before running to block re-entry
-                    _ = Task.Run(() => RunJobAsync(key, stoppingToken), stoppingToken);
+
+                    // Server was down/asleep at the scheduled time: a 9:00 reminder at
+                    // 15:00 is noise, so skip it once it's more than a few hours late
+                    var scheduledAt = nowIst.Date.AddHours(hour).AddMinutes(min);
+                    if (nowIst - scheduledAt > MaxLateness)
+                    {
+                        _logger.LogInformation("[Scheduler] Skipped {Job}: {Late:g} late", key, nowIst - scheduledAt);
+                        continue;
+                    }
+
+                    var runDate = DateOnly.FromDateTime(nowIst);
+                    _ = Task.Run(() => RunJobAsync(key, runDate, stoppingToken), stoppingToken);
                 }
             }
 
@@ -125,7 +139,7 @@ namespace DailyTrackerAPI.Services.Communication
         }
 
         // ── Job dispatcher ────────────────────────────────────────────────────
-        private async Task RunJobAsync(string jobKey, CancellationToken ct)
+        private async Task RunJobAsync(string jobKey, DateOnly runDate, CancellationToken ct)
         {
             try
             {
@@ -133,6 +147,13 @@ namespace DailyTrackerAPI.Services.Communication
                 using var scope = _services.CreateScope();
                 var svc = scope.ServiceProvider.GetRequiredService<IAppNotificationService>();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                // Already sent today (e.g. before a restart/redeploy)? Then don't repeat it.
+                if (await db.SchedulerRuns.AnyAsync(r => r.JobKey == jobKey && r.RunDate == runDate, ct))
+                {
+                    _logger.LogInformation("[Scheduler] Already ran today: {Job}", jobKey);
+                    return;
+                }
 
                 _logger.LogInformation("[Scheduler] Running: {Job}", jobKey);
 
@@ -143,6 +164,9 @@ namespace DailyTrackerAPI.Services.Communication
                     case JOB_EOD: await RunEodReminderAsync(db, svc, ct); break;
                     case JOB_LOG: await RunDailyLogReminderAsync(db, svc, ct); break;
                 }
+
+                db.SchedulerRuns.Add(new SchedulerRun { JobKey = jobKey, RunDate = runDate });
+                await db.SaveChangesAsync(ct);
 
                 _logger.LogInformation("[Scheduler] Done: {Job}", jobKey);
             }

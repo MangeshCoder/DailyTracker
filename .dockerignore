@@ -1,0 +1,18 @@
+# Keep the Docker build small and free of local files / secrets
+.git
+.github
+**/bin
+**/obj
+**/node_modules
+ui/dist
+ui/dev-dist
+ui/test-results
+ui/playwright-report
+api/wwwroot/uploads
+api/App_Data
+api/Properties/launchSettings.json
+tests
+**/*.user
+**/.vs
+**/.vscode
+**/*.log

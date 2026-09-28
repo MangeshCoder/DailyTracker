@@ -24,6 +24,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.HR;
+using DailyTrackerAPI.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -35,7 +36,13 @@ namespace DailyTrackerAPI.Controllers.Tasks
     {
         private readonly ITrainingService _svc;
 
-        public TrainingController(ITrainingService svc) => _svc = svc;
+        private readonly IFileStorage _files;
+
+        public TrainingController(ITrainingService svc, IFileStorage files)
+        {
+            _svc = svc;
+            _files = files;
+        }
 
         private string Role => User.FindFirstValue(ClaimTypes.Role) ?? "Developer";
 
@@ -155,9 +162,8 @@ namespace DailyTrackerAPI.Controllers.Tasks
             var info = await _svc.GetCertFileInfoAsync(id, User.GetUserId(), Role);
             if (info == null) return NotFound();
 
-            var (fullPath, mimeType, fileName) = info.Value;
-            var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            return File(stream, mimeType, fileName);
+            var (key, mimeType, fileName) = info.Value;
+            return await this.StoredFileAsync(_files, key, mimeType, fileName);
         }
     }
 }

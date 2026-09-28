@@ -3,6 +3,7 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Hubs;
 using DailyTrackerAPI.Services.Communication;
+using DailyTrackerAPI.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -35,10 +36,12 @@ namespace DailyTrackerAPI.Controllers.Communication
         private readonly IHubContext<ChatHub> _hub;
         private readonly AppDbContext _db;
         private readonly IAppNotificationService _notifications;
+        private readonly IFileStorage _files;
 
         public ChatController(IChatService chatService, IHubContext<ChatHub> hub, AppDbContext db,
-            IAppNotificationService notifications)
+            IAppNotificationService notifications, IFileStorage files)
         {
+            _files = files;
             _chatService = chatService;
             _hub = hub;
             _db = db;
@@ -111,6 +114,7 @@ namespace DailyTrackerAPI.Controllers.Communication
                 return Ok(detail);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         }
 
         /// <summary>Get online user IDs from the ChatHub in-memory dictionary</summary>
@@ -150,6 +154,7 @@ namespace DailyTrackerAPI.Controllers.Communication
                 return Ok(messages);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
         }
 
         /// <summary>
@@ -289,11 +294,11 @@ namespace DailyTrackerAPI.Controllers.Communication
                     || file.ContentType.StartsWith("audio/"));
 
                 if (!inline)
-                    return PhysicalFile(file.FullPath, file.ContentType, file.FileName, enableRangeProcessing: true);
+                    return await this.StoredFileAsync(_files, file.Key, file.ContentType, file.FileName);
 
                 var disposition = new System.Net.Mime.ContentDisposition { Inline = true, FileName = file.FileName };
                 Response.Headers["Content-Disposition"] = disposition.ToString();
-                return PhysicalFile(file.FullPath, file.ContentType, enableRangeProcessing: true);
+                return await this.StoredFileAsync(_files, file.Key, file.ContentType, downloadName: null);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
             catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }

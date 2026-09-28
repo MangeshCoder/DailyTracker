@@ -65,6 +65,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // face-api is only needed for face check-in — cache it on first use instead
         globIgnores: ['**/face-api-*.js'],
+        // Hosted, the API shares this address: links to it (downloads, health
+        // checks …) must reach the server, not get the app's index.html
+        navigateFallbackDenylist: [/^\/api\//, /^\/hubs\//, /^\/uploads\//, /^\/health/, /^\/swagger/],
 
         runtimeCaching: [
           // ── face-api.js chunk + ML models — CacheFirst (hashed / static files)
