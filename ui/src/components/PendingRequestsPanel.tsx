@@ -290,6 +290,11 @@ export const PendingRequestsPanel: React.FC = () => {
                           <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base truncate">
                             {req.employeeName}
                           </h4>
+                          {req.isOwn && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+                              Your request
+                            </span>
+                          )}
 
                           {/* Request badge */}
                           <span

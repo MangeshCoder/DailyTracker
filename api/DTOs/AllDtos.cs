@@ -354,6 +354,7 @@ namespace DailyTrackerAPI.DTOs
     public class LeaveResponseDto
     {
         public int Id { get; set; }
+        public int UserId { get; set; }
         public string UserName { get; set; } = string.Empty;
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }
@@ -365,6 +366,10 @@ namespace DailyTrackerAPI.DTOs
         public string? ReviewNote { get; set; }
         public DateTime? ReviewedAt { get; set; }
         public DateTime AppliedAt { get; set; }
+        /// <summary>Team view: the viewer's own leave</summary>
+        public bool IsOwn { get; set; }
+        /// <summary>Team view: the viewer may approve / reject it now</summary>
+        public bool CanReview { get; set; }
     }
 
     public class ReviewLeaveDto
@@ -813,6 +818,8 @@ namespace DailyTrackerAPI.DTOs
         public string? ReviewNote { get; set; }
         public DateTime? ReviewedAt { get; set; }
         public DateTime RequestedAt { get; set; }
+        /// <summary>Pending queue: the viewing manager's own request (only when no one else can review it)</summary>
+        public bool IsOwn { get; set; }
     }
 
     public class ManagerDailyStatusDto

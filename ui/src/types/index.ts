@@ -155,7 +155,7 @@ export interface KudosLeaderboard {
 
 // ─── Feature 9: Leave ─────────────────────────────────────────────────────────
 export interface ApplyLeaveDto { fromDate: string; toDate: string; leaveType: string; reason: string; }
-export interface LeaveRequest { id: number; userName: string; fromDate: string; toDate: string; leaveDays: number; leaveType: string; reason: string; status: string; reviewerName?: string; reviewNote?: string; reviewedAt?: string; appliedAt: string; }
+export interface LeaveRequest { id: number; userId?: number; userName: string; fromDate: string; toDate: string; leaveDays: number; leaveType: string; reason: string; status: string; reviewerName?: string; reviewNote?: string; reviewedAt?: string; appliedAt: string; isOwn?: boolean; canReview?: boolean; }
 export interface ReviewLeaveDto { status: string; reviewNote?: string; }
 export interface LeaveTypeBalanceItem {leaveType: string;entitlement: number; used: number;pending: number;remaining: number;isUnlimited: boolean;}
 export interface LeaveBalanceDto {userId: number;userName: string;year: number;balances: LeaveTypeBalanceItem[];}
@@ -210,6 +210,7 @@ export interface WFHRequest {
   reviewNote?: string;
   reviewedAt?: string;
   requestedAt: string;
+  isOwn?: boolean;
 }
 
 export interface TeamMemberStatus {

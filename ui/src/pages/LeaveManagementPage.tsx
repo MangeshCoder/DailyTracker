@@ -896,6 +896,11 @@ export const LeaveManagementPage: React.FC = () => {
                             👤
                           </span>
                           <span>{l.userName}</span>
+                          {l.isOwn && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold">
+                              You
+                            </span>
+                          )}
                         </div>
                       )}
 
@@ -972,7 +977,12 @@ export const LeaveManagementPage: React.FC = () => {
                       )}
 
                       {/* Review trigger for manager */}
-                      {tab === 'all' && isPending && reviewId !== l.id && (
+                      {tab === 'all' && isPending && l.canReview === false && (
+                        <span className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                          Waiting for another manager
+                        </span>
+                      )}
+                      {tab === 'all' && isPending && l.canReview !== false && reviewId !== l.id && (
                         <button
                           type="button"
                           onClick={() => {

@@ -54,7 +54,7 @@ namespace DailyTrackerAPI.Controllers.HR
         [HttpGet("all"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetAll([FromQuery] string? status)
         {
-            var leaves = await _leaveSvc.GetAllLeavesAsync(status);
+            var leaves = await _leaveSvc.GetAllLeavesAsync(status, User.GetUserId());
             return Ok(leaves);
         }
 

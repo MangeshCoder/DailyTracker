@@ -152,7 +152,37 @@ public class LeaveWfhTests : IDisposable
         var mine = (await Json(await ApplyLeave(_manager, Monday.AddDays(3), Monday.AddDays(3)))).GetProperty("id").GetInt32();
         var own = await _manager.PutAsJsonAsync($"/api/leave/{mine}/review", new { status = "Approved" });
         Assert.Equal(HttpStatusCode.BadRequest, own.StatusCode);
-        Assert.Contains("own leave", await Message(own));
+        Assert.Contains("another manager", await Message(own));
+
+        // the team list tells the UI not to offer Review on it, but Asha can
+        var row = (await Json(await _manager.GetAsync("/api/leave/all"))).EnumerateArray()
+            .Single(l => l.GetProperty("id").GetInt32() == mine);
+        Assert.True(row.GetProperty("isOwn").GetBoolean());
+        Assert.False(row.GetProperty("canReview").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await _manager2.PutAsJsonAsync($"/api/leave/{mine}/review", new { status = "Approved" })).StatusCode);
+    }
+
+    private void DeactivateSecondManager()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Users.Find(4)!.IsActive = false;
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public async Task The_only_manager_can_review_their_own_leave()
+    {
+        DeactivateSecondManager();
+        var mine = (await Json(await ApplyLeave(_manager, Monday, Monday))).GetProperty("id").GetInt32();
+
+        var row = (await Json(await _manager.GetAsync("/api/leave/all"))).EnumerateArray().Single();
+        Assert.True(row.GetProperty("isOwn").GetBoolean());
+        Assert.True(row.GetProperty("canReview").GetBoolean());
+
+        var ok = await _manager.PutAsJsonAsync($"/api/leave/{mine}/review", new { status = "Approved" });
+        Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
+        Assert.Equal("Approved", (await Json(await _manager.GetAsync("/api/leave/my"))).EnumerateArray().Single().GetProperty("status").GetString());
     }
 
     [Fact]
@@ -235,8 +265,38 @@ public class LeaveWfhTests : IDisposable
         var own = await _manager.PostAsJsonAsync($"/api/wfh-requests/{id}/approve", new { note = "self" });
 
         Assert.Equal(HttpStatusCode.Forbidden, own.StatusCode);
-        Assert.Contains("own request", await Message(own));
+        Assert.Contains("another manager", await Message(own));
         Assert.Equal(HttpStatusCode.OK, (await _manager2.PostAsJsonAsync($"/api/wfh-requests/{id}/approve", new { note = "ok" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_only_manager_sees_and_can_approve_their_own_WFH_and_half_day()
+    {
+        DeactivateSecondManager();
+        Assert.Equal(HttpStatusCode.OK, (await RequestWfh(_manager, Monday)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await RequestWfh(_manager, Monday.AddDays(1), "HalfDay", "Morning")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await RequestWfh(_priya, Monday)).StatusCode);
+
+        var pending = (await Json(await _manager.GetAsync("/api/wfh-requests/pending"))).EnumerateArray().ToList();
+        Assert.Equal(3, pending.Count);
+        var own = pending.Where(r => r.GetProperty("isOwn").GetBoolean()).ToList();
+        Assert.Equal(2, own.Count);
+        Assert.All(own, r => Assert.Equal("Mangesh", r.GetProperty("employeeName").GetString()));
+
+        Assert.Equal(HttpStatusCode.OK, (await _manager.PostAsJsonAsync($"/api/wfh-requests/{own[0].GetProperty("id").GetInt32()}/approve", new { note = "ok" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await _manager.PostAsJsonAsync($"/api/wfh-requests/{own[1].GetProperty("id").GetInt32()}/reject", new { note = "no" })).StatusCode);
+        Assert.Single((await Json(await _manager.GetAsync("/api/wfh-requests/pending"))).EnumerateArray());
+    }
+
+    [Fact]
+    public async Task An_employee_can_never_approve_their_own_request()
+    {
+        DeactivateSecondManager();
+        Assert.Equal(HttpStatusCode.OK, (await RequestWfh(_priya, Monday)).StatusCode);
+        var id = await PendingWfhId(_manager, "Priya");
+
+        var own = await _priya.PostAsJsonAsync($"/api/wfh-requests/{id}/approve", new { note = "self" });
+        Assert.True(own.StatusCode is HttpStatusCode.Forbidden);
     }
 
     [Fact]

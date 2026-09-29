@@ -35,7 +35,7 @@ namespace DailyTrackerAPI.Services.HR
     {
         Task<LeaveResponseDto> ApplyAsync(int userId, ApplyLeaveDto dto);
         Task<List<LeaveResponseDto>> GetMyLeavesAsync(int userId);
-        Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null);
+        Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null, int? viewerId = null);
         Task ReviewAsync(int leaveId, int managerId, ReviewLeaveDto dto);
         Task CancelAsync(int leaveId, int userId);
 
@@ -212,7 +212,7 @@ namespace DailyTrackerAPI.Services.HR
         }
 
         // ── UNCHANGED ─────────────────────────────────────────────────────────
-        public async Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null)
+        public async Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null, int? viewerId = null)
         {
             var query = _db.LeaveRequests
                 .Include(l => l.User)
@@ -223,10 +223,24 @@ namespace DailyTrackerAPI.Services.HR
                 query = query.Where(l => l.Status == status);
 
             var leaves = await query.OrderByDescending(l => l.AppliedAt).ToListAsync();
+            var ownNeedsOtherManager = viewerId.HasValue && await OtherManagerExistsAsync(viewerId.Value);
             var result = new List<LeaveResponseDto>();
-            foreach (var l in leaves) result.Add(await MapLeave(l));
+            foreach (var l in leaves)
+            {
+                var dto = await MapLeave(l);
+                dto.IsOwn = l.UserId == viewerId;
+                dto.CanReview = l.Status == "Pending" && (!dto.IsOwn || !ownNeedsOtherManager);
+                result.Add(dto);
+            }
             return result;
         }
+
+        /// <summary>
+        /// A manager's own leave is reviewed by another manager. Only when there is
+        /// no other active manager may they review it themselves.
+        /// </summary>
+        private Task<bool> OtherManagerExistsAsync(int managerId) =>
+            _db.Users.AnyAsync(u => u.Role == "Manager" && u.IsActive && u.Id != managerId);
 
         // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task ReviewAsync(int leaveId, int managerId, ReviewLeaveDto dto)
@@ -243,8 +257,8 @@ namespace DailyTrackerAPI.Services.HR
                 ?? throw new ValidationException("Status must be Approved or Rejected.");
             if (leave.Status != "Pending")
                 throw new ValidationException($"This leave request is already {leave.Status.ToLower()}.");
-            if (leave.UserId == managerId)
-                throw new ValidationException("You can't review your own leave request.");
+            if (leave.UserId == managerId && await OtherManagerExistsAsync(managerId))
+                throw new ValidationException("You can't review your own leave request — another manager needs to review it.");
 
             leave.Status = status;
             leave.ReviewedByUserId = managerId;
@@ -414,6 +428,7 @@ namespace DailyTrackerAPI.Services.HR
             Task.FromResult(new LeaveResponseDto
             {
                 Id = l.Id,
+                UserId = l.UserId,
                 UserName = l.User?.FullName ?? "Unknown",
                 FromDate = l.FromDate,
                 ToDate = l.ToDate,

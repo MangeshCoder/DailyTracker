@@ -143,6 +143,14 @@ namespace DailyTrackerAPI.Services.Attendance
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// A manager / team lead reviews their own request only when nobody else can
+        /// (no other active manager and no active manager assigned to them).
+        /// </summary>
+        private async Task<bool> CanReviewOwnAsync(Models.Auth.User user) =>
+            user.Role is "Manager" or "TeamLead" or "Admin" && user.IsActive
+            && (await GetApproversAsync(user)).Count == 0;
+
         private async Task BestEffortAsync(string what, Func<Task> action)
         {
             try { await action(); }
@@ -280,14 +288,18 @@ namespace DailyTrackerAPI.Services.Attendance
         {
             var teamUserIds = await GetTeamUserIds(managerId);
 
+            // Own requests only when nobody else can review them
+            var manager = await _db.Users.FindAsync(managerId);
+            var includeOwn = manager != null && await CanReviewOwnAsync(manager);
+
             var requests = await _db.WFHRequests
-                .Where(r => teamUserIds.Contains(r.UserId) && r.UserId != managerId && r.Status == "Pending")
+                .Where(r => teamUserIds.Contains(r.UserId) && (includeOwn || r.UserId != managerId) && r.Status == "Pending")
                 .Include(r => r.User)
                 .Include(r => r.ReviewedBy)
                 .OrderBy(r => r.RequestDate)
                 .ToListAsync();
 
-            return requests.Select(MapToDto).ToList();
+            return requests.Select(r => { var d = MapToDto(r); d.IsOwn = r.UserId == managerId; return d; }).ToList();
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -551,7 +563,12 @@ namespace DailyTrackerAPI.Services.Attendance
         private async Task VerifyManagerAccess(int managerId, int employeeUserId)
         {
             if (managerId == employeeUserId)
-                throw new UnauthorizedAccessException("You can't review your own request.");
+            {
+                var self = await _db.Users.FindAsync(managerId);
+                if (self == null || !await CanReviewOwnAsync(self))
+                    throw new UnauthorizedAccessException("You can't review your own request — another manager needs to review it.");
+                return;
+            }
 
             var isManager = await _db.Users
                 .AnyAsync(u => u.Id == employeeUserId
