@@ -16,6 +16,8 @@ namespace DailyTrackerAPI.Controllers.Monitoring
     //    GET    /api/monitoring/backups                 → backup list
     //    POST   /api/monitoring/backups                 → back up now
     //    GET    /api/monitoring/backups/{id}/download   → the .json.gz file
+    //    POST   /api/monitoring/backups/{id}/restore    → put a backup back   { confirm: "RESTORE" }
+    //    POST   /api/monitoring/restore                 → same, from an uploaded file (form: file, confirm)
     // ─────────────────────────────────────────────────────────────────────────
     [ApiController, Route("api/monitoring"), Authorize(Roles = "Manager,Admin")]
     public class MonitoringController : ControllerBase
@@ -106,5 +108,38 @@ namespace DailyTrackerAPI.Controllers.Monitoring
             if (backup?.FileKey == null) return NotFound(new { message = "Backup not found." });
             return await this.StoredFileAsync(files, backup.FileKey, "application/gzip", Path.GetFileName(backup.FileKey));
         }
+
+        // ── Restore: replaces ALL current data (a safety backup is taken first) ──
+        public const string ConfirmWord = "RESTORE";
+
+        public class RestoreRequest { public string? Confirm { get; set; } }
+
+        [HttpPost("backups/{id:int}/restore")]
+        public async Task<IActionResult> Restore(int id, [FromBody] RestoreRequest body, [FromServices] IRestoreService restore)
+        {
+            if (!string.Equals(body.Confirm?.Trim(), ConfirmWord, StringComparison.Ordinal))
+                return BadRequest(new { message = $"Type {ConfirmWord} to confirm." });
+            return Ok(Result(await restore.RestoreStoredAsync(id, User.GetUserId(), HttpContext.RequestAborted)));
+        }
+
+        [HttpPost("restore"), RequestSizeLimit(100 * 1024 * 1024)]
+        public async Task<IActionResult> RestoreUpload(IFormFile? file, [FromForm] string? confirm, [FromServices] IRestoreService restore)
+        {
+            if (!string.Equals(confirm?.Trim(), ConfirmWord, StringComparison.Ordinal))
+                return BadRequest(new { message = $"Type {ConfirmWord} to confirm." });
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "Choose the backup file (.json.gz) to restore." });
+            await using var stream = file.OpenReadStream();
+            return Ok(Result(await restore.RestoreFileAsync(stream, User.GetUserId(), HttpContext.RequestAborted)));
+        }
+
+        private static object Result(RestoreResult r) => new
+        {
+            message = "Restore complete.",
+            tables = r.Tables,
+            rows = r.Rows,
+            safetyBackupId = r.SafetyBackupId,
+            backupCreatedAt = r.BackupCreatedAtUtc,
+        };
     }
 }

@@ -69,6 +69,42 @@ export function useConfirm() {
     return result.isConfirmed;
   };
 
+  // ── confirmTyped() — for actions that can't easily be undone ────────────
+  //  await confirmTyped('Replace all data?', 'RESTORE') → true only if the
+  //  person typed the word exactly
+  const confirmTyped = async (
+    message: string,
+    word: string,
+    options?: { title?: string; confirmText?: string }
+  ): Promise<boolean> => {
+    const result = await Swal.fire({
+      ...themeBase(),
+      customClass:        { popup: POPUP_CLASS, input: '!rounded-xl !text-base' },
+      title:              options?.title ?? 'Are you sure?',
+      text:               message,
+      icon:               'warning',
+      iconColor:          ICON_COLORS.warning,
+      input:              'text',
+      inputPlaceholder:   `Type ${word} to confirm`,
+      inputAttributes:    { autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false' },
+      showCancelButton:   true,
+      reverseButtons:     true,
+      focusCancel:        false,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor:  isDarkMode() ? '#475569' : '#94a3b8',
+      confirmButtonText:  options?.confirmText ?? 'Yes, continue',
+      cancelButtonText:   'Cancel',
+      preConfirm: (value: string) => {
+        if ((value ?? '').trim() !== word) {
+          Swal.showValidationMessage(`Type ${word} (capital letters) to confirm`);
+          return false;
+        }
+        return true;
+      },
+    });
+    return result.isConfirmed;
+  };
+
   // ── alert() — replaces window.alert() ───────────────────────────────────
   const alert = async (
     message: string,
@@ -106,5 +142,5 @@ export function useConfirm() {
     });
   };
 
-  return { confirm, alert, toast };
+  return { confirm, confirmTyped, alert, toast };
 }

@@ -1101,7 +1101,7 @@ export interface DatabaseBackupDto {
   id: number;
   startedAt: string;           // UTC
   finishedAt?: string | null;
-  trigger: 'Weekly' | 'Manual';
+  trigger: 'Weekly' | 'Manual' | 'PreRestore';
   status: 'Running' | 'Succeeded' | 'Failed';
   sizeBytes: number;
   tableCount: number;
@@ -1109,4 +1109,11 @@ export interface DatabaseBackupDto {
   error?: string | null;
   requestedBy?: string | null;
   canDownload: boolean;
+}
+export interface RestoreResultDto {
+  message: string;
+  tables: number;
+  rows: number;
+  safetyBackupId: number;
+  backupCreatedAt: string;     // UTC
 }

@@ -9,15 +9,15 @@
 //     storage bucket (newest 8 kept); "Back up now" and Download
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity, AlertTriangle, ChevronDown, ChevronRight, Clock, Copy, DatabaseBackup,
-  Download, Loader2, RefreshCw, ShieldCheck, Trash2, Turtle,
+  Download, History, Loader2, RefreshCw, ShieldCheck, Trash2, Turtle, Upload,
 } from 'lucide-react';
 import { monitoringApi } from '../services/api';
-import type { DatabaseBackupDto, ErrorLogEntry } from '../types';
+import type { DatabaseBackupDto, ErrorLogEntry, RestoreResultDto } from '../types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardContent } from '../components/ui/Card';
@@ -336,9 +336,18 @@ const STATUS_STYLE: Record<DatabaseBackupDto['status'], string> = {
   Running: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
 };
 
+const TRIGGER_LABEL: Record<DatabaseBackupDto['trigger'], string> = {
+  Weekly: 'Weekly',
+  Manual: 'Manual',
+  PreRestore: 'Before restore',
+};
+
 const Backups = () => {
   const { toast } = useToast();
+  const { confirmTyped, alert } = useConfirm();
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const backups = useQuery({
     queryKey: ['backups'],
     queryFn: () => monitoringApi.backups().then(r => r.data),
@@ -361,13 +370,69 @@ const Backups = () => {
     }
   };
 
+  // Replaces ALL current data. The server saves a "Before restore" copy first.
+  const restore = async (what: string, run: () => Promise<{ data: RestoreResultDto }>) => {
+    const ok = await confirmTyped(
+      `All current data will be replaced by ${what}. Anything added or changed after it was taken will be lost ` +
+      `(the error log and this backup list are kept). A "Before restore" copy of the current data is saved first, ` +
+      `so you can undo this by restoring that copy.`,
+      'RESTORE',
+      { title: 'Restore this backup?', confirmText: 'Restore' },
+    );
+    if (!ok) return;
+
+    setRestoring(true);
+    try {
+      const { data } = await run();
+      setRestoring(false);
+      await alert(
+        `Restored ${data.rows.toLocaleString('en-IN')} rows in ${data.tables} tables from the backup of ` +
+        `${formatWhen(data.backupCreatedAt)}. The page will reload now — some people may need to sign in again.`,
+        'success',
+        'Restore complete',
+      );
+      window.location.reload();
+    } catch (e) {
+      setRestoring(false);
+      await alert(apiErrorMessage(e, 'The restore failed. Nothing was changed.'), 'error', 'Restore failed');
+      backups.refetch();
+    }
+  };
+
+  const restoreFile = (file?: File) => {
+    if (fileInput.current) fileInput.current.value = '';
+    if (!file) return;
+    void restore(`the backup file "${file.name}"`, () => monitoringApi.restoreFile(file, 'RESTORE'));
+  };
+
+  const smallButton =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed';
+
   return (
     <Card>
       <CardContent className="p-0">
-        <p className="p-4 text-sm text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-          A full copy of the database is saved to your private storage every 7 days (and whenever you press
-          <strong className="text-slate-800 dark:text-slate-200"> Back up now</strong>). The newest 8 are kept.
-        </p>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-3">
+          <p className="flex-1 min-w-[16rem] text-sm text-slate-600 dark:text-slate-400">
+            A full copy of the database is saved to your private storage every 7 days (and whenever you press
+            <strong className="text-slate-800 dark:text-slate-200"> Back up now</strong>). The newest 8 are kept.
+          </p>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".gz,application/gzip"
+            className="hidden"
+            data-testid="restore-file"
+            onChange={e => restoreFile(e.target.files?.[0])}
+          />
+          <button
+            type="button"
+            disabled={restoring}
+            onClick={() => fileInput.current?.click()}
+            className={`${smallButton} border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800`}
+          >
+            <Upload className="w-3.5 h-3.5" /> Restore from a file…
+          </button>
+        </div>
         {backups.isLoading ? (
           <div className="p-10 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
         ) : backups.isError ? (
@@ -387,7 +452,7 @@ const Backups = () => {
                     <span className="font-semibold text-sm text-slate-900 dark:text-white">{formatWhen(b.startedAt)}</span>
                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${STATUS_STYLE[b.status]}`}>{b.status}</span>
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                      {b.trigger === 'Manual' ? `Manual${b.requestedBy ? ` · ${b.requestedBy}` : ''}` : 'Weekly'}
+                      {TRIGGER_LABEL[b.trigger] ?? b.trigger}{b.trigger !== 'Weekly' && b.requestedBy ? ` · ${b.requestedBy}` : ''}
                     </span>
                   </div>
                   {b.status === 'Succeeded' && (
@@ -398,21 +463,42 @@ const Backups = () => {
                   {b.error && <p className="text-xs text-rose-600 dark:text-rose-400 break-words">{b.error}</p>}
                 </div>
                 {b.canDownload && (
-                  <button
-                    type="button"
-                    onClick={() => download(b)}
-                    disabled={downloading === b.id}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer disabled:opacity-60"
-                  >
-                    {downloading === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    Download
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => download(b)}
+                      disabled={downloading === b.id}
+                      className={`${smallButton} border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800`}
+                    >
+                      {downloading === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      disabled={restoring}
+                      onClick={() => restore(`the backup of ${formatWhen(b.startedAt)}`, () => monitoringApi.restoreBackup(b.id, 'RESTORE'))}
+                      className={`${smallButton} border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10`}
+                    >
+                      <History className="w-3.5 h-3.5" /> Restore
+                    </button>
+                  </div>
                 )}
               </li>
             ))}
           </ul>
         )}
       </CardContent>
+
+      {restoring && (
+        <div role="alertdialog" aria-live="assertive"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+          <div className="max-w-sm w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 text-center space-y-3 shadow-xl">
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-violet-500" />
+            <p className="font-semibold text-slate-900 dark:text-white">Restoring the database…</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Saving a safety copy first, then replacing the data. Please keep this page open.</p>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

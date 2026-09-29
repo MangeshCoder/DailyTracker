@@ -23,8 +23,11 @@ const BACKUPS = [
 ];
 
 let fake: FakeBackend;
+let restoreCalls: string[] = [];
+const RESTORED = { message: 'Restore complete.', tables: 53, rows: 67, safetyBackupId: 4, backupCreatedAt: hoursAgo(2) };
 
 test.beforeEach(async ({ page }) => {
+  restoreCalls = [];
   fake = new FakeBackend(page);
   fake.me = { ...fake.me, role: 'Manager' };
   fake.answer = (path, method) => {
@@ -32,6 +35,10 @@ test.beforeEach(async ({ page }) => {
       return { errors24h: 1, slow24h: 1, lastErrorAt: ERRORS[0].occurredAt, lastBackup: { id: 3, startedAt: BACKUPS[0].startedAt, sizeBytes: 482_000, rowCount: 1234 }, nextBackupDue: hoursAgo(-24 * 6) };
     if (path === '/monitoring/errors' && method === 'GET') return { items: ERRORS, hasMore: false };
     if (path === '/monitoring/backups' && method === 'GET') return BACKUPS;
+    if (method === 'POST' && (path === '/monitoring/backups/3/restore' || path === '/monitoring/restore')) {
+      restoreCalls.push(path);
+      return RESTORED;
+    }
     return undefined;
   };
   await fake.install();
@@ -78,4 +85,51 @@ test('team leads do not get the System page', async ({ page }) => {
   await expect(page.getByRole('link', { name: /System$/ })).toHaveCount(0);
   await lead.navigate('/manager/system');
   await expect(page).toHaveURL(/\/manager$/);
+});
+
+test('restoring a backup needs RESTORE typed, then reports what came back and reloads', async ({ page }) => {
+  await fake.navigate('/manager/system');
+  await page.getByRole('button', { name: 'Backups' }).click();
+  await expect(page.getByRole('button', { name: 'Restore', exact: true })).toHaveCount(1);   // only for good backups
+
+  await page.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expect(page.getByText('Restore this backup?')).toBeVisible();
+  await expect(page.getByText(/Before restore" copy of the current data is saved first/)).toBeVisible();
+
+  // a wrong word is refused, nothing is sent
+  await page.getByPlaceholder('Type RESTORE to confirm').fill('restore');
+  await page.getByRole('button', { name: 'Restore', exact: true }).last().click();
+  await expect(page.getByText('Type RESTORE (capital letters) to confirm')).toBeVisible();
+  expect(restoreCalls).toHaveLength(0);
+
+  await page.getByPlaceholder('Type RESTORE to confirm').fill('RESTORE');
+  await page.getByRole('button', { name: 'Restore', exact: true }).last().click();
+
+  await expect(page.getByText('Restore complete')).toBeVisible();
+  await expect(page.getByText(/Restored 67 rows in 53 tables/)).toBeVisible();
+  expect(restoreCalls).toEqual(['/monitoring/backups/3/restore']);
+  await expect(page.getByText('Restoring the database…')).toHaveCount(0);
+  await page.waitForTimeout(400);   // dialog animation
+  await page.screenshot({ path: 'test-results/system-restored.png' });
+
+  const reloaded = page.waitForEvent('load');
+  await page.getByRole('button', { name: 'OK' }).click();
+  await reloaded;
+});
+
+test('a backup file from the PC can be restored', async ({ page }) => {
+  await fake.navigate('/manager/system');
+  await page.getByRole('button', { name: 'Backups' }).click();
+
+  await page.getByTestId('restore-file').setInputFiles({
+    name: 'dailytracker-backup-2026-09-30.json.gz', mimeType: 'application/gzip', buffer: Buffer.from([0x1f, 0x8b, 0x08, 0x00]),
+  });
+  await expect(page.getByText(/the backup file "dailytracker-backup-2026-09-30.json.gz"/)).toBeVisible();
+  await page.waitForTimeout(400);   // dialog animation
+  await page.screenshot({ path: 'test-results/system-restore-confirm.png' });
+  await page.getByPlaceholder('Type RESTORE to confirm').fill('RESTORE');
+  await page.getByRole('button', { name: 'Restore', exact: true }).last().click();
+
+  await expect(page.getByText('Restore complete')).toBeVisible();
+  expect(restoreCalls).toEqual(['/monitoring/restore']);
 });

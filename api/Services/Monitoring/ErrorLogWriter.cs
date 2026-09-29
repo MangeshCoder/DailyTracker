@@ -69,7 +69,8 @@ namespace DailyTrackerAPI.Services.Monitoring
             path.StartsWithSegments("/api")
             && !path.Value!.Contains("/upload", StringComparison.OrdinalIgnoreCase)
             && !path.Value!.Contains("/download", StringComparison.OrdinalIgnoreCase)
-            && !path.StartsWithSegments("/api/monitoring/backups");
+            && !path.StartsWithSegments("/api/monitoring/backups")
+            && !path.StartsWithSegments("/api/monitoring/restore");
 
         private bool TakeSlowSlot()
         {

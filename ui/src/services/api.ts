@@ -12,7 +12,7 @@ import type {
   ResignationSummaryDto,
   SubmitResignationDto,
   AppNotification,
-  MonitoringSummary, ErrorLogPage, DatabaseBackupDto,
+  MonitoringSummary, ErrorLogPage, DatabaseBackupDto, RestoreResultDto,
 } from '../types';
 import type { ChatApiResponse, MessageHistory } from '../types/chat';
 
@@ -826,6 +826,17 @@ export const monitoringApi = {
   clearErrors: () => api.delete<{ removed: number }>('/monitoring/errors'),
   backups: () => api.get<DatabaseBackupDto[]>('/monitoring/backups'),
   backupNow: () => api.post('/monitoring/backups', null, { timeout: 5 * 60 * 1000 }),
+  restoreBackup: (id: number, confirm: string) =>
+    api.post<RestoreResultDto>(`/monitoring/backups/${id}/restore`, { confirm }, { timeout: 10 * 60 * 1000 }),
+  restoreFile: (file: File, confirm: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('confirm', confirm);
+    return api.post<RestoreResultDto>('/monitoring/restore', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 10 * 60 * 1000,
+    });
+  },
   downloadBackup: (id: number) =>
     api.get(`/monitoring/backups/${id}/download`, { responseType: 'blob', timeout: 5 * 60 * 1000 }),
 };

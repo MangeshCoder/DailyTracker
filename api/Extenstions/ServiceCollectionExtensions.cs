@@ -89,6 +89,7 @@ namespace DailyTrackerAPI.Extensions
             // ── Monitoring (managers' System page) ────────────────────────────
             services.AddSingleton<ErrorLogWriter>();
             services.AddScoped<IBackupService, BackupService>();
+            services.AddScoped<IRestoreService, RestoreService>();
             services.AddScoped<ILocationService, LocationService>();
 
             return services;
