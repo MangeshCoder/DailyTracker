@@ -15,7 +15,7 @@ import { useState } from 'react';
 import { DatePicker } from './DatePicker';
 import { Card } from './ui/Card';
 import { StatCard } from './ui/StatCard';
-import { Building2, Home, SunMoon, Hourglass, Clock, Users, Inbox } from 'lucide-react';
+import { Building2, Home, SunMoon, Hourglass, Clock, Users, Inbox, Palmtree } from 'lucide-react';
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
@@ -62,10 +62,11 @@ export const TeamDailyStatusDashboard = () => {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard title="Present"        value={status?.presentCount ?? 0}      icon={Building2} color="emerald" loading={isLoading} />
         <StatCard title="Work From Home" value={status?.wfhCount ?? 0}          icon={Home}      color="blue"    loading={isLoading} />
         <StatCard title="Half Day"       value={status?.halfDayCount ?? 0}      icon={SunMoon}   color="amber"   loading={isLoading} />
+        <StatCard title="On Leave"       value={status?.onLeaveCount ?? 0}      icon={Palmtree}  color="indigo"  loading={isLoading} />
         <StatCard title="Not Checked In" value={status?.notCheckedInCount ?? 0} icon={Hourglass} color="slate"   loading={isLoading} />
       </div>
 

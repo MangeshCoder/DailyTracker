@@ -1,5 +1,6 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
+using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Models.Attendance;
 using DailyTrackerAPI.Services.Auth;
 using Microsoft.EntityFrameworkCore;
@@ -37,9 +38,11 @@ namespace DailyTrackerAPI.Services.Attendance
         private readonly AppDbContext _db;
         private readonly ILogger<WFHRequestService> _logger;
         private readonly IEmailService _emailService;
+        private readonly IConfiguration _config;
 
-        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger, IEmailService emailService)
+        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger, IEmailService emailService, IConfiguration config)
         {
+            _config = config;
             _db = db;
             _logger = logger;
             _emailService = emailService;
@@ -50,27 +53,51 @@ namespace DailyTrackerAPI.Services.Attendance
         // ══════════════════════════════════════════════════════════════════════
         public async Task<WFHRequest> SubmitRequestAsync(int userId, CreateWFHRequestDto dto)
         {
+            // ── Every check runs BEFORE anything is saved ─────────────────────
+            if (dto.RequestType is not ("WFH" or "HalfDay"))
+                throw new InvalidOperationException("Request type must be WFH or HalfDay.");
+            if (dto.RequestDate == default)
+                throw new InvalidOperationException("Please choose a date.");
+
             var requestDate = dto.RequestDate.Date;
 
-            // Validate: cannot request for past dates (allow today and future)
-            if (requestDate < DateTime.UtcNow.Date)
+            // Past dates are not allowed ("today" is the Indian date, not the server's UTC date)
+            if (requestDate < AppClock.TodayIst)
                 throw new InvalidOperationException("Cannot submit a request for past dates.");
+            if (requestDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+                throw new InvalidOperationException($"{requestDate:dddd, MMMM d} is a weekend — no request is needed.");
+            if (await _db.Holidays.AnyAsync(h => h.Date.Date == requestDate && h.Type == "Public"))
+                throw new InvalidOperationException($"{requestDate:MMMM d} is a public holiday — no request is needed.");
 
-            // Validate: no duplicate pending/approved request for same date
+            if (dto.RequestType == "HalfDay" && dto.HalfDaySlot is not ("Morning" or "Afternoon"))
+                throw new InvalidOperationException("Please specify Morning or Afternoon for Half Day requests.");
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+                throw new InvalidOperationException("Please give a reason.");
+
+            // No duplicate pending/approved request for the same date
             var existing = await _db.WFHRequests
                 .FirstOrDefaultAsync(r => r.UserId == userId
                     && r.RequestDate.Date == requestDate
                     && (r.Status == "Pending" || r.Status == "Approved"));
-
             if (existing != null)
                 throw new InvalidOperationException(
                     $"You already have a {existing.Status.ToLower()} {existing.RequestType} request for {requestDate:MMMM d, yyyy}.");
 
-            // Validate HalfDaySlot is provided for HalfDay requests
-            if (dto.RequestType == "HalfDay" && string.IsNullOrEmpty(dto.HalfDaySlot))
-                throw new InvalidOperationException("Please specify Morning or Afternoon for Half Day requests.");
+            // Already on leave that day?
+            var leave = await _db.LeaveRequests.FirstOrDefaultAsync(l => l.UserId == userId
+                && (l.Status == "Pending" || l.Status == "Approved")
+                && l.FromDate <= requestDate && l.ToDate >= requestDate);
+            if (leave != null)
+                throw new InvalidOperationException(
+                    $"You have a {leave.Status.ToLower()} {leave.LeaveType} leave on {requestDate:MMMM d} — cancel it first to request {dto.RequestType}.");
 
-            // Check if a DailyLog already exists for that date and link it
+            var employee = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId)
+                ?? throw new InvalidOperationException("Employee not found.");
+
+            // Who reviews it: the assigned manager, or else every manager
+            var approvers = await GetApproversAsync(employee);
+
+            // ── Save ───────────────────────────────────────────────────────────
             var dailyLog = await _db.DailyLogs
                 .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate.Date == requestDate);
 
@@ -80,7 +107,7 @@ namespace DailyTrackerAPI.Services.Attendance
                 RequestType = dto.RequestType,
                 RequestDate = requestDate,
                 HalfDaySlot = dto.RequestType == "HalfDay" ? dto.HalfDaySlot : null,
-                Reason = dto.Reason,
+                Reason = dto.Reason.Trim(),
                 Status = "Pending",
                 DailyLogId = dailyLog?.Id
             };
@@ -88,44 +115,38 @@ namespace DailyTrackerAPI.Services.Attendance
             _db.WFHRequests.Add(request);
             await _db.SaveChangesAsync();
 
-            // Get employee
-            var employee = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == userId);
-
-            if (employee == null)
-                throw new Exception("Employee not found.");
-
-            // Ensure employee has manager assigned
-            if (employee.ManagerId == null)
-                throw new Exception("No manager assigned to this employee.");
-
-            // Get manager
-            var manager = await _db.Users
-                .FirstOrDefaultAsync(u => u.Id == employee.ManagerId);
-
-            if (manager == null)
-                throw new Exception("Assigned manager not found.");
-
-            // Optional safety: Ensure manager role is valid
-            if (manager.Role is not ("Manager" or "TeamLead" or "Admin"))
-                throw new Exception("Assigned user is not authorized as a manager.");
-
-            // Generate email token
-            var token = GenerateWFHEmailToken(request.Id, manager.Id);
-
-            // Send email
-            await _emailService.SendWFHAppliedEmailAsync(
-                manager.Email!,
-                manager.FullName,
-                employee.FullName,
-                request,
-                token
-            );
+            // ── Tell the approvers (best effort: the request is already saved) ─
+            foreach (var manager in approvers)
+            {
+                var token = CreateEmailToken(request.Id, manager.Id);
+                await BestEffortAsync($"email to manager {manager.Id}", () => _emailService.SendWFHAppliedEmailAsync(
+                    manager.Email!, manager.FullName, employee.FullName, request, token));
+            }
 
             _logger.LogInformation("User {UserId} submitted {Type} request for {Date}",
                 userId, dto.RequestType, requestDate.ToString("yyyy-MM-dd"));
 
             return request;
+        }
+
+        /// <summary>Assigned manager if valid, otherwise all active managers (never the requester)</summary>
+        private async Task<List<Models.Auth.User>> GetApproversAsync(Models.Auth.User employee)
+        {
+            if (employee.ManagerId.HasValue && employee.ManagerId != employee.Id)
+            {
+                var assigned = await _db.Users.FirstOrDefaultAsync(u => u.Id == employee.ManagerId && u.IsActive
+                    && (u.Role == "Manager" || u.Role == "TeamLead" || u.Role == "Admin"));
+                if (assigned != null) return new() { assigned };
+            }
+            return await _db.Users
+                .Where(u => u.Role == "Manager" && u.IsActive && u.Id != employee.Id)
+                .ToListAsync();
+        }
+
+        private async Task BestEffortAsync(string what, Func<Task> action)
+        {
+            try { await action(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "WFH: {What} failed (the request itself was saved)", what); }
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -184,6 +205,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
             // Verify manager owns this user's team
             await VerifyManagerAccess(managerId, request.UserId);
+            var reviewer = await _db.Users.FindAsync(managerId);
 
             request.Status = "Approved";
             request.ReviewedByUserId = managerId;
@@ -195,14 +217,13 @@ namespace DailyTrackerAPI.Services.Attendance
             await ApplyStatusToDailyLog(request);
 
             await _db.SaveChangesAsync();
-            await _emailService.SendWFHReviewedEmailAsync(
+            await BestEffortAsync("approval email", () => _emailService.SendWFHReviewedEmailAsync(
                 request.User.Email!,
                 request.User.FullName,
-                request.ReviewedBy?.FullName ?? "Manager",
+                reviewer?.FullName ?? "Manager",
                 request,
                 "Approved",
-                note
-            );
+                note));
 
             _logger.LogInformation("Manager {ManagerId} approved {Type} request {RequestId} for user {UserId}",
                 managerId, request.RequestType, requestId, request.UserId);
@@ -224,6 +245,7 @@ namespace DailyTrackerAPI.Services.Attendance
                 throw new InvalidOperationException($"Request is already {request.Status}.");
 
             await VerifyManagerAccess(managerId, request.UserId);
+            var reviewer = await _db.Users.FindAsync(managerId);
 
             request.Status = "Rejected";
             request.ReviewedByUserId = managerId;
@@ -241,14 +263,13 @@ namespace DailyTrackerAPI.Services.Attendance
             }
 
             await _db.SaveChangesAsync();
-            await _emailService.SendWFHReviewedEmailAsync(
+            await BestEffortAsync("rejection email", () => _emailService.SendWFHReviewedEmailAsync(
                 request.User.Email!,
                 request.User.FullName,
-                request.ReviewedBy?.FullName ?? "Manager",
+                reviewer?.FullName ?? "Manager",
                 request,
                 "Rejected",
-                note
-            );
+                note));
             return request;
         }
 
@@ -260,7 +281,7 @@ namespace DailyTrackerAPI.Services.Attendance
             var teamUserIds = await GetTeamUserIds(managerId);
 
             var requests = await _db.WFHRequests
-                .Where(r => teamUserIds.Contains(r.UserId) && r.Status == "Pending")
+                .Where(r => teamUserIds.Contains(r.UserId) && r.UserId != managerId && r.Status == "Pending")
                 .Include(r => r.User)
                 .Include(r => r.ReviewedBy)
                 .OrderBy(r => r.RequestDate)
@@ -295,7 +316,7 @@ namespace DailyTrackerAPI.Services.Attendance
         // ══════════════════════════════════════════════════════════════════════
         public async Task<ManagerDailyStatusDto> GetTeamDailyStatusAsync(int managerId, DateTime? date = null)
         {
-            var targetDate = (date ?? DateTime.UtcNow).Date;
+            var targetDate = (date ?? AppClock.TodayIst).Date;
             var teamUserIds = await GetTeamUserIds(managerId);
 
             var teamUsers = await _db.Users
@@ -315,6 +336,13 @@ namespace DailyTrackerAPI.Services.Attendance
                     && r.RequestDate.Date == targetDate
                     && r.Status == "Approved")
                 .ToListAsync();
+
+            // Approved leave covering this date → "On Leave"
+            var onLeaveUserIds = (await _db.LeaveRequests
+                .Where(l => teamUserIds.Contains(l.UserId) && l.Status == "Approved"
+                    && l.FromDate <= targetDate && l.ToDate >= targetDate)
+                .Select(l => l.UserId)
+                .ToListAsync()).ToHashSet();
 
             // Fetch pending requests (so manager can take action)
             var pendingRequests = await _db.WFHRequests
@@ -336,6 +364,8 @@ namespace DailyTrackerAPI.Services.Attendance
                     effectiveStatus = log.DayStatus ?? "Present";
                 else if (approvedReq != null)
                     effectiveStatus = approvedReq.RequestType; // WFH or HalfDay
+                else if (onLeaveUserIds.Contains(user.Id))
+                    effectiveStatus = "On Leave";
                 else
                     effectiveStatus = "Not Checked In";
 
@@ -391,6 +421,7 @@ namespace DailyTrackerAPI.Services.Attendance
                 WFHCount = members.Count(m => m.EffectiveStatus == "WFH"),
                 HalfDayCount = members.Count(m => m.EffectiveStatus == "HalfDay"),
                 NotCheckedInCount = members.Count(m => m.EffectiveStatus == "Not Checked In"),
+                OnLeaveCount = members.Count(m => m.EffectiveStatus == "On Leave"),
                 PendingRequestsCount = members.Count(m => m.HasPendingRequest),
                 Members = members.OrderBy(m => m.FullName).ToList()
             };
@@ -422,6 +453,13 @@ namespace DailyTrackerAPI.Services.Attendance
                 .Where(u => teamUserIds.Contains(u.Id))
                 .ToListAsync();
 
+            // Approved leave in this month (working days only) — not "absent"
+            var monthEnd = to.AddDays(-1);
+            var approvedLeaves = await _db.LeaveRequests
+                .Where(l => teamUserIds.Contains(l.UserId) && l.Status == "Approved"
+                    && l.FromDate <= monthEnd && l.ToDate >= from)
+                .ToListAsync();
+
             return teamUsers.Select(user =>
             {
                 var userLogs = dailyLogs.Where(d => d.UserId == user.Id).ToList();
@@ -438,8 +476,10 @@ namespace DailyTrackerAPI.Services.Attendance
                 int daysHoliday = userLogs.Count(l => l.DayStatus == "Holiday"); // ← NEW
 
                 int daysWorked = daysPresent + daysWFH + daysHalfDay;
-                // Weekend/Holiday are bonus days — don't reduce the absent count
-                int daysAbsent = Math.Max(0, workingDays - daysWorked);
+                int daysOnLeave = approvedLeaves.Where(l => l.UserId == user.Id).Sum(l =>
+                    CountWorkingDays(l.FromDate < from ? from : l.FromDate, l.ToDate > monthEnd ? monthEnd : l.ToDate));
+                // Weekend/Holiday are bonus days — don't reduce the absent count; approved leave isn't absence
+                int daysAbsent = Math.Max(0, workingDays - daysWorked - daysOnLeave);
 
                 var totalWorkMinutes = userLogs.Sum(l =>
                     l.CheckInTime.HasValue && l.CheckOutTime.HasValue
@@ -458,6 +498,7 @@ namespace DailyTrackerAPI.Services.Attendance
                     DaysWFH = daysWFH,
                     DaysHalfDay = daysHalfDay,
                     DaysAbsent = daysAbsent,
+                    DaysOnLeave = daysOnLeave,
                     DaysWeekend = daysWeekend,  // ← NEW
                     DaysHoliday = daysHoliday,  // ← NEW
                     AttendancePercentage = workingDays > 0
@@ -509,6 +550,9 @@ namespace DailyTrackerAPI.Services.Attendance
 
         private async Task VerifyManagerAccess(int managerId, int employeeUserId)
         {
+            if (managerId == employeeUserId)
+                throw new UnauthorizedAccessException("You can't review your own request.");
+
             var isManager = await _db.Users
                 .AnyAsync(u => u.Id == employeeUserId
                     && (u.ManagerId == managerId || managerId == employeeUserId));
@@ -529,8 +573,12 @@ namespace DailyTrackerAPI.Services.Attendance
             if (isManagerRole)
             {
                 // Get all direct reports
+                // Direct reports + self; Managers also cover people with no manager assigned
+                // (their requests are sent to every manager)
+                bool coversUnassigned = managerUser!.Role == "Manager";
                 var teamIds = await _db.Users
-                    .Where(u => u.ManagerId == managerId || u.Id == managerId)
+                    .Where(u => u.ManagerId == managerId || u.Id == managerId
+                        || (coversUnassigned && u.ManagerId == null && u.Role != "Pending"))
                     .Select(u => u.Id)
                     .ToListAsync();
 
@@ -579,12 +627,8 @@ namespace DailyTrackerAPI.Services.Attendance
             RequestedAt = r.RequestedAt,
         };
 
-        private string GenerateWFHEmailToken(int requestId, int managerId)
-        {
-            var expiry = DateTime.UtcNow.AddHours(24);
-
-            var payload = $"{requestId}|{managerId}|{expiry:O}";
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
-        }
+        private string CreateEmailToken(int requestId, int managerId) =>
+            SignedActionToken.Create("wfh-review", requestId, managerId, DateTime.UtcNow.AddHours(48),
+                _config["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not set."));
     }
 }

@@ -49,6 +49,9 @@ namespace DailyTrackerAPI.Services.HR
         private readonly INotificationSender _notif;
         private readonly IEmailService _email;
         private readonly IEmailActionService _emailAction;
+        private readonly ILogger<LeaveService> _logger;
+
+        private static readonly string[] ReviewStatuses = { "Approved", "Rejected" };
 
         // ── Annual entitlements per leave type ────────────────────────────────
         // 0 = unlimited (CompOff, Unpaid — don't enforce a cap)
@@ -65,29 +68,59 @@ namespace DailyTrackerAPI.Services.HR
             AppDbContext db,
             INotificationSender notif,
             IEmailService email,
-            IEmailActionService emailAction)
+            IEmailActionService emailAction,
+            ILogger<LeaveService> logger)
         {
             _db = db;
             _notif = notif;
             _email = email;
             _emailAction = emailAction;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Emails / live notifications are extras: once the leave is saved, a mail
+        /// server problem must not turn the request into an error for the user.
+        /// </summary>
+        private async Task BestEffortAsync(string what, Func<Task> action)
+        {
+            try { await action(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "Leave: {What} failed (the leave itself was saved)", what); }
         }
 
         // ── CHANGED: uses annual entitlement instead of monthly 2-day cap ─────
         public async Task<LeaveResponseDto> ApplyAsync(int userId, ApplyLeaveDto dto)
         {
+            if (dto.FromDate == default || dto.ToDate == default)
+                throw new ValidationException("Please choose the From and To dates.");
             if (dto.FromDate.Date > dto.ToDate.Date)
-                throw new Exception("From date cannot be after To date.");
+                throw new ValidationException("From date cannot be after To date.");
+            if (!Entitlements.ContainsKey(dto.LeaveType ?? ""))
+                throw new ValidationException("Please choose a valid leave type.");
 
             var user = await _db.Users.FindAsync(userId)
-                ?? throw new Exception("User not found");
+                ?? throw new ValidationException("User not found.");
+
+            // Same days already requested (pending) or approved?
+            var fromDate = dto.FromDate.Date;
+            var toDate = dto.ToDate.Date;
+            var overlap = await _db.LeaveRequests
+                .Where(l => l.UserId == userId
+                    && (l.Status == "Pending" || l.Status == "Approved")
+                    && l.FromDate <= toDate && l.ToDate >= fromDate)
+                .OrderBy(l => l.FromDate)
+                .FirstOrDefaultAsync();
+            if (overlap != null)
+                throw new ValidationException(
+                    $"You already have a {overlap.Status.ToLower()} {overlap.LeaveType} leave from " +
+                    $"{overlap.FromDate:dd MMM yyyy} to {overlap.ToDate:dd MMM yyyy} that overlaps these dates.");
 
             // Load public holidays covering the requested date range
             var holidays = await GetHolidayDatesAsync(dto.FromDate.Year, dto.ToDate.Year);
 
             int requestedDays = CountWorkingDays(dto.FromDate, dto.ToDate, holidays);
             if (requestedDays <= 0)
-                throw new Exception("Selected dates contain only weekends or public holidays.");
+                throw new ValidationException("Selected dates contain only weekends or public holidays.");
 
             // ── Annual entitlement check (skip for unlimited types) ───────────
             var entitlement = Entitlements.GetValueOrDefault(dto.LeaveType, 12);
@@ -135,25 +168,29 @@ namespace DailyTrackerAPI.Services.HR
 
             _db.LeaveRequests.Add(leave);
             await _db.SaveChangesAsync();
+            leave.User = user;
 
-            // 🔔 Notification (UNCHANGED)
-            await _notif.SendToManagers("LeaveApplied", new
+            // 🔔 Live notification to managers (best effort)
+            await BestEffortAsync("manager notification", () => _notif.SendToManagers("LeaveApplied", new
             {
                 UserId = userId,
                 LeaveId = leave.Id,
                 Message = "New leave request pending review"
-            });
+            }));
 
-            // 📧 Email to managers (UNCHANGED)
+            // 📧 Email to every manager (best effort, one failing address doesn't stop the others)
             var managers = await _db.Users
-                .Where(u => u.Role == "Manager")
+                .Where(u => u.Role == "Manager" && u.IsActive && u.Id != userId)
                 .ToListAsync();
 
             foreach (var manager in managers)
             {
-                var token = await _emailAction.CreateTokenAsync(leave.Id, manager.Id);
-                await _email.SendLeaveAppliedEmailAsync(
-                    manager.Email, manager.FullName, user.FullName, leave, token);
+                await BestEffortAsync($"email to manager {manager.Id}", async () =>
+                {
+                    var token = await _emailAction.CreateTokenAsync(leave.Id, manager.Id);
+                    await _email.SendLeaveAppliedEmailAsync(
+                        manager.Email, manager.FullName, user.FullName, leave, token);
+                });
             }
 
             return await MapLeave(leave);
@@ -202,23 +239,30 @@ namespace DailyTrackerAPI.Services.HR
             var manager = await _db.Users.FindAsync(managerId)
                 ?? throw new ValidationException("Manager not found");
 
-            leave.Status = dto.Status;
+            var status = ReviewStatuses.FirstOrDefault(s => s.Equals(dto.Status?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new ValidationException("Status must be Approved or Rejected.");
+            if (leave.Status != "Pending")
+                throw new ValidationException($"This leave request is already {leave.Status.ToLower()}.");
+            if (leave.UserId == managerId)
+                throw new ValidationException("You can't review your own leave request.");
+
+            leave.Status = status;
             leave.ReviewedByUserId = managerId;
             leave.ReviewNote = dto.ReviewNote;
             leave.ReviewedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
 
-            await _notif.SendToUser(leave.UserId, "ReceiveNotification", new
+            await BestEffortAsync("employee notification", () => _notif.SendToUser(leave.UserId, "ReceiveNotification", new
             {
-                Title = $"Leave {dto.Status}",
-                Message = $"Your leave request has been {dto.Status.ToLower()}",
-                Type = dto.Status == "Approved" ? "Success" : "Warning"
-            });
+                Title = $"Leave {status}",
+                Message = $"Your leave request has been {status.ToLower()}",
+                Type = status == "Approved" ? "Success" : "Warning"
+            }));
 
-            await _email.SendLeaveReviewedEmailAsync(
+            await BestEffortAsync("review email", () => _email.SendLeaveReviewedEmailAsync(
                 leave.User.Email, leave.User.FullName,
-                manager.FullName, leave, dto.Status, dto.ReviewNote);
+                manager.FullName, leave, status, dto.ReviewNote));
         }
 
         // ── UNCHANGED ─────────────────────────────────────────────────────────

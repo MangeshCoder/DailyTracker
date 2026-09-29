@@ -3,7 +3,6 @@ using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Attendance;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 
 namespace DailyTrackerAPI.Controllers.Attendance
 {
@@ -139,7 +138,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
                 });
             }
             catch (KeyNotFoundException) { return NotFound(new { message = "Request not found." }); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
@@ -160,7 +159,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
                 });
             }
             catch (KeyNotFoundException) { return NotFound(new { message = "Request not found." }); }
-            catch (UnauthorizedAccessException ex) { return Forbid(ex.Message); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
@@ -172,7 +171,13 @@ namespace DailyTrackerAPI.Controllers.Attendance
         public async Task<IActionResult> GetTeamStatus([FromQuery] string? date = null)
         {
             var managerId = User.GetUserId();
-            var targetDate = date != null ? DateTime.Parse(date) : (DateTime?)null;
+            DateTime? targetDate = null;
+            if (!string.IsNullOrWhiteSpace(date))
+            {
+                if (!DateTime.TryParse(date, out var parsed))
+                    return BadRequest(new { message = "Invalid date." });
+                targetDate = parsed;
+            }
             var result = await _wfhService.GetTeamDailyStatusAsync(managerId, targetDate);
             return Ok(result);
         }
@@ -195,24 +200,30 @@ namespace DailyTrackerAPI.Controllers.Attendance
 
         [AllowAnonymous]
         [HttpPost("review")]
-        public async Task<IActionResult> ReviewFromEmail(string token, string status)
+        public async Task<IActionResult> ReviewFromEmail(string token, string status,
+            [FromServices] IConfiguration config)
         {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(token));
-            var parts = decoded.Split('|');
+            // The link is signed with the server's key: edited or made-up links are refused
+            if (!SignedActionToken.TryRead(token, "wfh-review", config["Jwt:Key"] ?? "",
+                    out var requestId, out var managerId, out var expired))
+                return BadRequest(new { message = "This link is not valid." });
+            if (expired)
+                return BadRequest(new { message = "This link has expired — please review the request in DailyTracker." });
+            if (status is not ("Approved" or "Rejected"))
+                return BadRequest(new { message = "Status must be Approved or Rejected." });
 
-            var requestId = int.Parse(parts[0]);
-            var managerId = int.Parse(parts[1]);
-            var expiry = DateTime.Parse(parts[2]);
+            try
+            {
+                if (status == "Approved")
+                    await _wfhService.ApproveAsync(managerId, requestId, "Approved via Email");
+                else
+                    await _wfhService.RejectAsync(managerId, requestId, "Rejected via Email");
+            }
+            catch (KeyNotFoundException) { return NotFound(new { message = "Request not found." }); }
+            catch (UnauthorizedAccessException ex) { return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
 
-            if (DateTime.UtcNow > expiry)
-                return BadRequest("Link expired.");
-
-            if (status == "Approved")
-                await _wfhService.ApproveAsync(managerId, requestId, "Approved via Email");
-            else
-                await _wfhService.RejectAsync(managerId, requestId, "Rejected via Email");
-
-            return Ok("Request processed successfully.");
+            return Ok(new { message = $"Request {status.ToLower()} successfully." });
         }
     }
 }

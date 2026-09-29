@@ -41,6 +41,7 @@ export const TeamMonthlyAttendances = () => {
     { l: 'Present',       c: 'text-emerald-600 dark:text-emerald-400' },
     { l: 'WFH',           c: 'text-blue-600 dark:text-blue-400' },
     { l: 'Half Day',      c: 'text-amber-600 dark:text-amber-400' },
+    { l: 'On Leave',      c: 'text-teal-600 dark:text-teal-400' },
     { l: 'Absent',        c: 'text-rose-600 dark:text-rose-400' },
     { l: 'Attendance',    c: 'text-slate-500 dark:text-slate-400' },
     { l: 'Weekend',       c: 'text-orange-600 dark:text-orange-400' },
@@ -112,6 +113,7 @@ export const TeamMonthlyAttendances = () => {
                       <td className="text-center px-3 py-3 font-semibold text-emerald-600 dark:text-emerald-400">{m.daysPresent}</td>
                       <td className="text-center px-3 py-3 font-semibold text-blue-600 dark:text-blue-400">{m.daysWFH}</td>
                       <td className="text-center px-3 py-3 font-semibold text-amber-600 dark:text-amber-400">{m.daysHalfDay}</td>
+                      <td className="text-center px-3 py-3 font-semibold text-teal-600 dark:text-teal-400">{m.daysOnLeave ?? 0}</td>
                       <td className="text-center px-3 py-3 font-semibold text-rose-600 dark:text-rose-400">{m.daysAbsent}</td>
                       <td className="text-center px-3 py-3">
                         <div className="inline-flex flex-col items-center gap-1">

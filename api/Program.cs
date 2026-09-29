@@ -84,10 +84,21 @@ app.UseExceptionHandler(errorApp =>
         context.Response.ContentType = "application/json";
         var ex = context.Features.Get<IExceptionHandlerFeature>()?.Error;
 
-        if (ex is ValidationException)
+        // Business-rule errors thrown by our own code → their real message
+        // (framework/database errors keep the generic text below)
+        bool ours = ex?.TargetSite?.DeclaringType?.Namespace?.StartsWith("DailyTrackerAPI") == true;
+        int? status = ex switch
         {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { message = ex.Message });
+            ValidationException => StatusCodes.Status400BadRequest,
+            KeyNotFoundException when ours => StatusCodes.Status404NotFound,
+            UnauthorizedAccessException when ours => StatusCodes.Status403Forbidden,
+            InvalidOperationException when ours => StatusCodes.Status400BadRequest,
+            _ => null,
+        };
+        if (status.HasValue)
+        {
+            context.Response.StatusCode = status.Value;
+            await context.Response.WriteAsJsonAsync(new { message = ex!.Message });
             return;
         }
 

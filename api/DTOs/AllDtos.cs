@@ -824,6 +824,7 @@ namespace DailyTrackerAPI.DTOs
         public int WFHCount { get; set; }
         public int HalfDayCount { get; set; }
         public int NotCheckedInCount { get; set; }
+        public int OnLeaveCount { get; set; }
         public int PendingRequestsCount { get; set; }
         public List<TeamMemberStatusDto> Members { get; set; } = new();
     }
@@ -863,6 +864,7 @@ namespace DailyTrackerAPI.DTOs
         public int DaysWFH { get; set; }
         public int DaysHalfDay { get; set; }
         public int DaysAbsent { get; set; }
+        public int DaysOnLeave { get; set; }
         public int DaysWeekend { get; set; }  
         public int DaysHoliday { get; set; }
         public List<string> WeekendDates { get; set; } = new();

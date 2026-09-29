@@ -277,7 +277,7 @@ namespace DailyTrackerAPI.Services.Team
                 ?? throw new KeyNotFoundException("User not found");
 
             if (user.Role == "Manager")
-                throw new Exception("Managers cannot be deactivated.");
+                throw new Custom.ValidationException("Managers cannot be deactivated.");
 
             user.IsActive = !user.IsActive;
             await _db.SaveChangesAsync();

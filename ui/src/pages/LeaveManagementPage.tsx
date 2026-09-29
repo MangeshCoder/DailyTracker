@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { apiErrorMessage } from '../utils/apiError';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveApi, holidayApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -375,28 +376,27 @@ export const LeaveManagementPage: React.FC = () => {
     mutationFn: () => leaveApi.apply(form),
     onSuccess: () => {
       toast.success('Leave applied successfully 🎉');
-      qc.invalidateQueries({ queryKey: ['myLeaves'] });
-      qc.invalidateQueries({ queryKey: ['leaveBalance'] });
       setForm({ fromDate: '', toDate: '', leaveType: 'Casual', reason: '' });
       setShowApply(false);
     },
-    onError: (error: any) => {
-      const msg =
-        error.response?.data?.message ||
-        error.response?.data ||
-        'Failed to apply leave';
-      toast.error(msg);
+    onError: (error: any) => toast.error(apiErrorMessage(error, 'Failed to apply leave')),
+    // refresh either way, so the lists always match the server
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['myLeaves'] });
+      qc.invalidateQueries({ queryKey: ['allLeaves'] });
+      qc.invalidateQueries({ queryKey: ['leaveBalance'] });
     },
   });
 
   const cancelLeave = useMutation({
     mutationFn: (id: number) => leaveApi.cancel(id),
-    onSuccess: () => {
-      toast.success('Leave application cancelled');
+    onSuccess: () => toast.success('Leave application cancelled'),
+    onError: (error: any) => toast.error(apiErrorMessage(error, 'Failed to cancel leave')),
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['myLeaves'] });
+      qc.invalidateQueries({ queryKey: ['allLeaves'] });
       qc.invalidateQueries({ queryKey: ['leaveBalance'] });
     },
-    onError: () => toast.error('Failed to cancel leave'),
   });
 
   const doReview = useMutation({
@@ -404,12 +404,16 @@ export const LeaveManagementPage: React.FC = () => {
       leaveApi.review(id, { status: s, reviewNote }),
     onSuccess: () => {
       toast.success('Leave review decision submitted');
-      qc.invalidateQueries({ queryKey: ['allLeaves'] });
-      qc.invalidateQueries({ queryKey: ['leaveBalance'] });
       setReviewId(null);
       setReviewNote('');
     },
-    onError: () => toast.error('Failed to submit review'),
+    onError: (error: any) => toast.error(apiErrorMessage(error, 'Failed to submit review')),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['allLeaves'] });
+      qc.invalidateQueries({ queryKey: ['myLeaves'] });
+      qc.invalidateQueries({ queryKey: ['leaveBalance'] });
+      qc.invalidateQueries({ queryKey: ['teamStatus'] });
+    },
   });
 
   const createHoliday = useMutation({

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiErrorMessage } from '../utils/apiError';
 import { useMutation } from '@tanstack/react-query';
 import { Home, Sun, Moon, Send, AlertCircle, Sparkles } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -44,7 +45,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
     onError: (err: any) => {
       Swal.fire({
         title: 'Submission Failed',
-        text: err.response?.data?.message || 'Failed to submit request. Please try again.',
+        text: apiErrorMessage(err, 'Failed to submit request. Please try again.'),
         icon: 'error',
         background: 'rgb(15, 23, 42)',
         color: '#ffffff',
@@ -53,7 +54,9 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
     },
   });
 
-  const minDate = new Date().toISOString().split('T')[0];
+  // today's date on this device (toISOString would give yesterday before 05:30 IST)
+  const now = new Date();
+  const minDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   return (
     <Card className="overflow-hidden">

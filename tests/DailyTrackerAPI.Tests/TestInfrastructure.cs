@@ -202,8 +202,12 @@ public sealed class ApiFactory : WebApplicationFactory<AppDbContext>
     private readonly TestDatabase _database = new();
     public string ContentRoot { get; }
 
-    public ApiFactory(string? jwtKey = null, Action<string>? prepareContentRoot = null)
+    private readonly Action<IServiceCollection>? _configureServices;
+
+    public ApiFactory(string? jwtKey = null, Action<string>? prepareContentRoot = null,
+        Action<IServiceCollection>? configureServices = null)
     {
+        _configureServices = configureServices;
         ContentRoot = Paths.NewTempDir("api-tests");
         File.Copy(Path.Combine(Paths.ApiProject, "appsettings.json"), Path.Combine(ContentRoot, "appsettings.json"));
         prepareContentRoot?.Invoke(ContentRoot);
@@ -227,6 +231,8 @@ public sealed class ApiFactory : WebApplicationFactory<AppDbContext>
             // No background schedulers during tests
             foreach (var d in services.Where(d => d.ServiceType == typeof(IHostedService)).ToList())
                 services.Remove(d);
+
+            _configureServices?.Invoke(services);
         });
     }
 

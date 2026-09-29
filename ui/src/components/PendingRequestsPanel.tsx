@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { apiErrorMessage } from '../utils/apiError';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { wfhApi } from '../services/api';
 import type { WFHRequest } from '../types';
@@ -59,6 +60,15 @@ export const PendingRequestsPanel: React.FC = () => {
     refetchInterval: 30000,
   });
 
+  // Every manager view that shows WFH data (pending list, today's status, history, monthly)
+  const refreshWfhViews = () => {
+    qc.invalidateQueries({ queryKey: ['pendingWFH'] });
+    qc.invalidateQueries({ queryKey: ['teamStatus'] });
+    qc.invalidateQueries({ queryKey: ['teamMonthly'] });
+    qc.invalidateQueries({ queryKey: ['team-monthly'] });
+    qc.invalidateQueries({ queryKey: ['allWFH'] });
+  };
+
   // ================= APPROVE MUTATION =================
   const approveMutation = useMutation({
     mutationFn: ({ id, note }: { id: number; note?: string }) =>
@@ -69,8 +79,7 @@ export const PendingRequestsPanel: React.FC = () => {
       qc.setQueryData<WFHRequest[]>(['pendingWFH'], (old) =>
         old ? old.filter((r) => r.id !== variables.id) : []
       );
-      qc.invalidateQueries({ queryKey: ['teamStatus'] });
-      qc.invalidateQueries({ queryKey: ['team-monthly'] });
+      refreshWfhViews();
 
       Swal.fire({
         title: 'Request Approved!',
@@ -92,9 +101,10 @@ export const PendingRequestsPanel: React.FC = () => {
     },
 
     onError: (err: any) => {
+      refreshWfhViews();
       Swal.fire({
         title: 'Approval Failed',
-        text: err.response?.data?.message || 'Failed to approve request',
+        text: apiErrorMessage(err, 'Failed to approve request'),
         icon: 'error',
         background: 'rgb(15, 23, 42)',
         color: '#ffffff',
@@ -112,8 +122,7 @@ export const PendingRequestsPanel: React.FC = () => {
       qc.setQueryData<WFHRequest[]>(['pendingWFH'], (old) =>
         old ? old.filter((r) => r.id !== variables.id) : []
       );
-      qc.invalidateQueries({ queryKey: ['teamStatus'] });
-      qc.invalidateQueries({ queryKey: ['team-monthly'] });
+      refreshWfhViews();
 
       Swal.fire({
         title: 'Request Denied',
@@ -135,9 +144,10 @@ export const PendingRequestsPanel: React.FC = () => {
     },
 
     onError: (err: any) => {
+      refreshWfhViews();
       Swal.fire({
         title: 'Rejection Failed',
-        text: err.response?.data?.message || 'Failed to reject request',
+        text: apiErrorMessage(err, 'Failed to reject request'),
         icon: 'error',
         background: 'rgb(15, 23, 42)',
         color: '#ffffff',

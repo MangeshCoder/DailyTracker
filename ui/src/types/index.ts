@@ -242,6 +242,7 @@ export interface TeamDailyStatus {
   wfhCount: number;
   halfDayCount: number;
   notCheckedInCount: number;
+  onLeaveCount?: number;
   pendingRequestsCount: number;
   members: TeamMemberStatus[];
 }
@@ -255,6 +256,7 @@ export interface TeamMonthlyAttendance {
   daysWFH:             number;
   daysHalfDay:         number;
   daysAbsent:          number;
+  daysOnLeave?:        number;   // approved leave (not counted as absent)
   daysWeekend:         number;   // ← NEW
   daysHoliday:         number;   // ← NEW
   attendancePercentage: number;
