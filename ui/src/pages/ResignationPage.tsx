@@ -23,6 +23,7 @@ import {
   X,
   ShieldAlert,
   ClipboardList} from 'lucide-react';
+import { localDate } from '../utils/date';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso?: string) {
@@ -150,7 +151,7 @@ function SubmitResignationForm({ onSuccess }: { onSuccess: () => void }) {
             type="date"
             value={lastDay}
             onChange={(e) => setLastDay(e.target.value)}
-            min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+            min={localDate(new Date(Date.now() + 86400000))}
             className={inputCls}
           />
           <p className="text-[11px] text-slate-400 mt-1">

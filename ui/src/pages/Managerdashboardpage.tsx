@@ -60,6 +60,7 @@ import {
   Info,
   CalendarRange,
 } from 'lucide-react';
+import { localDate } from '../utils/date';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -189,9 +190,9 @@ const DownloadReport = ({
 }: { userId: number; userName: string; isManager: boolean }) => {
   const [from, setFrom] = useState(() => {
     const d = new Date(); d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return localDate(d);
   });
-  const [to, setTo]         = useState(new Date().toISOString().split('T')[0]);
+  const [to, setTo]         = useState(localDate());
   const [format, setFormat] = useState<'pdf' | 'docx'>('pdf');
   const [loading, setLoading] = useState(false);
 
@@ -397,7 +398,7 @@ export const ManagerDashboardPage = () => {
   const navigate = useNavigate();
   const [teamDaily, setTeamDaily]           = useState<ManagerTeamDaily | null>(null);
   const [teamMonthly, setTeamMonthly]       = useState<TeamMonthlyStats | null>(null);
-  const [selectedDate, setSelectedDate]     = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate]     = useState(localDate());
   const [selectedMonth, setSelectedMonth]   = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear]     = useState(new Date().getFullYear());
   const [loading, setLoading]               = useState(false);

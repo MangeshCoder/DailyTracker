@@ -43,6 +43,7 @@ import {
   Home,
   Inbox,
 } from 'lucide-react';
+import { localDate } from '../utils/date';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -187,9 +188,9 @@ export const UserDetailPage = () => {
   // date range for report
   const today = new Date();
   const [fromDate, setFromDate] = useState(() => {
-    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0];
+    const d = new Date(); d.setDate(1); return localDate(d);
   });
-  const [toDate, setToDate] = useState(today.toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState(localDate(today));
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());
 

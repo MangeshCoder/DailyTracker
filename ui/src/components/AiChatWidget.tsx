@@ -48,6 +48,7 @@ import { AI_WIDGET_EVENT, CHAT_DOCK_EVENT } from "../context/ChatContext";
 import { FaceVerifyModal } from "./FaceVerifyModal";
 import { useGeolocation } from "../context/useGeolocation";
 import type { FaceVerifyResult } from "../hooks/useFaceRecognition";
+import { localDate } from "../utils/date";
 
 interface ContextSummary {
   isCheckedIn: boolean;
@@ -162,16 +163,16 @@ const ActionCard = ({
   const [breakType, setBreakType] = useState(action.payload?.breakType || "Tea");
 
   const [fromDate, setFromDate] = useState(
-    action.payload?.fromDate || new Date().toISOString().split("T")[0]
+    action.payload?.fromDate || localDate()
   );
   const [toDate, setToDate] = useState(
-    action.payload?.toDate || new Date().toISOString().split("T")[0]
+    action.payload?.toDate || localDate()
   );
   const [leaveType, setLeaveType] = useState(action.payload?.leaveType || "Casual");
   const [leaveReason, setLeaveReason] = useState(action.payload?.reason || "");
 
   const [wfhDate, setWfhDate] = useState(
-    action.payload?.requestDate || new Date().toISOString().split("T")[0]
+    action.payload?.requestDate || localDate()
   );
   const [wfhRequestType, setWfhRequestType] = useState(
     action.payload?.requestType || "WFH"
@@ -190,7 +191,7 @@ const ActionCard = ({
     }
 
     if (action.type === "APPLY_WFH") {
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = localDate();
       if (wfhDate < todayStr) {
         toast.error("Cannot submit a WFH request for past dates.");
         return;
@@ -547,7 +548,7 @@ const ActionCard = ({
   }
 
   if (action.type === "APPLY_WFH") {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = localDate();
     return (
       <div className={`${CARD_CLS} border-violet-500/40`}>
         <CardHead

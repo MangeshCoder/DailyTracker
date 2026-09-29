@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import { wfhApi } from '../services/api';
 import { DatePicker } from './DatePicker';
 import { Card, CardContent } from './ui/Card';
+import { localDate } from '../utils/date';
 
 export interface WFHRequestFormProps {
   onSuccess: () => void;
@@ -56,7 +57,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
 
   // today's date on this device (toISOString would give yesterday before 05:30 IST)
   const now = new Date();
-  const minDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const minDate = localDate(now);
 
   return (
     <Card className="overflow-hidden">

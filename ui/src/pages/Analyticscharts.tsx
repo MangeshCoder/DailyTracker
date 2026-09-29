@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsApi } from '../services/api';
 import type { HeatmapData, ProjectTime, ProductivityTrend, PeakHour } from '../types';
+import { localDate } from '../utils/date';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Feature 5: GitHub-style Heatmap Calendar
@@ -49,7 +50,7 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
   while (current <= today) {
     const week: Array<{ date: Date; data?: HeatmapData }> = [];
     for (let d = 0; d < 7; d++) {
-      const dateKey = current.toISOString().split('T')[0];
+      const dateKey = localDate(current);
       week.push({ date: new Date(current), data: dataMap.get(dateKey) });
       current.setDate(current.getDate() + 1);
     }

@@ -40,6 +40,7 @@ import {
   Inbox,
   Zap,
 } from 'lucide-react';
+import { localDate } from '../utils/date';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -134,9 +135,9 @@ export const MyReportPage = () => {
 
   const [from, setFrom] = useState(() => {
     const d = new Date(); d.setDate(1);
-    return d.toISOString().split('T')[0];
+    return localDate(d);
   });
-  const [to, setTo] = useState(new Date().toISOString().split('T')[0]);
+  const [to, setTo] = useState(localDate());
   const [report, setReport] = useState<UserFullReport | null>(null);
   const [calDays, setCalDays] = useState<AttendanceDay[]>([]);
   const [month, setMonth] = useState(currentMonth);
@@ -184,24 +185,24 @@ export const MyReportPage = () => {
   const quickRanges = [
     { label: 'This Month', action: () => {
       const d = new Date(); d.setDate(1);
-      setFrom(d.toISOString().split('T')[0]);
-      setTo(new Date().toISOString().split('T')[0]);
+      setFrom(localDate(d));
+      setTo(localDate());
     }},
     { label: 'Last Month', action: () => {
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
       const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-      setFrom(d.toISOString().split('T')[0]);
-      setTo(end.toISOString().split('T')[0]);
+      setFrom(localDate(d));
+      setTo(localDate(end));
     }},
     { label: 'Last 7 Days', action: () => {
       const d = new Date(); d.setDate(d.getDate() - 7);
-      setFrom(d.toISOString().split('T')[0]);
-      setTo(new Date().toISOString().split('T')[0]);
+      setFrom(localDate(d));
+      setTo(localDate());
     }},
     { label: 'Last 30 Days', action: () => {
       const d = new Date(); d.setDate(d.getDate() - 30);
-      setFrom(d.toISOString().split('T')[0]);
-      setTo(new Date().toISOString().split('T')[0]);
+      setFrom(localDate(d));
+      setTo(localDate());
     }},
   ];
 
