@@ -6,6 +6,7 @@ using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Services.Auth;
 using DailyTrackerAPI.Services.Communication;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.HR
 {
@@ -300,7 +301,7 @@ namespace DailyTrackerAPI.Services.HR
         //  userId = N    → that user only
         public async Task<List<LeaveBalanceDto>> GetAnnualBalanceAsync(int? userId = null)
         {
-            var year = DateTime.UtcNow.Year;
+            var year = AppClock.TodayIst.Year;
             var yearStart = new DateTime(year, 1, 1);
             var yearEnd = new DateTime(year, 12, 31);
 

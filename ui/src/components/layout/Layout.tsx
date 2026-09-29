@@ -160,6 +160,8 @@ const LayoutShell = () => {
       { to: '/manager/eod-reviews', label: 'EOD Reviews', icon: '📝' },
       { to: '/manager/wfh-dashboard', label: 'Employee Requests', icon: '🗓️' },
       { to: '/manager/support-assignments', label: 'Support Assignments', icon: '🔧' },
+      // error log + backups: Managers only (not Team Leads)
+      ...(user?.role === 'Manager' ? [{ to: '/manager/system', label: 'System', icon: '🛡️' }] : []),
     ],
   };
 

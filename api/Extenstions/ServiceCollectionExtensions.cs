@@ -7,6 +7,7 @@ using DailyTrackerAPI.Services.Attendance;
 using DailyTrackerAPI.Services.Auth;
 using DailyTrackerAPI.Services.Communication;
 using DailyTrackerAPI.Services.HR;
+using DailyTrackerAPI.Services.Monitoring;
 using DailyTrackerAPI.Services.Tasks;
 using DailyTrackerAPI.Services.Team;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -83,6 +84,11 @@ namespace DailyTrackerAPI.Extensions
 
             // ── Background Jobs ───────────────────────────────────────────────
             services.AddHostedService<NotificationSchedulerService>();
+            services.AddHostedService<MaintenanceService>();          // weekly backup, error log clean-up
+
+            // ── Monitoring (managers' System page) ────────────────────────────
+            services.AddSingleton<ErrorLogWriter>();
+            services.AddScoped<IBackupService, BackupService>();
             services.AddScoped<ILocationService, LocationService>();
 
             return services;

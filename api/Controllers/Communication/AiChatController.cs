@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Controllers.Communication
 {
@@ -104,8 +105,8 @@ namespace DailyTrackerAPI.Controllers.Communication
 
             try
             {
-                var today = DateTime.UtcNow.Date;
-                var todayLog = await _db.DailyLogs.FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+                var today = AppClock.TodayIst;
+                var todayLog = await _db.DailyLogs.CurrentForAsync(userId);
                 bool isCheckedIn = todayLog != null && todayLog.CheckInTime != null;
 
                 // ── STRICT ENFORCEMENT: Block work actions if not checked in ──
@@ -340,6 +341,8 @@ namespace DailyTrackerAPI.Controllers.Communication
                 // ── 7. Check In ─────────────────────────────────────────────
                 if (request.Type == "CHECK_IN")
                 {
+                    // yesterday's still-open shift doesn't count as checked in today
+                    if (todayLog != null && todayLog.LogDate != today) { todayLog = null; isCheckedIn = false; }
                     if (isCheckedIn)
                     {
                         return BadRequest(new { success = false, message = "You are already checked in for today." });

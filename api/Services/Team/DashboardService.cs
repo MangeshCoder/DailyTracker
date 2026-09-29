@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Services.Attendance;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 namespace DailyTrackerAPI.Services.Team
 {
     // ─── Dashboard Service ─────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ namespace DailyTrackerAPI.Services.Team
 
         public async Task<List<TeamMemberActivityDto>> GetTeamActivityAsync()
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
             var todayLogs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)

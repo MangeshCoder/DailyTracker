@@ -3,6 +3,7 @@ using DailyTrackerAPI.Services.HR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Controllers.HR
 {
@@ -16,7 +17,7 @@ namespace DailyTrackerAPI.Controllers.HR
         [HttpGet]
         public async Task<IActionResult> Get([FromQuery] int year = 0)
         {
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (year == 0) year = AppClock.TodayIst.Year;
             var list = await _holidaySvc.GetByYearAsync(year);
             return Ok(list);
         }

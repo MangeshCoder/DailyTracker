@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.AI
 {
@@ -39,11 +40,10 @@ namespace DailyTrackerAPI.Services.AI
 
         public async Task<object> GetUserContextSummaryAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
             var dailyLog = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+                .CurrentForAsync(userId);
 
             var activeBreak = dailyLog?.BreakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
 
@@ -64,12 +64,12 @@ namespace DailyTrackerAPI.Services.AI
 
         public async Task<object> GenerateEodDraftAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var dailyLog = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Include(d => d.BreakLogs)
                 .Include(d => d.SupportLogs).ThenInclude(s => s.SupportedDeveloper)
-                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+                .CurrentForAsync(userId);
 
             if (dailyLog == null || dailyLog.CheckInTime == null)
             {
@@ -156,11 +156,11 @@ namespace DailyTrackerAPI.Services.AI
             List<MessageHistory> history,
             int userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var todayLog = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+                .CurrentForAsync(userId);
             bool isCheckedIn = todayLog != null && todayLog.CheckInTime != null;
 
             var actions = DetectClientActions(userMessage, userId, isCheckedIn);
@@ -213,7 +213,7 @@ namespace DailyTrackerAPI.Services.AI
 
                 var systemPrompt = $"""
                     You are the AI Copilot for Daily Tracker EMS.
-                    Current date: {DateTime.Now:dddd, MMMM dd, yyyy}. Server time: {DateTime.Now:hh:mm tt}.
+                    Current date: {AppClock.NowIst:dddd, MMMM dd, yyyy}. Server time: {AppClock.NowIst:hh:mm tt}.
 
                     IMPORTANT GUIDELINES:
                     - Be direct, structured, and helpful. Format work hours as 'Xh Ym'.
@@ -550,7 +550,7 @@ namespace DailyTrackerAPI.Services.AI
             // Meetings question
             if (lower.Contains("meeting") || lower.Contains("1-on-1") || lower.Contains("schedule"))
             {
-                var today = DateTime.UtcNow.Date;
+                var today = AppClock.TodayStartUtc;   // ScheduledAt is a UTC timestamp
                 var meetings = await _db.Meetings
                     .Include(m => m.Attendees)
                     .Where(m => (m.OrganisedByUserId == userId || m.Attendees.Any(a => a.UserId == userId))
@@ -582,7 +582,6 @@ namespace DailyTrackerAPI.Services.AI
         private async Task<string> BuildUserContextAsync(int userId)
         {
             var sb = new StringBuilder();
-            var today = DateTime.UtcNow.Date;
 
             var user = await _db.Users
                 .Where(u => u.Id == userId)
@@ -597,7 +596,7 @@ namespace DailyTrackerAPI.Services.AI
             var dailyLog = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(l => l.UserId == userId && l.LogDate == today);
+                .CurrentForAsync(userId);
 
             if (dailyLog != null)
             {

@@ -3,6 +3,7 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Services.Communication;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 namespace DailyTrackerAPI.Services.HR
 {
     // ─── Interface ────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ namespace DailyTrackerAPI.Services.HR
                 throw new InvalidOperationException(
                     $"You already have a {existing.Status.ToLower()} resignation. Withdraw it first.");
 
-            if (dto.RequestedLastDay.Date < DateTime.UtcNow.Date.AddDays(1))
+            if (dto.RequestedLastDay.Date < AppClock.TodayIst.AddDays(1))
                 throw new InvalidOperationException("Requested last day must be at least tomorrow.");
 
             var resignation = new Resignation
@@ -304,7 +305,7 @@ namespace DailyTrackerAPI.Services.HR
             int? daysRemaining = null;
             if (r.Status == "Accepted" && r.NoticePeriodEndDate.HasValue)
             {
-                daysRemaining = (int)(r.NoticePeriodEndDate.Value.Date - DateTime.UtcNow.Date).TotalDays;
+                daysRemaining = (int)(r.NoticePeriodEndDate.Value.Date - AppClock.TodayIst).TotalDays;
                 if (daysRemaining < 0) daysRemaining = 0;
             }
 

@@ -484,7 +484,7 @@ namespace DailyTrackerAPI.Controllers.HR
             var cur = p.Currency;
             var sym = CurrencySymbol(cur);
             var logoPath = @"C: \Users\Mangesh Ghule\DailyTrackerAPI\Images\montcrest_software_pvt_ltd_cover.jpg";
-            var genDate = DateTime.Now.ToString("dd MMM yyyy, hh:mm tt");
+            var genDate = AppClock.NowIst.ToString("dd MMM yyyy, hh:mm tt");
 
             // ── Helper: format money ──────────────────────────────────────────
             string Fmt(decimal amount) =>

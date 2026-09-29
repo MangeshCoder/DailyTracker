@@ -3,6 +3,7 @@ using DailyTrackerAPI.Models.Auth;
 using DailyTrackerAPI.Models.Communication;
 using DailyTrackerAPI.Models.Face_Lock;
 using DailyTrackerAPI.Models.HR;
+using DailyTrackerAPI.Models.Monitoring;
 using DailyTrackerAPI.Models.Performance;
 using DailyTrackerAPI.Models.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,10 @@ namespace DailyTrackerAPI.Data
         // ─── Feature 1: Notifications ─────────────────────────────────────────
         public DbSet<AppNotification> Notifications { get; set; }
         public DbSet<SchedulerRun> SchedulerRuns { get; set; }
+
+        // ─── Monitoring ───────────────────────────────────────────────────────
+        public DbSet<AppErrorLog> AppErrorLogs { get; set; }
+        public DbSet<DatabaseBackup> DatabaseBackups { get; set; }
 
         // ─── Two-Factor Authentication ───────────────────────────────────────
         public DbSet<UserTwoFactor> UserTwoFactors { get; set; }
@@ -260,6 +265,26 @@ namespace DailyTrackerAPI.Data
             {
                 e.HasIndex(r => new { r.JobKey, r.RunDate }).IsUnique();
                 e.Property(r => r.JobKey).HasMaxLength(50);
+            });
+
+            // ── Monitoring: newest first, filtered by kind
+            mb.Entity<AppErrorLog>(e =>
+            {
+                e.HasIndex(x => x.OccurredAt);
+                e.Property(x => x.Kind).HasMaxLength(10);
+                e.Property(x => x.Method).HasMaxLength(10);
+                e.Property(x => x.Path).HasMaxLength(500);
+                e.Property(x => x.Message).HasMaxLength(1000);
+                e.Property(x => x.Details).HasMaxLength(8000);
+                e.Property(x => x.TraceId).HasMaxLength(100);
+            });
+            mb.Entity<DatabaseBackup>(e =>
+            {
+                e.HasIndex(x => x.StartedAt);
+                e.Property(x => x.Trigger).HasMaxLength(10);
+                e.Property(x => x.Status).HasMaxLength(10);
+                e.Property(x => x.FileKey).HasMaxLength(200);
+                e.Property(x => x.Error).HasMaxLength(2000);
             });
 
             // ── Holiday - unique per date

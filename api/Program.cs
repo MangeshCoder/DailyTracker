@@ -77,6 +77,30 @@ try { app.Services.GetRequiredService<IFileStorage>(); }
 catch (Exception ex) { app.Logger.LogCritical("File storage is misconfigured: {Message} (check the Storage__S3__* settings)", ex.Message); }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Request monitor ──────────────────────────────────────────────────────────
+// Server errors (500) and API calls over 2 s are saved for the managers'
+// System page; anything over 1 s is also a warning in the hosting logs.
+// SignalR hubs are long-lived connections, so they're skipped.
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/hubs")) { await next(); return; }
+    var watch = System.Diagnostics.Stopwatch.StartNew();
+    Exception? escaped = null;
+    try { await next(); }
+    catch (Exception ex) { escaped = ex; throw; }
+    finally
+    {
+        var ms = watch.ElapsedMilliseconds;
+        if (ms > 1000)
+            app.Logger.LogWarning("Slow request: {Method} {Path} took {Ms} ms (status {Status})",
+                context.Request.Method, context.Request.Path, ms, context.Response.StatusCode);
+        var error = escaped ?? context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        if (escaped != null && !context.Response.HasStarted) context.Response.StatusCode = 500;
+        await context.RequestServices.GetRequiredService<DailyTrackerAPI.Services.Monitoring.ErrorLogWriter>()
+            .RecordAsync(context, ms, error);
+    }
+});
+
 // ─── Global Exception Handler ─────────────────────────────────────────────────
 app.UseExceptionHandler(errorApp =>
     errorApp.Run(async context =>
@@ -105,19 +129,6 @@ app.UseExceptionHandler(errorApp =>
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         await context.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
     }));
-
-// ─── Slow request log ─────────────────────────────────────────────────────────
-// Any API call over 1 s is logged as a warning (e.g. a slow database query).
-// SignalR hubs are long-lived connections, so they're skipped.
-app.Use(async (context, next) =>
-{
-    var watch = System.Diagnostics.Stopwatch.StartNew();
-    await next();
-    if (watch.ElapsedMilliseconds > 1000 && !context.Request.Path.StartsWithSegments("/hubs"))
-        app.Logger.LogWarning("Slow request: {Method} {Path}{Query} took {Ms} ms (status {Status})",
-            context.Request.Method, context.Request.Path, context.Request.QueryString,
-            watch.ElapsedMilliseconds, context.Response.StatusCode);
-});
 
 // ─── Swagger (Development only) ───────────────────────────────────────────────
 if (app.Environment.IsDevelopment())

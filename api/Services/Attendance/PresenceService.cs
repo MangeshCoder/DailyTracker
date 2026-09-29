@@ -3,6 +3,7 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models;
 using DailyTrackerAPI.Models.Attendance;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Attendance
 {
@@ -48,7 +49,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<List<UserPresenceDto>> GetTeamPresenceAsync()
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
 
             var presences = await _db.UserPresences.ToDictionaryAsync(p => p.UserId);

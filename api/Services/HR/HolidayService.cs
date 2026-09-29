@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.HR
 {
@@ -38,7 +39,7 @@ namespace DailyTrackerAPI.Services.HR
 
         public async Task<List<HolidayDto>> GetByYearAsync(int year)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             return await _db.Holidays
                 .Where(h => h.Year == year)
                 .OrderBy(h => h.Date)
@@ -62,7 +63,7 @@ namespace DailyTrackerAPI.Services.HR
         }
 
         public async Task<bool> IsTodayHolidayAsync() =>
-            await _db.Holidays.AnyAsync(h => h.Date == DateTime.UtcNow.Date);
+            await _db.Holidays.AnyAsync(h => h.Date == AppClock.TodayIst);
 
         private static HolidayDto Map(Holiday h) => new()
         {

@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Team
 {
@@ -29,7 +30,7 @@ namespace DailyTrackerAPI.Services.Team
             var totalTasks = heatmap.Sum(h => h.TasksCompleted);
 
             // Find most productive day of week
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var logs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.UserId == userId && d.LogDate >= from)
@@ -65,7 +66,7 @@ namespace DailyTrackerAPI.Services.Team
 
         public async Task<List<HeatmapDataDto>> GetHeatmapAsync(int userId, int days = 365)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var logs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.UserId == userId && d.LogDate >= from)
@@ -96,7 +97,7 @@ namespace DailyTrackerAPI.Services.Team
 
         public async Task<List<ProjectTimeDto>> GetProjectBreakdownAsync(int userId, int days = 30)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var tasks = await _db.TaskLogs
                 .Where(t => t.DailyLog.UserId == userId
                     && t.DailyLog.LogDate >= from
@@ -150,7 +151,7 @@ namespace DailyTrackerAPI.Services.Team
 
         public async Task<List<PeakHourDto>> GetPeakHoursAsync(int userId, int days = 30)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
 
             // Get tasks with their completion times to determine peak hours
             var completedTasks = await _db.TaskLogs
@@ -174,7 +175,7 @@ namespace DailyTrackerAPI.Services.Team
 
         private async Task<List<ProductivityTrendDto>> GetProductivityTrendInternalAsync(int userId, int days)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var logs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.UserId == userId && d.LogDate >= from)

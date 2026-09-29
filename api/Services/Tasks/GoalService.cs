@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Attendance;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Tasks
 {
@@ -30,7 +31,7 @@ namespace DailyTrackerAPI.Services.Tasks
         // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<DailyGoal> SetOrUpdateGoalAsync(int userId, SetGoalDto dto)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var goal = await _db.DailyGoals
                 .FirstOrDefaultAsync(g => g.UserId == userId && g.GoalDate == today);
 
@@ -53,7 +54,7 @@ namespace DailyTrackerAPI.Services.Tasks
         // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<GoalProgressDto> GetTodayProgressAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
 
             var goal = await _db.DailyGoals
                 .FirstOrDefaultAsync(g => g.UserId == userId && g.GoalDate == today)
@@ -71,7 +72,7 @@ namespace DailyTrackerAPI.Services.Tasks
                 .Include(d => d.TaskLogs)
                 .Include(d => d.BreakLogs)
                 .Include(d => d.SupportLogs)
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+                .CurrentForAsync(userId);
 
             int actualWork = 0, actualBreak = 0, actualTasks = 0, actualSupport = 0;
 
@@ -143,7 +144,7 @@ namespace DailyTrackerAPI.Services.Tasks
         // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<List<ProductivityTrendDto>> GetProductivityTrendAsync(int userId, int days = 14)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var logs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.UserId == userId && d.LogDate >= from)

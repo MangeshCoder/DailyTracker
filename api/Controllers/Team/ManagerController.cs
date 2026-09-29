@@ -3,6 +3,7 @@ using DailyTrackerAPI.Services.Team;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Controllers.Team
 {
@@ -47,8 +48,8 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            if (month == 0) month = DateTime.UtcNow.Month;
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (month == 0) month = AppClock.TodayIst.Month;
+            if (year == 0) year = AppClock.TodayIst.Year;
 
             var result = await _managerService.GetTeamMonthlyStatsAsync(month, year);
             return Ok(result);
@@ -61,8 +62,8 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            if (month == 0) month = DateTime.UtcNow.Month;
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (month == 0) month = AppClock.TodayIst.Month;
+            if (year == 0) year = AppClock.TodayIst.Year;
 
             try
             {
@@ -82,8 +83,8 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            if (month == 0) month = DateTime.UtcNow.Month;
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (month == 0) month = AppClock.TodayIst.Month;
+            if (year == 0) year = AppClock.TodayIst.Year;
 
             var result = await _managerService.GetUserAttendanceCalendarAsync(userId, month, year);
             return Ok(result);

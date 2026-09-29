@@ -52,7 +52,7 @@ namespace DailyTrackerAPI.Controllers.Tasks
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to)
         {
-            var toDate = DateTime.UtcNow.Date;
+            var toDate = AppClock.TodayIst;
             var fromDate = preset switch
             {
                 "week" => toDate.AddDays(-6),   // last 7 days including today

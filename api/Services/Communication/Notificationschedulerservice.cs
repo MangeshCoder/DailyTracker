@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Models.Communication;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Communication
 {
@@ -57,7 +58,7 @@ namespace DailyTrackerAPI.Services.Communication
 
         // Guards against double-firing: stores "JOBKEY_2025-01-15" etc.
         private readonly HashSet<string> _firedToday = new();
-        private DateTime _lastResetDate = DateTime.UtcNow.Date;
+        private DateTime _lastResetDate = AppClock.TodayIst;
 
         // IST timezone — OperatingSystem check makes it work on both Windows + Linux Docker
         private static readonly TimeZoneInfo IST =
@@ -191,7 +192,7 @@ namespace DailyTrackerAPI.Services.Communication
         private async Task RunGoalReminderAsync(
             AppDbContext db, IAppNotificationService svc, CancellationToken ct)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
 
             var usersWithGoal = await db.DailyGoals
                 .Where(g => g.GoalDate == today)
@@ -283,7 +284,7 @@ namespace DailyTrackerAPI.Services.Communication
         private async Task RunEodReminderAsync(
             AppDbContext db, IAppNotificationService svc, CancellationToken ct)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
 
             var usersWithLog = await db.DailyLogs
                 .Where(d => d.LogDate == today)
@@ -320,7 +321,7 @@ namespace DailyTrackerAPI.Services.Communication
         private async Task RunDailyLogReminderAsync(
             AppDbContext db, IAppNotificationService svc, CancellationToken ct)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
 
             var usersWithLog = await db.DailyLogs
                 .Where(d => d.LogDate == today)

@@ -16,6 +16,7 @@ using DailyTrackerAPI.Models;
 using DailyTrackerAPI.Models.Tasks;
 using DailyTrackerAPI.Services.Tasks;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Attendance
 {
@@ -41,7 +42,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<DailyLogResponseDto?> CheckInAsync(int userId, CheckInDto dto)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
 
             var existing = await _db.DailyLogs
                 .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
@@ -130,10 +131,9 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<DailyLogResponseDto?> CheckOutAsync(int userId, CheckOutDto dto)
         {
-            var today = DateTime.UtcNow.Date;
             var log = await _db.DailyLogs
                 .Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+                .CurrentForAsync(userId);
 
             if (log == null || log.CheckInTime == null) return null;
 
@@ -176,8 +176,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<DailyLogResponseDto?> GetTodayLogAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
-            var log = await _db.DailyLogs.FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+            var log = await _db.DailyLogs.CurrentForAsync(userId);
             if (log == null) return null;
             return await MapToDtoAsync(log.Id);
         }
@@ -191,7 +190,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<List<DailyLogResponseDto>> GetHistoryAsync(int userId, int days = 30)
         {
-            var from = DateTime.UtcNow.Date.AddDays(-days);
+            var from = AppClock.TodayIst.AddDays(-days);
             var logs = await _db.DailyLogs
                 .Where(d => d.UserId == userId && d.LogDate >= from)
                 .OrderByDescending(d => d.LogDate)

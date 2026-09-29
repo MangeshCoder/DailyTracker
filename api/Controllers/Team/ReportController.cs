@@ -81,8 +81,8 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            if (month == 0) month = DateTime.UtcNow.Month;
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (month == 0) month = AppClock.TodayIst.Month;
+            if (year == 0) year = AppClock.TodayIst.Year;
 
             var userId = User.GetUserId();
             var result = await _managerService.GetUserMonthlyAttendanceAsync(userId, month, year);
@@ -95,8 +95,8 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            if (month == 0) month = DateTime.UtcNow.Month;
-            if (year == 0) year = DateTime.UtcNow.Year;
+            if (month == 0) month = AppClock.TodayIst.Month;
+            if (year == 0) year = AppClock.TodayIst.Year;
 
             var userId = User.GetUserId();
             var result = await _managerService.GetUserAttendanceCalendarAsync(userId, month, year);

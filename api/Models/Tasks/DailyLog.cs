@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Models.Attendance;
 using DailyTrackerAPI.Models.Auth;
 using System.ComponentModel.DataAnnotations;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Models.Tasks
 {
@@ -11,7 +12,7 @@ namespace DailyTrackerAPI.Models.Tasks
         public int UserId { get; set; }
         public User User { get; set; } = null!;
 
-        public DateTime LogDate { get; set; } = DateTime.UtcNow.Date;
+        public DateTime LogDate { get; set; } = AppClock.TodayIst;
 
         public DateTime? CheckInTime { get; set; }
 

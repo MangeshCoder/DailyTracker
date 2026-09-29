@@ -1074,3 +1074,39 @@ export interface FaceAttemptLog {
   result:      'Matched' | 'Mismatch' | 'NoFaceDetected' | 'NotRegistered';
   attemptedAt: string;
 }
+// ─── System page (Manager) ────────────────────────────────────────────────────
+export interface MonitoringSummary {
+  errors24h: number;
+  slow24h: number;
+  lastErrorAt?: string | null;
+  lastBackup?: { id: number; startedAt: string; sizeBytes: number; rowCount: number } | null;
+  nextBackupDue?: string | null;
+}
+export interface ErrorLogEntry {
+  id: number;
+  occurredAt: string;          // UTC
+  kind: 'Error' | 'Slow';
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  userId?: number | null;
+  userName?: string | null;
+  message: string;
+  details?: string | null;
+  traceId?: string | null;
+}
+export interface ErrorLogPage { items: ErrorLogEntry[]; hasMore: boolean; }
+export interface DatabaseBackupDto {
+  id: number;
+  startedAt: string;           // UTC
+  finishedAt?: string | null;
+  trigger: 'Weekly' | 'Manual';
+  status: 'Running' | 'Succeeded' | 'Failed';
+  sizeBytes: number;
+  tableCount: number;
+  rowCount: number;
+  error?: string | null;
+  requestedBy?: string | null;
+  canDownload: boolean;
+}

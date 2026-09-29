@@ -121,6 +121,9 @@ const ResignationPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage }))
 );
+const SystemHealthPage = lazy(() =>
+  import('./pages/SystemHealthPage').then(m => ({ default: m.SystemHealthPage }))
+);
 const SupportAssignmentPage = lazy(() =>
   import('./pages/SupportAssignmentPage').then(m => ({ default: m.SupportAssignmentPage }))
 );
@@ -493,6 +496,16 @@ const AppRoutes = () => {
               <ManagerRoute>
                 <Suspense fallback={<SkeletonDashboard />}>
                   <ManagerWFHDashboard />
+                </Suspense>
+              </ManagerRoute>
+            }
+          />
+          <Route
+            path="manager/system"
+            element={
+              <ManagerRoute>
+                <Suspense fallback={<SkeletonDashboard />}>
+                  <SystemHealthPage />
                 </Suspense>
               </ManagerRoute>
             }

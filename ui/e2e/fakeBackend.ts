@@ -45,6 +45,11 @@ export class FakeBackend {
   sent: { conversationId: number; content: string }[] = [];
   readCalls: number[] = [];
 
+  /** Who logs in (tests can switch the role) */
+  me = { ...ME };
+  /** Extra answers for a test: return undefined to fall through to the defaults */
+  answer?: (path: string, method: string) => unknown;
+
   constructor(private page: Page) {
     for (let i = 0; i < 120; i++) this.message(10, [5, 6, 1][i % 3], `standup note ${i}`, 600 - i * 4);
     this.message(10, 1, 'Shipped the release notes', 3);
@@ -104,7 +109,9 @@ export class FakeBackend {
 
     if (url.pathname.endsWith('/negotiate'))
       return json({ connectionId: 'c', connectionToken: 'c', negotiateVersion: 1, availableTransports: [{ transport: 'WebSockets', transferFormats: ['Text', 'Binary'] }] });
-    if (path === '/auth/login') return json({ requiresTwoFactor: false, accessToken: 'test', user: ME });
+    if (path === '/auth/login') return json({ requiresTwoFactor: false, accessToken: 'test', user: this.me });
+    const extra = this.answer?.(path, req.method());
+    if (extra !== undefined) return json(extra);
     if (path === '/chat/conversations') return json(this.conversations);
     if (path === '/chat/unread-counts') return json(Object.fromEntries(this.conversations.map(c => [c.id, c.unreadCount])));
     if (path === '/chat/users') return json([5, 6].map(id => ({ id, fullName: NAMES[id], email: '', role: 'Developer', onlineStatus: 'Online' })));

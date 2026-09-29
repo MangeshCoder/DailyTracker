@@ -207,7 +207,7 @@ namespace DailyTrackerAPI.Controllers.Auth
             var caller = await _db.Users.FindAsync(callerId);
             if (!IsManagerRole(caller?.Role)) return Forbid();
 
-            var todayStart = DateTime.UtcNow.Date;
+            var todayStart = AppClock.TodayStartUtc;
 
             var attempts = await _db.FaceAttemptLogs
                 .Where(f => !f.Success && f.AttemptedAt >= todayStart)

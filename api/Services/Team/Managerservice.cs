@@ -4,6 +4,7 @@ using DailyTrackerAPI.Models.Auth;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Models.Tasks;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Team
 {
@@ -263,7 +264,7 @@ namespace DailyTrackerAPI.Services.Team
                     result.Add(new AttendanceDayDto
                     {
                         Date = day,
-                        Status = day.Date > DateTime.UtcNow.Date ? "Future" : "Absent"
+                        Status = day.Date > AppClock.TodayIst ? "Future" : "Absent"
                     });
                 }
             }

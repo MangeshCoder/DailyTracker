@@ -2,6 +2,7 @@ using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Tasks;
 using DailyTrackerAPI.Services.Team;
+using DailyTrackerAPI.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.Tasks
@@ -52,9 +53,8 @@ namespace DailyTrackerAPI.Services.Tasks
             }
 
             // ── Validate daily log ────────────────────────────────────────────
-            var today = DateTime.UtcNow.Date;
             var log = await _db.DailyLogs
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+                .CurrentForAsync(userId);
             if (log == null) return null;
 
             // ── Validate engineer and developer ───────────────────────────────
@@ -111,13 +111,14 @@ namespace DailyTrackerAPI.Services.Tasks
 
         public async Task<List<SupportLogResponseDto>> GetTodaySupportAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var current = await _db.DailyLogs.CurrentForAsync(userId);
+            if (current == null) return new();
             var list = await _db.SupportLogs
                 .Include(s => s.DailyLog)
                 .Include(s => s.SupportEngineer)
                 .Include(s => s.SupportedDeveloper)
                 .Include(s => s.MediaEvidences)
-                .Where(s => s.DailyLog.UserId == userId && s.DailyLog.LogDate == today)
+                .Where(s => s.DailyLogId == current.Id)
                 .ToListAsync();
 
             return list.Select(s => MapToDto(

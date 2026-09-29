@@ -12,6 +12,7 @@ import type {
   ResignationSummaryDto,
   SubmitResignationDto,
   AppNotification,
+  MonitoringSummary, ErrorLogPage, DatabaseBackupDto,
 } from '../types';
 import type { ChatApiResponse, MessageHistory } from '../types/chat';
 
@@ -815,6 +816,18 @@ export const faceApi = {
   // Manager: all team failed attempts today
   getTeamFailedToday: () =>
     api.get('/face/attempts/team/failed-today'),
+};
+
+// ─── System page (Manager): error log + database backups ─────────────────────
+export const monitoringApi = {
+  summary: () => api.get<MonitoringSummary>('/monitoring/summary'),
+  errors: (kind?: 'Error' | 'Slow', before?: number) =>
+    api.get<ErrorLogPage>('/monitoring/errors', { params: { kind, before } }),
+  clearErrors: () => api.delete<{ removed: number }>('/monitoring/errors'),
+  backups: () => api.get<DatabaseBackupDto[]>('/monitoring/backups'),
+  backupNow: () => api.post('/monitoring/backups', null, { timeout: 5 * 60 * 1000 }),
+  downloadBackup: (id: number) =>
+    api.get(`/monitoring/backups/${id}/download`, { responseType: 'blob', timeout: 5 * 60 * 1000 }),
 };
 
 export default api;

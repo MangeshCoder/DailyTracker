@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Tasks;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Tasks
 {
@@ -23,9 +24,7 @@ namespace DailyTrackerAPI.Services.Tasks
 
         private async Task<DailyLog?> GetOrCreateTodayLogAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
-            var log = await _db.DailyLogs.FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
-            return log;
+            return await _db.DailyLogs.CurrentForAsync(userId);
         }
 
         public async Task<TaskLogDto?> CreateTaskAsync(int userId, CreateTaskDto dto)
@@ -53,7 +52,6 @@ namespace DailyTrackerAPI.Services.Tasks
 
         public async Task<TaskLogDto?> UpdateTaskAsync(int userId, int taskId, UpdateTaskDto dto)
         {
-            var today = DateTime.UtcNow.Date;
             var task = await _db.TaskLogs
                 .Include(t => t.DailyLog)
                 .FirstOrDefaultAsync(t => t.Id == taskId && t.DailyLog.UserId == userId);
@@ -93,10 +91,11 @@ namespace DailyTrackerAPI.Services.Tasks
 
         public async Task<List<TaskLogDto>> GetTodayTasksAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
+            var log = await _db.DailyLogs.CurrentForAsync(userId);
+            if (log == null) return new();
             return await _db.TaskLogs
                 .Include(t => t.DailyLog)
-                .Where(t => t.DailyLog.UserId == userId && t.DailyLog.LogDate == today)
+                .Where(t => t.DailyLogId == log.Id)
                 .Select(t => MapTaskDto(t))
                 .ToListAsync();
         }

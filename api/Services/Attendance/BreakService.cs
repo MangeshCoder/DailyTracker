@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Attendance;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Services.Attendance
 {
@@ -21,10 +22,9 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<BreakLogDto?> StartBreakAsync(int userId, StartBreakDto dto)
         {
-            var today = DateTime.UtcNow.Date;
             var log = await _db.DailyLogs
                 .Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+                .CurrentForAsync(userId);
 
             if (log == null || log.CheckInTime == null) return null;
 
@@ -53,8 +53,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<BreakLogDto?> EndBreakAsync(int userId, int breakId)
         {
-            var today = DateTime.UtcNow.Date;
-            var log = await _db.DailyLogs.FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+            var log = await _db.DailyLogs.CurrentForAsync(userId);
             if (log == null) return null;
 
             var breakLog = await _db.BreakLogs.FirstOrDefaultAsync(b => b.Id == breakId && b.DailyLogId == log.Id);
@@ -70,9 +69,8 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task<List<BreakLogDto>> GetTodayBreaksAsync(int userId)
         {
-            var today = DateTime.UtcNow.Date;
             var log = await _db.DailyLogs.Include(d => d.BreakLogs)
-                .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
+                .CurrentForAsync(userId);
 
             return log?.BreakLogs.Select(MapBreakDto).ToList() ?? new List<BreakLogDto>();
         }

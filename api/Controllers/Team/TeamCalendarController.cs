@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using DailyTrackerAPI.Helpers;
 
 namespace DailyTrackerAPI.Controllers.Team
 {
@@ -36,7 +37,7 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int? month = null,
             [FromQuery] int? year = null)
         {
-            var today = DateTime.UtcNow.Date;
+            var today = AppClock.TodayIst;
             var m = month ?? today.Month;
             var y = year ?? today.Year;
 
