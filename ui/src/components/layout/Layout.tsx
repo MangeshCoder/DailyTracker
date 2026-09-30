@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { ChatProvider } from '../../context/ChatContext';
 import { ChatDock } from '../chat/ChatDock';
+import { IdleSignOut } from '../IdleSignOut';
 
 const LayoutShell = () => {
   const { user, logout } = useAuth();
@@ -742,6 +743,7 @@ const LayoutShell = () => {
 // Chat lives app-wide: one connection + the floating chat bubble / panel
 export const Layout = () => (
   <ChatProvider>
+    <IdleSignOut />
     <LayoutShell />
     <ChatDock />
   </ChatProvider>

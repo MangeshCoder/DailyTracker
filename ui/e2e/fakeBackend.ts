@@ -114,6 +114,7 @@ export class FakeBackend {
     // session restore after a reload: "who am I?" — only once signed in
     if (path === '/auth/me') return this.signedIn ? json(this.me) : json({ message: 'Not signed in' }, 401);
     if (path === '/auth/refresh') return this.signedIn ? json({}) : json({ message: 'Not signed in' }, 401);
+    if (path === '/auth/logout') { this.signedIn = false; return json({ message: 'Logged out' }); }
     const extra = this.answer?.(path, req.method());
     if (extra !== undefined) return json(extra);
     if (path === '/chat/conversations') return json(this.conversations);

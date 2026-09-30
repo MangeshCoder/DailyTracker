@@ -95,12 +95,14 @@ export const getDeviceToken = (): string => {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login: (d: { email: string; password: string }, deviceToken?: string) =>
+  // remember = "Trust this device": stay signed in for days; otherwise the sign-in ends
+  // when the browser is closed
+  login: (d: { email: string; password: string }, deviceToken?: string, remember = false) =>
     api.post('/auth/login', d, {
-      headers: deviceToken ? { 'X-Device-Token': deviceToken } : undefined,
+      headers: { 'X-Remember-Me': String(remember), ...(deviceToken ? { 'X-Device-Token': deviceToken } : {}) },
     }),
-  verify2FALogin: (tempToken: string, code: string) =>
-    api.post('/auth/verify-2fa-login', { tempToken, code }),
+  verify2FALogin: (tempToken: string, code: string, remember = false) =>
+    api.post('/auth/verify-2fa-login', { tempToken, code }, { headers: { 'X-Remember-Me': String(remember) } }),
   register: (d: object) => api.post('/auth/register', d),
   refresh: () => api.post('/auth/refresh'),
   logout: () => api.post('/auth/logout'),
@@ -121,8 +123,8 @@ export const authApi = {
   sendLoginOtp: (data: { email: string }) =>
     api.post('/auth/send-login-otp', data),
 
-  verifyLoginOtp: (data: { email: string; code: string }) =>
-    api.post('/auth/verify-login-otp', data),
+  verifyLoginOtp: (data: { email: string; code: string }, remember = false) =>
+    api.post('/auth/verify-login-otp', data, { headers: { 'X-Remember-Me': String(remember) } }),
 
   sendForgotPasswordOtp: (data: { email: string }) =>
     api.post('/auth/send-forgot-password-otp', data),

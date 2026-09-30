@@ -67,7 +67,8 @@ namespace DailyTrackerAPI.Controllers.Auth
         /// <param name="deviceToken"></param>
         /// <returns></returns>
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDto dto, [FromHeader(Name = "X-Device-Token")] string? deviceToken = null)
+        public async Task<IActionResult> Login([FromBody] LoginDto dto, [FromHeader(Name = "X-Device-Token")] string? deviceToken = null,
+            [FromHeader(Name = "X-Remember-Me")] string? rememberMe = null)
         {
             try
             {
@@ -75,7 +76,7 @@ namespace DailyTrackerAPI.Controllers.Auth
                 var result = await _authSvc.LoginAsync(dto.Email, dto.Password, ip, deviceToken);
                 if (!result.RequiresTwoFactor)
                 {
-                    SetAuthCookies(result.Tokens);
+                    SetAuthCookies(result.Tokens, rememberMe == "true");
                 }
                 return Ok(result);
             }
@@ -88,13 +89,14 @@ namespace DailyTrackerAPI.Controllers.Auth
         /// <param name="dto"></param>
         /// <returns></returns>
         [HttpPost("verify-2fa-login")]
-        public async Task<IActionResult> Verify2FALogin([FromBody] Verify2FALoginDto dto)
+        public async Task<IActionResult> Verify2FALogin([FromBody] Verify2FALoginDto dto,
+            [FromHeader(Name = "X-Remember-Me")] string? rememberMe = null)
         {
             try
             {
                 var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
                 var result = await _authSvc.Verify2FAAndLoginAsync(dto.TempToken, dto.Code, ip);
-                SetAuthCookies(result);
+                SetAuthCookies(result, rememberMe == "true");
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
@@ -247,6 +249,7 @@ namespace DailyTrackerAPI.Controllers.Auth
             await _authSvc.RevokeAllForUserAsync(User.GetUserId());
             Response.Cookies.Delete("accessToken");
             Response.Cookies.Delete("refreshToken");
+            Response.Cookies.Delete(SessionModeCookie);
             return Ok(new { message = "Logged out from all sessions." });
         }
 
@@ -302,7 +305,8 @@ namespace DailyTrackerAPI.Controllers.Auth
         /// <param name="dto"></param>
         /// <returns></returns>
         [HttpPost("verify-login-otp")]
-        public async Task<IActionResult> VerifyLoginOtp([FromBody] VerifyLoginOtpDto dto)
+        public async Task<IActionResult> VerifyLoginOtp([FromBody] VerifyLoginOtpDto dto,
+            [FromHeader(Name = "X-Remember-Me")] string? rememberMe = null)
         {
             try
             {
@@ -319,7 +323,7 @@ namespace DailyTrackerAPI.Controllers.Auth
                 {
                     Response.Cookies.Delete("accessToken");
                     Response.Cookies.Delete("refreshToken");
-                    SetAuthCookies(result.Tokens);
+                    SetAuthCookies(result.Tokens, rememberMe == "true");
                     return Ok(new { user = result.Tokens.User });
                 }
 
@@ -479,9 +483,18 @@ namespace DailyTrackerAPI.Controllers.Auth
         //    Response.Cookies.Append("refreshToken", tokens.RefreshToken, refreshOptions);
         //}
 
-        private void SetAuthCookies(AuthResponseV2Dto tokens)
+        /// <summary>Marks a sign-in that should end when the browser closes (not a trusted device)</summary>
+        private const string SessionModeCookie = "sessionMode";
+
+        /// <param name="remember">
+        /// true: "Trust this device" — stay signed in for days.
+        /// false: sign-in lasts until the browser is closed (cookies without an expiry date).
+        /// null (token renewal): keep whatever the sign-in started with.
+        /// </param>
+        private void SetAuthCookies(AuthResponseV2Dto tokens, bool? remember = null)
         {
             var isHttps = HttpContext.Request.IsHttps;
+            var persistent = remember ?? Request.Cookies[SessionModeCookie] != "browser";
 
             // SameSite=None REQUIRES Secure=true (browser spec)
             // Over HTTP (mobile local testing): use SameSite=Lax instead
@@ -493,7 +506,7 @@ namespace DailyTrackerAPI.Controllers.Auth
                 HttpOnly = true,
                 Secure = isHttps,
                 SameSite = sameSite,
-                Expires = DateTime.UtcNow.AddMinutes(15)
+                Expires = persistent ? DateTime.UtcNow.AddMinutes(15) : null
             };
 
             var refreshOptions = new CookieOptions
@@ -501,11 +514,16 @@ namespace DailyTrackerAPI.Controllers.Auth
                 HttpOnly = true,
                 Secure = isHttps,
                 SameSite = sameSite,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = persistent ? DateTime.UtcNow.AddDays(7) : null
             };
 
             Response.Cookies.Append("accessToken", tokens.AccessToken, accessOptions);
             Response.Cookies.Append("refreshToken", tokens.RefreshToken, refreshOptions);
+            if (persistent)
+                Response.Cookies.Delete(SessionModeCookie);
+            else
+                Response.Cookies.Append(SessionModeCookie, "browser", new CookieOptions
+                    { HttpOnly = true, Secure = isHttps, SameSite = sameSite });
         }
     }
 }

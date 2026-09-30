@@ -35,6 +35,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { authApi, getDeviceToken } from '../services/api';
+import { startSession } from '../utils/session';
 import { useAuth } from '../context/Authcontext';
 import { AUTH, AuthBackground, AuthThemeToggle } from '../components/auth/authTheme';
 
@@ -76,9 +77,13 @@ export const LoginPage = () => {
   const [authMode, setAuthMode] = useState<'password' | 'otp'>('password');
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
+  // unticked by default: on a shared computer the sign-in ends when the browser closes
+  const [rememberDevice, setRememberDevice] = useState(false);
   const [error, setError] = useState('');
-  const [infoMessage, setInfoMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState(() =>
+    new URLSearchParams(window.location.search).get('reason') === 'idle'
+      ? 'You were signed out after 30 minutes without activity. Please sign in again.'
+      : '');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -130,7 +135,8 @@ export const LoginPage = () => {
       const deviceToken = rememberDevice ? getDeviceToken() : undefined;
       const res = await authApi.login(
         { email: form.email.trim(), password: form.password },
-        deviceToken
+        deviceToken,
+        rememberDevice
       );
 
       if (res.data?.requiresTwoFactor) {
@@ -142,6 +148,7 @@ export const LoginPage = () => {
       // Supports both root user and nested tokens.user from the API
       const user = res.data?.user || res.data?.tokens?.user;
       if (user) {
+        startSession(rememberDevice);
         login(user);
         navigate('/');
       }
@@ -192,7 +199,7 @@ export const LoginPage = () => {
       const res = await authApi.verifyLoginOtp({
         email: form.email.trim(),
         code: emailOtp.trim()
-      });
+      }, rememberDevice);
 
       if (res.data?.requiresTwoFactor) {
         setTempToken(res.data.tempToken);
@@ -203,6 +210,7 @@ export const LoginPage = () => {
 
       const user = res.data?.user || res.data?.tokens?.user;
       if (user) {
+        startSession(rememberDevice);
         login(user);
         navigate('/');
       }
@@ -225,9 +233,10 @@ export const LoginPage = () => {
 
     setVerify2FALoading(true);
     try {
-      const res = await authApi.verify2FALogin(tempToken, totpCode.trim());
+      const res = await authApi.verify2FALogin(tempToken, totpCode.trim(), rememberDevice);
       const user = res.data?.user || res.data?.tokens?.user || res.data;
       if (user) {
+        startSession(rememberDevice);
         login(user);
         navigate('/');
       }
@@ -552,8 +561,9 @@ export const LoginPage = () => {
                         onChange={e => setRememberDevice(e.target.checked)}
                         className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-blue-600 focus:ring-blue-500/20 focus:ring-offset-0 transition"
                       />
-                      <span className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300">
-                        Trust this device (30 days)
+                      <span className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                        title="Keep me signed in on this computer. Leave unticked on a shared computer: you'll be signed out when the browser closes or after 30 minutes without activity.">
+                        Trust this device (stay signed in)
                       </span>
                     </label>
 
@@ -694,6 +704,7 @@ export const RegisterPage = () => {
         });
 
         if (res.data?.user) {
+          startSession(false);
           login(res.data.user);
           navigate('/');
         }
