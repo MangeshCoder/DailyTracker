@@ -39,7 +39,7 @@ import {
 
 const GRADE_META: Record<string, { text: string; stroke: string; label: string }> = {
   A: { text: 'text-emerald-600 dark:text-emerald-400', stroke: '#10b981', label: 'Excellent' },
-  B: { text: 'text-blue-600 dark:text-blue-400',       stroke: '#3b82f6', label: 'Good' },
+  B: { text: 'text-blue-600 dark:text-blue-400',       stroke: '#B32BEF', label: 'Good' },
   C: { text: 'text-amber-600 dark:text-amber-400',     stroke: '#f59e0b', label: 'Fair' },
   D: { text: 'text-rose-600 dark:text-rose-400',       stroke: '#f43f5e', label: 'Needs focus' },
 };

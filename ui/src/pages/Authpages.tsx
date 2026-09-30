@@ -30,7 +30,6 @@ import {
   ChevronRight,
   Shield,
   UserCheck,
-  Building2,
   MessagesSquare,
   Bot,
 } from 'lucide-react';
@@ -38,6 +37,7 @@ import { authApi, getDeviceToken } from '../services/api';
 import { startSession } from '../utils/session';
 import { useAuth } from '../context/Authcontext';
 import { AUTH, AuthBackground, AuthThemeToggle } from '../components/auth/authTheme';
+import { BrandLogo, BrandMark } from '../components/ui/Brand';
 
 // Demo autofill is a local-testing convenience — never shown in production builds
 const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
@@ -276,9 +276,10 @@ export const LoginPage = () => {
           {/* LEFT: Desktop Showcase */}
           <div className="hidden lg:flex lg:col-span-7 flex-col justify-between space-y-8 pr-4">
             <div>
+              <div className="mb-8"><BrandLogo className="h-11" /></div>
               <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400 text-xs font-medium mb-6">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Daily Tracker · v2</span>
+                <span>DailyTracker · v2</span>
                 <span className="text-blue-300 dark:text-blue-600 font-bold">·</span>
                 <span className="text-slate-500 dark:text-slate-400">Employee Management Suite</span>
               </div>
@@ -357,19 +358,15 @@ export const LoginPage = () => {
           {/* RIGHT: Authentication Form Card */}
           <div className="lg:col-span-5 w-full max-w-md mx-auto">
             <div className="lg:hidden text-center mb-6">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-3">
-                <Building2 className="w-6 h-6" />
-              </div>
-              <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>Daily Tracker EMS</h1>
+              <BrandMark className="w-12 h-12 mb-3" />
+              <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>DailyTracker</h1>
               <p className={`text-xs mt-1 ${AUTH.muted}`}>Employee Management Suite</p>
             </div>
 
             <div className={`${AUTH.card} relative`}>
               <div className="mb-6">
                 <div className="flex items-center gap-2.5">
-                  <div className="hidden lg:flex items-center justify-center w-9 h-9 rounded-lg bg-blue-600 text-white shadow-md shadow-blue-600/30">
-                    <Building2 className="w-5 h-5" />
-                  </div>
+                  <BrandMark className="hidden lg:inline-flex w-9 h-9 rounded-lg" />
                   <div>
                     <h2 className={`text-xl font-bold tracking-tight ${AUTH.heading}`}>
                       {twoFactorStep
@@ -723,12 +720,10 @@ export const RegisterPage = () => {
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-3">
-            <Building2 className="w-6 h-6" />
-          </div>
+          <BrandMark className="w-12 h-12 mb-3" />
           <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>Create Employee Account</h1>
           <p className={`text-xs mt-1 ${AUTH.muted}`}>
-            {otpStep ? 'Verify your email address' : 'Join your organization on Daily Tracker EMS'}
+            {otpStep ? 'Verify your email address' : 'Join your organization on DailyTracker'}
           </p>
         </div>
 

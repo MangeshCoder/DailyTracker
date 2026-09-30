@@ -81,7 +81,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 sm:p-5 shadow-xs transition-all duration-200 ${
+      className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-card dark:shadow-none transition-all duration-200 ${
         onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
       } ${scheme.bg} ${className}`}
     >
@@ -112,8 +112,10 @@ export const StatCard: React.FC<StatCardProps> = ({
           {trend && (
             <div className="flex items-center gap-1 text-xs pt-1">
               <span
-                className={`inline-flex items-center font-bold ${
-                  trend.isPositive ? 'text-emerald-500' : 'text-rose-500'
+                className={`inline-flex items-center font-semibold rounded-md px-1.5 py-0.5 border ${
+                  trend.isPositive
+                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                    : 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20'
                 }`}
               >
                 {trend.isPositive ? (

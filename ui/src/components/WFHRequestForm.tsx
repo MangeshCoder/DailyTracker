@@ -36,9 +36,9 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
         title: 'Request Submitted!',
         text: data.message || 'Your request was dispatched to your manager for review.',
         icon: 'success',
-        background: 'rgb(15, 23, 42)',
+        background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        iconColor: '#3b82f6',
+        iconColor: '#B32BEF',
         timer: 2000,
         showConfirmButton: false,
       });
@@ -48,9 +48,9 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
         title: 'Submission Failed',
         text: apiErrorMessage(err, 'Failed to submit request. Please try again.'),
         icon: 'error',
-        background: 'rgb(15, 23, 42)',
+        background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#3b82f6',
+        confirmButtonColor: '#B32BEF',
       });
     },
   });

@@ -5,7 +5,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Link } from 'react-router-dom';
-import { Loader2, CheckCircle2, XCircle, Building2, ArrowRight } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { BrandMark } from './ui/Brand';
 
 export const EmailActionCard = ({
   kind,
@@ -22,11 +23,9 @@ export const EmailActionCard = ({
 
     <div className="relative w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xl overflow-hidden">
       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 px-6 py-4 flex items-center gap-2.5 text-white">
-        <div className="w-8 h-8 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center">
-          <Building2 className="w-4 h-4" />
-        </div>
+        <BrandMark className="w-8 h-8 rounded-lg" />
         <div>
-          <p className="text-sm font-bold">Daily Tracker</p>
+          <p className="text-sm font-bold">DailyTracker</p>
           <p className="text-[11px] text-white/80">{kind} request · email action</p>
         </div>
       </div>
@@ -56,7 +55,7 @@ export const EmailActionCard = ({
               to="/"
               className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition"
             >
-              Open Daily Tracker <ArrowRight className="w-4 h-4" />
+              Open DailyTracker <ArrowRight className="w-4 h-4" />
             </Link>
           </>
         )}

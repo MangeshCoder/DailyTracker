@@ -22,8 +22,8 @@ const isDarkMode = () =>
 
 const themeBase = () =>
   isDarkMode()
-    ? { background: 'rgb(15, 23, 42)', color: '#f1f5f9' }   // slate-900 / slate-100
-    : { background: '#ffffff',         color: '#0f172a' };  // white / slate-900
+    ? { background: 'rgb(11, 23, 57)', color: '#ECEFFA' }   // slate-900 / slate-100
+    : { background: '#ffffff',         color: '#0B1739' };  // white / slate-900
 
 const POPUP_CLASS = 'font-sans !rounded-2xl';
 
@@ -31,8 +31,8 @@ const ICON_COLORS: Record<SweetAlertIcon, string> = {
   success:  '#10b981',
   error:    '#f43f5e',
   warning:  '#f59e0b',
-  info:     '#3b82f6',
-  question: '#3b82f6',
+  info:     '#B32BEF',
+  question: '#B32BEF',
 };
 
 export function useConfirm() {
@@ -61,8 +61,8 @@ export function useConfirm() {
       showCancelButton:   true,
       reverseButtons:     true,
       focusCancel:        isDanger,
-      confirmButtonColor: isDanger ? '#e11d48' : '#2563eb',
-      cancelButtonColor:  isDarkMode() ? '#475569' : '#94a3b8',
+      confirmButtonColor: isDanger ? '#e11d48' : '#9A1BD6',
+      cancelButtonColor:  isDarkMode() ? '#4E5A80' : '#96A3D0',
       confirmButtonText:  options?.confirmText ?? 'Yes, continue',
       cancelButtonText:   options?.cancelText  ?? 'Cancel',
     });
@@ -91,7 +91,7 @@ export function useConfirm() {
       reverseButtons:     true,
       focusCancel:        false,
       confirmButtonColor: '#e11d48',
-      cancelButtonColor:  isDarkMode() ? '#475569' : '#94a3b8',
+      cancelButtonColor:  isDarkMode() ? '#4E5A80' : '#96A3D0',
       confirmButtonText:  options?.confirmText ?? 'Yes, continue',
       cancelButtonText:   'Cancel',
       preConfirm: (value: string) => {
@@ -118,7 +118,7 @@ export function useConfirm() {
       text:               message,
       icon,
       iconColor:          ICON_COLORS[icon],
-      confirmButtonColor: '#2563eb',
+      confirmButtonColor: '#9A1BD6',
       confirmButtonText:  'OK',
     });
   };

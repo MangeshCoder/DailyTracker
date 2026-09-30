@@ -29,11 +29,11 @@ export default defineConfig({
 
       // ── Web App Manifest ────────────────────────────────────────────────────
       manifest: {
-        name:             'Daily Tracker EMS',
-        short_name:       'EMS',
+        name:             'DailyTracker · Montcrest Software',
+        short_name:       'DailyTracker',
         description:      'Employee Management System — track attendance, leave, tasks and more',
-        theme_color:      '#0f172a',   // slate-950 — matches your sidebar
-        background_color: '#0f172a',
+        theme_color:      '#081028',   // page background (Dashdark navy)
+        background_color: '#081028',
         display:          'standalone', // hides browser chrome, feels like a native app
         orientation:      'portrait',
         start_url:        '/',

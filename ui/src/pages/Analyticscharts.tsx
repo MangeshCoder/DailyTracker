@@ -132,8 +132,8 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
 //  Feature 5: Project Time Breakdown (Donut Chart)
 // ═══════════════════════════════════════════════════════════════════════════════
 const PROJECT_COLORS = [
-  '#3b82f6',
-  '#8b5cf6',
+  '#B32BEF',
+  '#7F25FB',
   '#10b981',
   '#f59e0b',
   '#ef4444',

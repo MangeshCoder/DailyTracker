@@ -11,7 +11,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Building2,
   Mail,
   Lock,
   ArrowRight,
@@ -23,6 +22,7 @@ import {
 } from 'lucide-react';
 import { authApi } from '../services/api';
 import { AUTH, AuthBackground, AuthThemeToggle } from '../components/auth/authTheme';
+import { BrandMark } from '../components/ui/Brand';
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate();
@@ -70,9 +70,7 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-3">
-            <Building2 className="w-6 h-6" />
-          </div>
+          <BrandMark className="w-12 h-12 mb-3" />
           <h1 className={`text-2xl font-bold tracking-tight ${AUTH.heading}`}>Account Recovery</h1>
           <p className={`text-xs mt-1 ${AUTH.muted}`}>
             {step === 'email' ? 'Enter your work email to reset your password' : 'Enter the code and choose a new password'}

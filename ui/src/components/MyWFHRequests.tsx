@@ -45,9 +45,9 @@ export const MyWFHRequests: React.FC = () => {
         title: 'Cancelled',
         text: 'Your request has been cancelled.',
         icon: 'success',
-        background: 'rgb(15, 23, 42)',
+        background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        iconColor: '#3b82f6',
+        iconColor: '#B32BEF',
         timer: 2000,
         showConfirmButton: false,
       });
@@ -57,9 +57,9 @@ export const MyWFHRequests: React.FC = () => {
         title: 'Cancellation Failed',
         text: err.response?.data?.message || 'Failed to cancel request',
         icon: 'error',
-        background: 'rgb(15, 23, 42)',
+        background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#3b82f6',
+        confirmButtonColor: '#B32BEF',
       });
     },
   });
@@ -190,12 +190,12 @@ export const MyWFHRequests: React.FC = () => {
                             title: 'Cancel Request?',
                             text: 'Are you sure you want to cancel this pending attendance request?',
                             icon: 'warning',
-                            background: 'rgb(15, 23, 42)',
+                            background: 'rgb(11, 23, 57)',
                             color: '#ffffff',
                             iconColor: '#ef4444',
                             showCancelButton: true,
                             confirmButtonColor: '#ef4444',
-                            cancelButtonColor: '#94a3b8',
+                            cancelButtonColor: '#96A3D0',
                             confirmButtonText: 'Yes, cancel it',
                             cancelButtonText: 'Keep request',
                           });
