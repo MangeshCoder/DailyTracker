@@ -8,6 +8,7 @@ import { useAuth } from '../../context/Authcontext';
 import { useTheme } from '../../context/ThemeContext';
 import { NotificationBell } from '../NotificationBell';
 import { Suspense, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { SkeletonDashboard } from '../Skeleton';
 import { announcementsApi, notifApi } from '../../services/api';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +28,11 @@ const LayoutShell = () => {
   // every section starts collapsed (after login or a reload); click a heading to open it
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [floatingSection, setFloatingSection] = useState<string | null>(null);
+  // screen position of the pop-out menu (collapsed sidebar); it's drawn on top of the page,
+  // outside the sidebar, so the sidebar's scroll area can't clip it
+  const [floatingPos, setFloatingPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const floatingRef = useRef<HTMLDivElement>(null);
   const isManager = user?.role === 'Manager' || user?.role === 'TeamLead';
 
   const toggleSection = (title: string) => {
@@ -55,7 +60,8 @@ const LayoutShell = () => {
   // Close floating section when clicking outside sidebar
   useEffect(() => {
     const handle = (e: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (sidebarRef.current && !sidebarRef.current.contains(t) && !floatingRef.current?.contains(t)) {
         setFloatingSection(null);
       }
     };
@@ -363,7 +369,14 @@ const LayoutShell = () => {
                   <div key={section.title} className="relative">
                     <button
                       type="button"
-                      onClick={() => setFloatingSection(floatingSection === section.title ? null : section.title)}
+                      onClick={(e) => {
+                        if (floatingSection === section.title) { setFloatingSection(null); return; }
+                        const r = e.currentTarget.getBoundingClientRect();
+                        // keep the menu on screen: shift it up if it would run past the bottom
+                        const est = 56 + section.items.length * 30;
+                        setFloatingPos({ left: r.right + 8, top: Math.max(8, Math.min(r.top, window.innerHeight - est - 8)) });
+                        setFloatingSection(section.title);
+                      }}
                       className={`w-full flex items-center justify-center p-2.5 rounded-xl transition ${
                         floatingSection === section.title
                           ? 'bg-blue-600 text-white shadow-sm'
@@ -376,8 +389,11 @@ const LayoutShell = () => {
                       <span className="text-lg">{section.icon}</span>
                     </button>
 
-                    {floatingSection === section.title && (
-                      <div className={`absolute left-16 top-0 w-60 rounded-xl shadow-xl p-2 z-50 border ${
+                    {floatingSection === section.title && createPortal(
+                      <div
+                        ref={floatingRef}
+                        style={{ top: floatingPos.top, left: floatingPos.left }}
+                        className={`fixed w-60 max-h-[calc(100vh-1rem)] overflow-y-auto rounded-xl shadow-xl p-2 z-[9999] border ${
                         isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
                       }`}>
                         <div className={`px-2 py-1.5 mb-1 border-b font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${
@@ -435,7 +451,8 @@ const LayoutShell = () => {
                             );
                           })}
                         </div>
-                      </div>
+                      </div>,
+                      document.body
                     )}
                   </div>
                 ))}

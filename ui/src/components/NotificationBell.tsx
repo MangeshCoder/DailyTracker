@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notifApi } from '../services/api';
 import type { AppNotification } from '../types';
@@ -40,6 +41,7 @@ export const NotificationBell = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const popupRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -87,7 +89,8 @@ export const NotificationBell = () => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+      const t = event.target as Node;
+      if (popupRef.current && !popupRef.current.contains(t) && !cardRef.current?.contains(t)) {
         setOpen(false);
       }
     };
@@ -118,8 +121,10 @@ export const NotificationBell = () => {
         )}
       </button>
 
-      {open && (
-        <div className="fixed left-4 sm:left-10 top-4 w-[calc(100vw-2rem)] sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-[9999] overflow-hidden">
+      {/* drawn on top of the page (not inside the sidebar) so it can sit in the middle of the screen */}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+        <div ref={cardRef} role="dialog" aria-label="Notifications" className="w-full sm:w-96 max-h-[calc(100vh-2rem)] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 pt-4 pb-3">
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-bold text-slate-900 dark:text-white">Notifications</h4>
@@ -145,7 +150,7 @@ export const NotificationBell = () => {
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+          <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
             {notifications?.length === 0 ? (
               <div className="text-center py-10">
                 <PartyPopper className="w-8 h-8 mx-auto text-emerald-500" />
@@ -186,6 +191,8 @@ export const NotificationBell = () => {
             )}
           </div>
         </div>
+        </div>,
+        document.body
       )}
     </div>
   );
