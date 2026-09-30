@@ -12,6 +12,7 @@ import { leaveApi } from '../services/api';
 import type { LeaveRequest } from '../types';
 import { useToast } from '../context/ToastContext';
 import { apiErrorMessage } from '../utils/apiError';
+import { Select } from './ui/Select';
 
 const fmt = (d: string) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -119,6 +120,62 @@ export const PendingLeavePanel = () => {
               </article>
             );
           })}
+        </div>
+      )}
+    </section>
+  );
+};
+
+/** Every team leave application with its decision — shown in the page's Request Archive */
+export const TeamLeaveHistory = () => {
+  const [status, setStatus] = useState('');
+  const { data: leaves = [], isLoading } = useQuery<LeaveRequest[]>({
+    queryKey: ['allLeaves', status],
+    queryFn: () => leaveApi.getAll(status || undefined).then(r => r.data),
+  });
+
+  return (
+    <section aria-labelledby="leave-history-title" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Palmtree className="w-4 h-4 text-emerald-500" />
+          <h3 id="leave-history-title" className="text-sm font-bold text-slate-900 dark:text-white">Leave history</h3>
+        </div>
+        <Select value={status} onChange={e => setStatus(e.target.value)} aria-label="Filter leave by status"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 min-w-[140px]">
+          <option value="">All statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="h-24 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse" />
+      ) : leaves.length === 0 ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400 px-4 py-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
+          No leave applications here.
+        </p>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 divide-y divide-slate-100 dark:divide-slate-800">
+          {leaves.map(l => (
+            <div key={l.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
+              <span className="font-semibold text-slate-900 dark:text-white min-w-[8rem]">{l.userName}</span>
+              <span className="text-slate-600 dark:text-slate-300">{l.leaveType}</span>
+              <span className="text-slate-600 dark:text-slate-300">
+                {fmt(l.fromDate)}{l.toDate !== l.fromDate && ` → ${fmt(l.toDate)}`} · {l.leaveDays}d
+              </span>
+              <span className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                : l.status === 'Rejected' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}>{l.status}</span>
+              {l.reviewerName && (
+                <span className="w-full text-xs text-slate-500 dark:text-slate-400">
+                  by {l.reviewerName}{l.reviewNote ? ` — “${l.reviewNote}”` : ''}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </section>

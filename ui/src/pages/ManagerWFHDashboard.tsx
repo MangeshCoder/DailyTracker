@@ -6,7 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { TeamDailyStatusDashboard } from '../components/TeamDailyStatusDashboard';
 import { PendingRequestsPanel } from '../components/PendingRequestsPanel';
-import { PendingLeavePanel, usePendingLeave } from '../components/PendingLeavePanel';
+import { PendingLeavePanel, TeamLeaveHistory, usePendingLeave } from '../components/PendingLeavePanel';
 import { useAuth } from '../context/Authcontext';
 import { TeamMonthlyAttendances } from '../components/TeamMonthlyAttendance';
 import { AllRequestsHistory } from '../components/AllRequestsHistory';
@@ -174,7 +174,15 @@ export const ManagerWFHDashboard: React.FC = () => {
           </div>
         )}
         {tab === 'monthly' && <TeamMonthlyAttendances />}
-        {tab === 'history' && <AllRequestsHistory />}
+        {tab === 'history' && (
+          <div className="space-y-8">
+            {canReviewLeave && <TeamLeaveHistory />}
+            <section aria-label="WFH and half-day history" className="space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">WFH &amp; half-day history</h3>
+              <AllRequestsHistory />
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );

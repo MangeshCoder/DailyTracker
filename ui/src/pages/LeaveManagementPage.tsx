@@ -5,6 +5,7 @@ import { leaveApi, holidayApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/Authcontext';
 import {
+  ArrowRight,
   CalendarRange,
   Palmtree,
   HeartPulse,
@@ -19,7 +20,6 @@ import {
   Send,
   PartyPopper,
   X,
-  Check,
   UserCheck
 } from 'lucide-react';
 import type { LeaveBalanceDto, LeaveTypeBalanceItem } from '../types';
@@ -29,6 +29,8 @@ import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Select } from '../components/ui/Select';
+import { useNavigate } from 'react-router-dom';
+import { usePendingLeave } from '../components/PendingLeavePanel';
 
 // ─── Leave type visual configuration ─────────────────────────────────────────
 interface LeaveTypeConfig {
@@ -334,9 +336,13 @@ export const LeaveManagementPage: React.FC = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const isManager = user?.role === 'Manager';
+  const navigate = useNavigate();
+  // how many team leave requests wait on the Employee Requests page
+  const { data: teamQueue = [] } = usePendingLeave(isManager);
+  const teamPending = teamQueue.filter(l => l.canReview !== false).length;
 
   const [showApply, setShowApply] = useState(false);
-  const [tab, setTab] = useState<'mine' | 'all' | 'holidays'>('mine');
+  const [tab, setTab] = useState<'mine' | 'holidays'>('mine');
   const [form, setForm] = useState({
     fromDate: '',
     toDate: '',
@@ -344,8 +350,6 @@ export const LeaveManagementPage: React.FC = () => {
     reason: '',
   });
 
-  const [reviewId, setReviewId] = useState<number | null>(null);
-  const [reviewNote, setReviewNote] = useState('');
   const [holidayForm, setHolidayForm] = useState({ name: '', date: '', type: 'Public' });
 
   // ── Queries ──
@@ -355,11 +359,6 @@ export const LeaveManagementPage: React.FC = () => {
     enabled: tab === 'mine',
   });
 
-  const { data: allLeaves = [] } = useQuery({
-    queryKey: ['allLeaves'],
-    queryFn: () => leaveApi.getAll().then((r) => r.data),
-    enabled: tab === 'all' && isManager,
-  });
 
   const { data: holidays = [] } = useQuery({
     queryKey: ['holidays'],
@@ -384,7 +383,7 @@ export const LeaveManagementPage: React.FC = () => {
     // refresh either way, so the lists always match the server
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['myLeaves'] });
-      qc.invalidateQueries({ queryKey: ['allLeaves'] });
+      qc.invalidateQueries({ queryKey: ['pendingLeave'] });
       qc.invalidateQueries({ queryKey: ['leaveBalance'] });
     },
   });
@@ -395,27 +394,11 @@ export const LeaveManagementPage: React.FC = () => {
     onError: (error: any) => toast.error(apiErrorMessage(error, 'Failed to cancel leave')),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['myLeaves'] });
-      qc.invalidateQueries({ queryKey: ['allLeaves'] });
+      qc.invalidateQueries({ queryKey: ['pendingLeave'] });
       qc.invalidateQueries({ queryKey: ['leaveBalance'] });
     },
   });
 
-  const doReview = useMutation({
-    mutationFn: ({ id, s }: { id: number; s: string }) =>
-      leaveApi.review(id, { status: s, reviewNote }),
-    onSuccess: () => {
-      toast.success('Leave review decision submitted');
-      setReviewId(null);
-      setReviewNote('');
-    },
-    onError: (error: any) => toast.error(apiErrorMessage(error, 'Failed to submit review')),
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['allLeaves'] });
-      qc.invalidateQueries({ queryKey: ['myLeaves'] });
-      qc.invalidateQueries({ queryKey: ['leaveBalance'] });
-      qc.invalidateQueries({ queryKey: ['teamStatus'] });
-    },
-  });
 
   const createHoliday = useMutation({
     mutationFn: () => holidayApi.create(holidayForm),
@@ -451,9 +434,8 @@ export const LeaveManagementPage: React.FC = () => {
   }, [myBalanceItem]);
 
   const pendingLeavesCount = useMemo(() => {
-    const list = isManager && tab === 'all' ? allLeaves : myLeaves;
-    return list.filter((l: any) => l.status === 'Pending').length;
-  }, [myLeaves, allLeaves, isManager, tab]);
+    return myLeaves.filter((l: any) => l.status === 'Pending').length;
+  }, [myLeaves]);
 
   const sickRemaining = useMemo(() => {
     const found = myBalanceItem?.balances.find((b) => b.leaveType === 'Sick');
@@ -470,7 +452,7 @@ export const LeaveManagementPage: React.FC = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   }, [form.fromDate, form.toDate]);
 
-  const currentLeaveData = tab === 'mine' ? myLeaves : allLeaves;
+  const currentLeaveData = myLeaves;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -535,7 +517,7 @@ export const LeaveManagementPage: React.FC = () => {
         <StatCard
           title="Pending In Review"
           value={pendingLeavesCount}
-          subtitle={isManager && tab === 'all' ? 'Team queue waiting' : 'Your pending requests'}
+          subtitle="Your pending requests"
           icon={Clock}
           color="amber"
         />
@@ -698,21 +680,19 @@ export const LeaveManagementPage: React.FC = () => {
             My Leave Requests
           </button>
           {isManager && (
+            // team leave is decided on the manager's Employee Requests page, next to WFH
             <button
               type="button"
-              onClick={() => setTab('all')}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                tab === 'all'
-                  ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              onClick={() => navigate('/manager/wfh-dashboard')}
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer flex items-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             >
-              <span>Team Applications</span>
-              {pendingLeavesCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
-                  {pendingLeavesCount}
+              <span>Team requests</span>
+              {teamPending > 0 && (
+                <span className="min-w-5 h-5 px-1 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {teamPending}
                 </span>
               )}
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
           <button
@@ -891,20 +871,6 @@ export const LeaveManagementPage: React.FC = () => {
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="space-y-2 flex-1">
-                      {tab === 'all' && (
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          <span className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center text-[10px]">
-                            👤
-                          </span>
-                          <span>{l.userName}</span>
-                          {l.isOwn && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold">
-                              You
-                            </span>
-                          )}
-                        </div>
-                      )}
-
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <span className="text-lg">{cfg.icon}</span>
@@ -977,66 +943,9 @@ export const LeaveManagementPage: React.FC = () => {
                         </button>
                       )}
 
-                      {/* Review trigger for manager */}
-                      {tab === 'all' && isPending && l.canReview === false && (
-                        <span className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                          Waiting for another manager
-                        </span>
-                      )}
-                      {tab === 'all' && isPending && l.canReview !== false && reviewId !== l.id && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReviewId(l.id);
-                            setReviewNote('');
-                          }}
-                          className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/20 transition cursor-pointer"
-                        >
-                          Review Application
-                        </button>
-                      )}
                     </div>
                   </div>
 
-                  {/* Manager Review Drawer */}
-                  {reviewId === l.id && (
-                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
-                      <textarea
-                        value={reviewNote}
-                        onChange={(e) => setReviewNote(e.target.value)}
-                        placeholder="Add review feedback or reason (optional)..."
-                        rows={2}
-                        className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => doReview.mutate({ id: l.id, s: 'Approved' })}
-                          disabled={doReview.isPending}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2 rounded-xl transition shadow-sm shadow-emerald-500/20"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Approve</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => doReview.mutate({ id: l.id, s: 'Rejected' })}
-                          disabled={doReview.isPending}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold py-2 rounded-xl transition shadow-sm shadow-rose-500/20"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          <span>Reject</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setReviewId(null)}
-                          className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );

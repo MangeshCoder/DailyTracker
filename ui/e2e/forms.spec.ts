@@ -104,3 +104,19 @@ test('a team lead (who cannot decide leave) sees only the WFH queue there', asyn
   await expect(page.getByRole('heading', { name: /WFH & half-day requests/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Leave requests' })).toHaveCount(0);
 });
+
+test('leave is decided only on Employee Requests — the Leave page links there instead', async ({ page }) => {
+  const { fake } = await signIn(page, 'Manager');
+  await fake.navigate('/leave');
+  await expect(page.getByRole('button', { name: /Team requests/ })).toBeVisible();
+  await expect(page.getByText('Team Applications')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Review Application|Approve/ })).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Team requests/ }).click();
+  await expect(page).toHaveURL(/\/manager\/wfh-dashboard$/);
+
+  // decided leave is kept in the page's archive
+  await page.getByRole('button', { name: /Request Archive/ }).click();
+  await expect(page.getByRole('heading', { name: 'Leave history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /WFH & half-day history/ })).toBeVisible();
+});
