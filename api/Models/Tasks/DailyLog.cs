@@ -36,6 +36,25 @@ namespace DailyTrackerAPI.Models.Tasks
         public double? CheckOutLatitude { get; set; }
         public double? CheckOutLongitude { get; set; }
 
+        // ── Forgotten check-out ───────────────────────────────────────────────
+        // The app closed the day because nobody checked out: at the last proof of
+        // work ("LastActivity") or after a normal day ("NormalDay").
+        public bool AutoCheckedOut { get; set; }
+        [MaxLength(20)]
+        public string? AutoCheckOutBasis { get; set; }
+
+        // The employee's answer: null = not answered yet, "Confirmed" = the time is
+        // right, "Pending" / "Approved" / "Rejected" = a correction for the manager
+        [MaxLength(20)]
+        public string? CorrectionStatus { get; set; }
+        public DateTime? CorrectionCheckOut { get; set; }
+        [MaxLength(300)]
+        public string? CorrectionReason { get; set; }
+        public int? CorrectionReviewedById { get; set; }
+        [MaxLength(300)]
+        public string? CorrectionReviewNote { get; set; }
+        public DateTime? CorrectionReviewedAt { get; set; }
+
         // Navigation
         public ICollection<BreakLog> BreakLogs { get; set; } = new List<BreakLog>();
         public ICollection<TaskLog> TaskLogs { get; set; } = new List<TaskLog>();

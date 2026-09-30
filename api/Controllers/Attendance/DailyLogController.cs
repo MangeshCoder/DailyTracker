@@ -13,9 +13,11 @@ namespace DailyTrackerAPI.Controllers.Attendance
     public class DailyLogController : ControllerBase
     {
         private readonly IDailyLogService _logService;
-        public DailyLogController(IDailyLogService logService)
+        private readonly IAutoCheckoutService _autoCheckout;
+        public DailyLogController(IDailyLogService logService, IAutoCheckoutService autoCheckout)
         {
             _logService = logService;
+            _autoCheckout = autoCheckout;
         }
 
         #region POST CheckIn
@@ -24,6 +26,8 @@ namespace DailyTrackerAPI.Controllers.Attendance
         {
             try
             {
+                // a shift left open from an earlier day is closed first (forgotten check-out)
+                await _autoCheckout.CloseForgottenShiftsAsync(User.GetUserId());
                 var result = await _logService.CheckInAsync(User.GetUserId(), dto);
                 if (result == null)
                     return BadRequest(new { message = "Already checked in today." });
@@ -58,6 +62,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
         [HttpGet("today")]
         public async Task<IActionResult> GetToday()
         {
+            await _autoCheckout.CloseForgottenShiftsAsync(User.GetUserId());
             var result = await _logService.GetTodayLogAsync(User.GetUserId());
             return result == null ? NotFound() : Ok(result);
         }
@@ -76,8 +81,47 @@ namespace DailyTrackerAPI.Controllers.Attendance
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory([FromQuery] int days = 30)
         {
+            await _autoCheckout.CloseForgottenShiftsAsync(User.GetUserId());
             var result = await _logService.GetHistoryAsync(User.GetUserId(), days);
             return Ok(result);
+        }
+        #endregion
+
+        #region Forgotten check-out
+        /// <summary>The latest day the app closed for me that I haven't answered yet (204 if none)</summary>
+        [HttpGet("auto-checkout")]
+        public async Task<IActionResult> GetAutoCheckout()
+        {
+            await _autoCheckout.CloseForgottenShiftsAsync(User.GetUserId());
+            var result = await _autoCheckout.GetUnansweredAsync(User.GetUserId());
+            return result == null ? NoContent() : Ok(result);
+        }
+
+        /// <summary>"That's right" — the saved finish time is correct</summary>
+        [HttpPost("{id:int}/auto-checkout/confirm")]
+        public async Task<IActionResult> ConfirmAutoCheckout(int id)
+        {
+            await _autoCheckout.ConfirmAsync(User.GetUserId(), id);
+            return Ok(new { message = "Thanks — your hours stay as they are." });
+        }
+
+        /// <summary>"I finished at …" — sent to the manager / team lead</summary>
+        [HttpPost("{id:int}/checkout-correction")]
+        public async Task<IActionResult> RequestCorrection(int id, [FromBody] CheckoutCorrectionRequestDto dto)
+        {
+            await _autoCheckout.RequestCorrectionAsync(User.GetUserId(), id, dto);
+            return Ok(new { message = "Sent to your manager for approval." });
+        }
+
+        [HttpGet("checkout-corrections/pending"), Authorize(Roles = "Manager,TeamLead")]
+        public async Task<IActionResult> PendingCorrections() =>
+            Ok(await _autoCheckout.GetPendingCorrectionsAsync(User.GetUserId()));
+
+        [HttpPut("{id:int}/checkout-correction/review"), Authorize(Roles = "Manager,TeamLead")]
+        public async Task<IActionResult> ReviewCorrection(int id, [FromBody] ReviewCheckoutCorrectionDto dto)
+        {
+            await _autoCheckout.ReviewCorrectionAsync(User.GetUserId(), id, dto);
+            return Ok(new { message = dto.Status == "Approved" ? "Check-out corrected." : "Correction declined." });
         }
         #endregion
     }

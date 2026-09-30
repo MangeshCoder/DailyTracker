@@ -507,6 +507,50 @@ namespace DailyTrackerAPI.DTOs
         public List<BreakLogDto> Breaks { get; set; } = new();
         public List<TaskLogDto> Tasks { get; set; } = new();
         public List<SupportLogResponseDto> SupportLogs { get; set; } = new();
+        /// <summary>The app closed this day because nobody checked out</summary>
+        public bool AutoCheckedOut { get; set; }
+        public string? CorrectionStatus { get; set; }
+    }
+
+    // ─── Forgotten check-out ────────────────────────────────────────────────────
+    public class AutoCheckoutDto
+    {
+        public int LogId { get; set; }
+        public DateTime LogDate { get; set; }
+        public DateTime CheckInTime { get; set; }
+        public DateTime CheckOutTime { get; set; }
+        /// <summary>"LastActivity" or "NormalDay"</summary>
+        public string Basis { get; set; } = "NormalDay";
+        public int WorkMinutes { get; set; }
+        /// <summary>Latest finish time that can be claimed (05:00 the next morning)</summary>
+        public DateTime LatestAllowed { get; set; }
+    }
+
+    public class CheckoutCorrectionRequestDto
+    {
+        /// <summary>The real finish time (UTC)</summary>
+        public DateTime CheckOutTime { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class CheckoutCorrectionDto
+    {
+        public int LogId { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public DateTime LogDate { get; set; }
+        public DateTime CheckInTime { get; set; }
+        public DateTime AutoCheckOutTime { get; set; }
+        public DateTime RequestedCheckOut { get; set; }
+        public string Basis { get; set; } = "NormalDay";
+        public string Reason { get; set; } = "";
+        public bool IsOwn { get; set; }
+    }
+
+    public class ReviewCheckoutCorrectionDto
+    {
+        public string Status { get; set; } = "";
+        public string? Note { get; set; }
     }
 
     // ─── Breaks ─────────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaceVerifyModal } from '../components/FaceVerifyModal';
 import type { FaceVerifyResult } from '../hooks/useFaceRecognition';
 import { PageHeader } from '../components/ui/PageHeader';
+import { AutoCheckoutNotice } from '../components/AutoCheckoutNotice';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardContent } from '../components/ui/Card';
 import {
@@ -381,6 +382,9 @@ export const DashboardPage = () => {
         }
         className="!mb-0"
       />
+
+      {/* ── Forgotten check-out: confirm or correct the time ────────────── */}
+      <AutoCheckoutNotice />
 
       {/* ── Location Error Banner ────────────────────────────────────────── */}
       {locationError && (

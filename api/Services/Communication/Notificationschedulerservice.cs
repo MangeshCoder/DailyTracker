@@ -2,6 +2,7 @@
 using DailyTrackerAPI.Models.Communication;
 using Microsoft.EntityFrameworkCore;
 using DailyTrackerAPI.Helpers;
+using DailyTrackerAPI.Services.Attendance;
 
 namespace DailyTrackerAPI.Services.Communication
 {
@@ -72,6 +73,8 @@ namespace DailyTrackerAPI.Services.Communication
         private const string JOB_PENDING = "PENDING_APPROVAL";
         private const string JOB_EOD = "EOD_REMINDER";
         private const string JOB_LOG = "LOG_REMINDER";
+        private const string JOB_CHECKOUT = "CHECKOUT_REMINDER";
+        private const string JOB_AUTO_CLOSE = "AUTO_CHECKOUT";
 
         // (IST hour, IST minute, job key)
         private static readonly (int Hour, int Min, string Key)[] _schedule =
@@ -80,6 +83,8 @@ namespace DailyTrackerAPI.Services.Communication
             (9,  30, JOB_PENDING),
             (17, 0,  JOB_EOD),
             (18, 0,  JOB_LOG),
+            (19, 0,  JOB_CHECKOUT),     // still checked in at 7 PM → reminder
+            (5,  0,  JOB_AUTO_CLOSE),   // shifts nobody checked out of → closed at the last proof of work
         };
 
         public NotificationSchedulerService(
@@ -125,7 +130,8 @@ namespace DailyTrackerAPI.Services.Communication
                     // Server was down/asleep at the scheduled time: a 9:00 reminder at
                     // 15:00 is noise, so skip it once it's more than a few hours late
                     var scheduledAt = nowIst.Date.AddHours(hour).AddMinutes(min);
-                    if (nowIst - scheduledAt > MaxLateness)
+                    // (closing forgotten shifts is still right when late — only reminders go stale)
+                    if (key != JOB_AUTO_CLOSE && nowIst - scheduledAt > MaxLateness)
                     {
                         _logger.LogInformation("[Scheduler] Skipped {Job}: {Late:g} late", key, nowIst - scheduledAt);
                         continue;
@@ -164,6 +170,10 @@ namespace DailyTrackerAPI.Services.Communication
                     case JOB_PENDING: await RunPendingApprovalAsync(db, svc, ct); break;
                     case JOB_EOD: await RunEodReminderAsync(db, svc, ct); break;
                     case JOB_LOG: await RunDailyLogReminderAsync(db, svc, ct); break;
+                    case JOB_CHECKOUT: await RunCheckoutReminderAsync(db, svc, ct); break;
+                    case JOB_AUTO_CLOSE:
+                        await scope.ServiceProvider.GetRequiredService<IAutoCheckoutService>().CloseForgottenShiftsAsync(null, ct);
+                        break;
                 }
 
                 db.SchedulerRuns.Add(new SchedulerRun { JobKey = jobKey, RunDate = runDate });
@@ -344,6 +354,30 @@ namespace DailyTrackerAPI.Services.Communication
             );
 
             _logger.LogInformation("[Scheduler] Log reminders → {N} users", usersToRemind.Count);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  JOB 5 — CHECK-OUT REMINDER  (19:00 IST)
+        //  Who gets it: everyone checked in today who hasn't checked out yet.
+        // ─────────────────────────────────────────────────────────────────────
+        private async Task RunCheckoutReminderAsync(
+            AppDbContext db, IAppNotificationService svc, CancellationToken ct)
+        {
+            var today = AppClock.TodayIst;
+            var stillIn = await db.DailyLogs
+                .Where(d => d.LogDate == today && d.CheckInTime != null && d.CheckOutTime == null)
+                .Select(d => d.UserId)
+                .ToListAsync(ct);
+            if (stillIn.Count == 0) return;
+
+            await svc.CreateForUsersAsync(
+                userIds: stillIn,
+                title: "🕖 Still checked in",
+                message: "It's 7 PM — remember to check out when you finish, so your hours (and any overtime) are counted right.",
+                type: "Reminder",
+                actionUrl: "/"
+            );
+            _logger.LogInformation("[Scheduler] Check-out reminders → {N} users", stillIn.Count);
         }
     }
 }

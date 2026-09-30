@@ -1,3 +1,5 @@
+using DailyTrackerAPI.Models.Tasks;
+using DailyTrackerAPI.Helpers;
 using System.Reflection;
 using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Models.Auth;
@@ -45,6 +47,59 @@ public class SchedulerTests : IDisposable
         var db2 = check.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(2, db2.Notifications.Count(n => n.UserId == 1 && n.Title.Contains("Daily Log Missing")));
         Assert.Equal(2, db2.SchedulerRuns.Count(r => r.JobKey == "LOG_REMINDER"));
+    }
+
+    [Fact]
+    public async Task At_7_pm_only_people_still_checked_in_get_a_check_out_reminder()
+    {
+        var today = AppClock.TodayIst;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            TestDatabase.CreateSchema(db);
+            db.Users.AddRange(
+                new User { Id = 1, FullName = "Still In", Email = "a@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true },
+                new User { Id = 2, FullName = "Went Home", Email = "b@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true },
+                new User { Id = 3, FullName = "Not In", Email = "c@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true });
+            db.SaveChanges();
+            TestDatabase.AfterSeed(db);
+            db.DailyLogs.AddRange(
+                new DailyLog { UserId = 1, LogDate = today, CheckInTime = DateTime.UtcNow.AddHours(-8) },
+                new DailyLog { UserId = 2, LogDate = today, CheckInTime = DateTime.UtcNow.AddHours(-9), CheckOutTime = DateTime.UtcNow.AddHours(-1) });
+            db.SaveChanges();
+        }
+
+        await RunJob("CHECKOUT_REMINDER", DateOnly.FromDateTime(today));
+
+        using var check = _factory.Services.CreateScope();
+        var reminded = check.ServiceProvider.GetRequiredService<AppDbContext>().Notifications
+            .Where(n => n.Title.Contains("Still checked in")).Select(n => n.UserId).ToList();
+        Assert.Equal(new[] { 1 }, reminded);
+    }
+
+    [Fact]
+    public async Task The_morning_job_closes_every_forgotten_shift()
+    {
+        var day = AppClock.TodayIst.AddDays(-2);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            TestDatabase.CreateSchema(db);
+            db.Users.Add(new User { Id = 1, FullName = "Priya", Email = "p@test.dev", PasswordHash = "x", Role = "Developer", IsActive = true });
+            db.SaveChanges();
+            TestDatabase.AfterSeed(db);
+            db.DailyLogs.Add(new DailyLog { UserId = 1, LogDate = day, CheckInTime = AppClock.FromIst(day.AddHours(9)) });
+            db.SaveChanges();
+        }
+
+        await RunJob("AUTO_CHECKOUT", DateOnly.FromDateTime(AppClock.TodayIst));
+
+        using var check = _factory.Services.CreateScope();
+        var cdb = check.ServiceProvider.GetRequiredService<AppDbContext>();
+        var log = cdb.DailyLogs.Single();
+        Assert.True(log.AutoCheckedOut);
+        Assert.Equal(AppClock.FromIst(day.AddHours(17)), log.CheckOutTime);
+        Assert.Single(cdb.Notifications.Where(n => n.UserId == 1 && n.Title.Contains("didn't check out")));
     }
 }
 

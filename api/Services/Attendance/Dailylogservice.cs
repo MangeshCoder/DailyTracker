@@ -235,6 +235,8 @@ namespace DailyTrackerAPI.Services.Attendance
                 TotalBreakMinutes = log.BreakLogs.Sum(b => b.DurationMinutes),
                 DayStatus = log.DayStatus,
                 Notes = log.Notes,
+                AutoCheckedOut = log.AutoCheckedOut,
+                CorrectionStatus = log.CorrectionStatus,
                 WorkHours = FormatMinutes(workMins),
                 Breaks = log.BreakLogs.Select(b => new BreakLogDto
                 {

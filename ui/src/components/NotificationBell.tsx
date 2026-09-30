@@ -35,6 +35,16 @@ const NOTIF_ICON: Record<string, { icon: React.ElementType; cls: string }> = {
   Reminder: { icon: BellRing,      cls: 'bg-violet-500/10 text-violet-600 dark:text-violet-400' },
 };
 
+// The bell is on the page twice (sidebar + phone header): show each live notification once
+const recentToasts = new Map<string, number>();
+const firstTimeSeen = (key: string) => {
+  const now = Date.now();
+  for (const [k, t] of recentToasts) if (now - t > 5000) recentToasts.delete(k);
+  if (recentToasts.has(key)) return false;
+  recentToasts.set(key, now);
+  return true;
+};
+
 export const NotificationBell = () => {
   const [open, setOpen] = useState(false);
   const { onEvent } = useSignalR();
@@ -77,6 +87,10 @@ export const NotificationBell = () => {
   useEffect(() => {
     const off = onEvent('ReceiveNotification', (data: unknown) => {
       const n = data as { title: string; message: string; type: string };
+      if (!firstTimeSeen(`${n.title}|${n.message}`)) {
+        qc.invalidateQueries({ queryKey: ['notifCount'] });
+        return;
+      }
       if (n.type === 'Success') toast.success(`${n.title}: ${n.message}`);
       else if (n.type === 'Warning') toast.warning(`${n.title}: ${n.message}`);
       else toast.info(`${n.title}: ${n.message}`);

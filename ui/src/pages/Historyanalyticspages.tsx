@@ -160,6 +160,12 @@ export const HistoryPage = () => {
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${STATUS_CHIP[log.dayStatus] ?? STATUS_CHIP.Present}`}>
                         {log.dayStatus}
                       </span>
+                      {log.autoCheckedOut && (
+                        <span title="You didn't check out — the app closed this day"
+                          className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                          {log.correctionStatus === 'Approved' ? 'Corrected' : log.correctionStatus === 'Pending' ? 'Correction sent' : 'Auto check-out'}
+                        </span>
+                      )}
                       <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${active ? 'rotate-90 lg:rotate-0 text-blue-500' : ''}`} />
                     </div>
                   </div>

@@ -5,3 +5,7 @@
  */
 export const localDate = (d: Date = new Date()): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** A time from the server (UTC, sometimes written without the trailing "Z") */
+export const utcDate = (s: string): Date =>
+  new Date(/(Z|[+-]\d\d:?\d\d)$/i.test(s) ? s : `${s}Z`);

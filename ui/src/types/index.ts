@@ -74,7 +74,7 @@ export interface MyAssignment {
   assignedAt?: string;
 }
 
-export interface DailyLog { id: number; logDate: string; checkInTime?: string; checkOutTime?: string; totalWorkMinutes: number; totalBreakMinutes: number; dayStatus: string; notes?: string; workHours: string; breaks: BreakLog[]; tasks: TaskLog[]; supportLogs: SupportLog[]; }
+export interface DailyLog { id: number; logDate: string; checkInTime?: string; checkOutTime?: string; totalWorkMinutes: number; totalBreakMinutes: number; dayStatus: string; notes?: string; workHours: string; breaks: BreakLog[]; tasks: TaskLog[]; supportLogs: SupportLog[]; autoCheckedOut?: boolean; correctionStatus?: string | null; }
 export interface DashboardSummary { todayLog?: DailyLog; tasksCompleted: number; tasksInProgress: number; totalSupportGiven: number; netWorkMinutes: number; netWorkHours: string; isCheckedIn: boolean; hasActiveBreak: boolean; activeBreak?: BreakLog; }
 
 // ─── Feature 11: Security ─────────────────────────────────────────────────────

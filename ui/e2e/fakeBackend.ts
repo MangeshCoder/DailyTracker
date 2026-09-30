@@ -24,6 +24,7 @@ export interface FakeMessage {
 export class FakeBackend {
   private nextId = 0;
   private hub: WebSocketRoute | null = null;
+  private notificationHub?: WebSocketRoute;
   private hubConnected!: () => void;
   /** Resolves once the app's live connection has completed its handshake */
   readonly hubReady = new Promise<void>(resolve => { this.hubConnected = resolve; });
@@ -74,6 +75,13 @@ export class FakeBackend {
     return m;
   }
 
+  /** A live notification on the notifications hub (waits until the app has connected to it) */
+  async notify(arg: unknown) {
+    for (let i = 0; i < 100 && !this.notificationHub; i++) await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => setTimeout(r, 300));   // handshake done
+    this.notificationHub!.send(JSON.stringify({ type: 1, target: 'ReceiveNotification', arguments: [arg] }) + RS);
+  }
+
   /** A live hub event (waits until the app is connected, like a real server would deliver it) */
   async push(target: string, arg: unknown) {
     await this.hubReady;
@@ -84,6 +92,7 @@ export class FakeBackend {
     // (one handler for all hubs: with several, the last one registered wins)
     await this.page.routeWebSocket(/\/hubs\//, ws => {
       if (ws.url().includes('/hubs/chat')) this.hub = ws;
+      if (ws.url().includes('/hubs/notifications')) this.notificationHub = ws;
       ws.onMessage(raw => {
         for (const part of String(raw).split(RS).filter(Boolean)) {
           const msg = JSON.parse(part);

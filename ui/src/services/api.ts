@@ -173,6 +173,14 @@ export const dailyLogApi = {
   getToday: () => api.get('/dailylog/today'),
   getByDate: (date: string) => api.get(`/dailylog/date/${date}`),
   getHistory: (days = 30) => api.get(`/dailylog/history?days=${days}`),
+  // forgotten check-out: the day the app closed for me (204 = nothing to answer)
+  getAutoCheckout: () => api.get('/dailylog/auto-checkout'),
+  confirmAutoCheckout: (logId: number) => api.post(`/dailylog/${logId}/auto-checkout/confirm`),
+  requestCheckoutCorrection: (logId: number, d: { checkOutTime: string; reason: string }) =>
+    api.post(`/dailylog/${logId}/checkout-correction`, d),
+  getPendingCorrections: () => api.get('/dailylog/checkout-corrections/pending'),
+  reviewCheckoutCorrection: (logId: number, d: { status: 'Approved' | 'Rejected'; note?: string }) =>
+    api.put(`/dailylog/${logId}/checkout-correction/review`, d),
 };
 
 // ─── Breaks ───────────────────────────────────────────────────────────────────

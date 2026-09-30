@@ -239,15 +239,40 @@ public class MonitoringTests : IDisposable
             return db.SaveChanges();
         });
 
-        var today = await Json(await _priya.GetAsync("/api/DailyLog/today"));
-        Assert.StartsWith(yesterday.ToString("yyyy-MM-dd"), today.GetProperty("logDate").GetString());
+        var response = await _priya.GetAsync("/api/DailyLog/today");
 
-        var r = await _priya.PutAsJsonAsync("/api/DailyLog/checkout", new CheckOutDto { Latitude = 0, Longitude = 0 });
-        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        if (DailyLogQueries.YesterdaysShiftMayRun(AppClock.NowIst))
+        {
+            // before 05:00 India time: still the running shift — checking out closes it
+            var today = await Json(response);
+            Assert.StartsWith(yesterday.ToString("yyyy-MM-dd"), today.GetProperty("logDate").GetString());
+            var r = await _priya.PutAsJsonAsync("/api/DailyLog/checkout", new CheckOutDto { Latitude = 0, Longitude = 0 });
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            var log = InScope(sp => sp.GetRequiredService<AppDbContext>().DailyLogs.AsNoTracking().Single());
+            Assert.NotNull(log.CheckOutTime);
+            Assert.InRange(log.TotalWorkMinutes, 299, 301);
+        }
+        else
+        {
+            // later in the morning it was a forgotten check-out: closed by the app, today starts fresh
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            var log = InScope(sp => sp.GetRequiredService<AppDbContext>().DailyLogs.AsNoTracking().Single());
+            Assert.True(log.AutoCheckedOut);
+            Assert.NotNull(log.CheckOutTime);
+        }
+    }
 
-        var log = InScope(sp => sp.GetRequiredService<AppDbContext>().DailyLogs.AsNoTracking().Single());
-        Assert.NotNull(log.CheckOutTime);
-        Assert.InRange(log.TotalWorkMinutes, 299, 301);
+    [Theory]
+    [InlineData(0, 30, true)]
+    [InlineData(4, 59, true)]
+    [InlineData(5, 0, false)]
+    [InlineData(9, 0, false)]
+    public void A_night_shift_may_run_until_5_am_the_next_morning(int hour, int minute, bool stillRunning)
+    {
+        var now = new DateTime(2026, 9, 30, hour, minute, 0);
+        Assert.Equal(stillRunning, DailyLogQueries.YesterdaysShiftMayRun(now));
+        // yesterday's shift can be closed only once it can't be running any more
+        Assert.Equal(stillRunning ? new DateTime(2026, 9, 28) : new DateTime(2026, 9, 29), DailyLogQueries.LastClosableDay(now));
     }
 
     [Fact]

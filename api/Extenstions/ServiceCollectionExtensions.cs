@@ -46,6 +46,7 @@ namespace DailyTrackerAPI.Extensions
 
             // ── Attendance & Work Tracking ────────────────────────────────────
             services.AddScoped<IDailyLogService, DailyLogService>();
+            services.AddScoped<IAutoCheckoutService, AutoCheckoutService>();   // forgotten check-outs
             services.AddScoped<IBreakService, BreakService>();
             services.AddScoped<IPresenceService, PresenceService>();
             services.AddScoped<IWFHRequestService, WFHRequestService>();
