@@ -10,13 +10,13 @@ namespace DailyTrackerAPI.Services.Team
 {
     public interface IManagerService
     {
-        Task<ManagerTeamDailyDto> GetTeamDailyActivityAsync(DateTime date);
+        Task<ManagerTeamDailyDto> GetTeamDailyActivityAsync(DateTime date, HashSet<int>? onlyUserIds = null);
         Task<UserAttendanceSummaryDto> GetUserMonthlyAttendanceAsync(int userId, int month, int year);
-        Task<TeamMonthlyStatsDto> GetTeamMonthlyStatsAsync(int month, int year);
+        Task<TeamMonthlyStatsDto> GetTeamMonthlyStatsAsync(int month, int year, HashSet<int>? onlyUserIds = null);
         Task<UserFullReportDto> GetUserFullReportAsync(int userId, DateTime from, DateTime to);
         Task<List<AttendanceDayDto>> GetUserAttendanceCalendarAsync(int userId, int month, int year);
         Task<object> ToggleUserStatusAsync(int userId);
-        Task<List<UserDto>> GetAllUsersForManagerAsync();
+        Task<List<UserDto>> GetAllUsersForManagerAsync(HashSet<int>? onlyUserIds = null);
     }
 
     public class ManagerService : IManagerService
@@ -30,10 +30,10 @@ namespace DailyTrackerAPI.Services.Team
 
         // ─── Team Daily Activity ──────────────────────────────────────────────
 
-        public async Task<ManagerTeamDailyDto> GetTeamDailyActivityAsync(DateTime date)
+        public async Task<ManagerTeamDailyDto> GetTeamDailyActivityAsync(DateTime date, HashSet<int>? onlyUserIds = null)
         {
             var targetDate = date.Date;
-            var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await TeamMembers(onlyUserIds).ToListAsync();
 
             var logs = await _db.DailyLogs
                 .Include(d => d.BreakLogs)
@@ -117,9 +117,9 @@ namespace DailyTrackerAPI.Services.Team
 
         // ─── Team Monthly Stats ───────────────────────────────────────────────
 
-        public async Task<TeamMonthlyStatsDto> GetTeamMonthlyStatsAsync(int month, int year)
+        public async Task<TeamMonthlyStatsDto> GetTeamMonthlyStatsAsync(int month, int year, HashSet<int>? onlyUserIds = null)
         {
-            var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await TeamMembers(onlyUserIds).ToListAsync();
             var summaries = new List<UserAttendanceSummaryDto>();
 
             foreach (var user in users)
@@ -294,9 +294,10 @@ namespace DailyTrackerAPI.Services.Team
             };
         }
 
-        public async Task<List<UserDto>> GetAllUsersForManagerAsync()
+        public async Task<List<UserDto>> GetAllUsersForManagerAsync(HashSet<int>? onlyUserIds = null)
         {
             return await _db.Users
+                .Where(u => onlyUserIds == null || onlyUserIds.Contains(u.Id))
                 .Select(u => new UserDto
                 {
                     Id = u.Id,
@@ -310,6 +311,11 @@ namespace DailyTrackerAPI.Services.Team
         }
 
         // ─── Helpers ──────────────────────────────────────────────────────────
+
+        /// <summary>Active, approved people (not "Pending"); a Team Lead's list is limited to their reports</summary>
+        private IQueryable<Models.Auth.User> TeamMembers(HashSet<int>? onlyUserIds) =>
+            _db.Users.Where(u => u.IsActive && u.Role != "Pending"
+                && (onlyUserIds == null || onlyUserIds.Contains(u.Id)));
 
         private static UserDailyActivityDto BuildUserDailyActivity(User user, DailyLog? log)
         {

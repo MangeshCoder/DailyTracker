@@ -3,6 +3,7 @@ using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Services.Communication;
+using DailyTrackerAPI.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.HR
@@ -12,8 +13,8 @@ namespace DailyTrackerAPI.Services.HR
     {
         Task<DocumentDto> UploadAsync(int uploaderId, string uploaderRole, UploadDocumentDto dto, IFormFile file);
         Task<List<DocumentDto>> GetMyDocumentsAsync(int userId);
-        Task<List<DocumentDto>> GetAllDocumentsAsync();
-        Task<List<DocumentDto>> GetDocumentsForUserAsync(int targetUserId);
+        Task<List<DocumentDto>> GetAllDocumentsAsync(int requesterId);
+        Task<List<DocumentDto>> GetDocumentsForUserAsync(int targetUserId, int requesterId);
         Task<DocumentDto?> GetDocumentAsync(int documentId, int requesterId, string requesterRole);
         Task<DocumentDto?> UpdateAsync(int documentId, int requesterId, string requesterRole, UpdateDocumentDto dto);
         Task<bool> DeleteAsync(int documentId, int requesterId, string requesterRole);
@@ -27,6 +28,7 @@ namespace DailyTrackerAPI.Services.HR
         private readonly AppDbContext _db;
         private readonly IFileStorage _files;
         private readonly IAppNotificationService _notif;
+        private readonly ITeamScope _scope;
 
         private const string UploadSubdir = "uploads/documents";
 
@@ -49,11 +51,13 @@ namespace DailyTrackerAPI.Services.HR
         public DocumentService(
             AppDbContext db,
             IFileStorage files,
-            IAppNotificationService notif)
+            IAppNotificationService notif,
+            ITeamScope scope)
         {
             _db = db;
             _files = files;
             _notif = notif;
+            _scope = scope;
         }
 
         // ── Upload ────────────────────────────────────────────────────────────
@@ -74,10 +78,10 @@ namespace DailyTrackerAPI.Services.HR
                     "File type not allowed. Accepted: PDF, Word, Excel, Images, Text.");
 
             // Determine owner
-            var isManager = uploaderRole == "Manager" || uploaderRole == "TeamLead";
-            var ownerUserId = (dto.OwnerUserId > 0 && isManager)
-                ? dto.OwnerUserId
-                : uploaderId;
+            // Uploading for someone else: only for people you manage
+            var ownerUserId = dto.OwnerUserId > 0 ? dto.OwnerUserId : uploaderId;
+            if (ownerUserId != uploaderId)
+                await _scope.EnsureCanManageAsync(uploaderId, ownerUserId);
 
             // Save the file (uploads/documents/{folder}/{random name})
             var ext = Path.GetExtension(file.FileName);
@@ -134,11 +138,13 @@ namespace DailyTrackerAPI.Services.HR
         }
 
         // ── All Documents (Manager/TeamLead) ──────────────────────────────────
-        public async Task<List<DocumentDto>> GetAllDocumentsAsync()
+        public async Task<List<DocumentDto>> GetAllDocumentsAsync(int requesterId)
         {
+            var team = await _scope.ManagedUserIdsAsync(requesterId);   // null = everyone
             var docs = await _db.Documents
                 .Include(d => d.OwnerUser)
                 .Include(d => d.UploadedBy)
+                .Where(d => team == null || team.Contains(d.OwnerUserId) || d.OwnerUserId == requesterId || d.IsPublic)
                 .OrderByDescending(d => d.UploadedAt)
                 .ToListAsync();
 
@@ -146,8 +152,9 @@ namespace DailyTrackerAPI.Services.HR
         }
 
         // ── Documents for a specific employee (Manager view) ─────────────────
-        public async Task<List<DocumentDto>> GetDocumentsForUserAsync(int targetUserId)
+        public async Task<List<DocumentDto>> GetDocumentsForUserAsync(int targetUserId, int requesterId)
         {
+            if (targetUserId != requesterId) await _scope.EnsureCanManageAsync(requesterId, targetUserId);
             var docs = await _db.Documents
                 .Include(d => d.OwnerUser)
                 .Include(d => d.UploadedBy)
@@ -168,7 +175,7 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(d => d.Id == documentId);
 
             if (doc == null) return null;
-            if (!CanAccess(doc, requesterId, requesterRole)) return null;
+            if (!await CanAccessAsync(doc, requesterId)) return null;
 
             return await MapAsync(doc);
         }
@@ -183,7 +190,7 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(d => d.Id == documentId);
 
             if (doc == null) return null;
-            if (!CanManage(doc, requesterId, requesterRole)) return null;
+            if (!await CanManageAsync(doc, requesterId)) return null;
 
             if (dto.Title != null) doc.Title = dto.Title.Trim();
             if (dto.Description != null) doc.Description = dto.Description.Trim();
@@ -203,7 +210,7 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(d => d.Id == documentId);
 
             if (doc == null) return false;
-            if (!CanManage(doc, requesterId, requesterRole)) return false;
+            if (!await CanManageAsync(doc, requesterId)) return false;
 
             // Delete the stored file (and its now-empty folder)
             try { await _files.DeleteAsync(doc.FilePath); }
@@ -217,12 +224,10 @@ namespace DailyTrackerAPI.Services.HR
         // ── Summary stats ─────────────────────────────────────────────────────
         public async Task<DocumentSummaryDto> GetSummaryAsync(int userId, string role)
         {
-            var isManager = role == "Manager" || role == "TeamLead";
             var now = DateTime.UtcNow;
-
-            var query = isManager
-                ? _db.Documents
-                : _db.Documents.Where(d => d.OwnerUserId == userId || d.IsPublic);
+            var team = await _scope.ManagedUserIdsAsync(userId);   // null = everyone
+            var query = _db.Documents.Where(d =>
+                d.OwnerUserId == userId || d.IsPublic || team == null || team.Contains(d.OwnerUserId));
 
             var docs = await query.ToListAsync();
 
@@ -249,7 +254,7 @@ namespace DailyTrackerAPI.Services.HR
         {
             var doc = await _db.Documents.FindAsync(documentId);
             if (doc == null) return null;
-            if (!CanAccess(doc, requesterId, requesterRole)) return null;
+            if (!await CanAccessAsync(doc, requesterId)) return null;
 
             return (doc.FilePath, doc.MimeType, doc.FileName);
         }
@@ -257,19 +262,13 @@ namespace DailyTrackerAPI.Services.HR
         // ─── Access helpers ───────────────────────────────────────────────────
 
         /// <summary>Can this user read/download this document?</summary>
-        private static bool CanAccess(Document doc, int userId, string role)
-        {
-            if (role == "Manager" || role == "TeamLead") return true;
-            if (doc.IsPublic) return true;
-            return doc.OwnerUserId == userId;
-        }
+        private async Task<bool> CanAccessAsync(Document doc, int userId) =>
+            doc.IsPublic || doc.OwnerUserId == userId || await _scope.CanManageAsync(userId, doc.OwnerUserId);
 
         /// <summary>Can this user edit/delete this document?</summary>
-        private static bool CanManage(Document doc, int userId, string role)
-        {
-            if (role == "Manager" || role == "TeamLead") return true;
-            return doc.OwnerUserId == userId && doc.UploadedByUserId == userId;
-        }
+        private async Task<bool> CanManageAsync(Document doc, int userId) =>
+            (doc.OwnerUserId == userId && doc.UploadedByUserId == userId)
+            || (doc.OwnerUserId != userId && await _scope.CanManageAsync(userId, doc.OwnerUserId));
 
         // ─── Mapping helpers ──────────────────────────────────────────────────
         private static Task<DocumentDto> MapAsync(Document d)

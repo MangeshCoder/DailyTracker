@@ -69,7 +69,9 @@ api.interceptors.response.use(
 
       } catch (refreshError) {
         processQueue(refreshError);
-        window.location.href = "/login";
+        // not signed in any more → login page (unless we're already on a public page)
+        const publicPage = /^\/(login|register|forgot-password|email-action|wfh-email-action)/.test(window.location.pathname);
+        if (!publicPage) window.location.href = "/login";
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -47,6 +47,8 @@ export function FaceSetupPage() {
   const [progress, setProgress]   = useState(0);   // 0-5 samples captured
   const [errorMsg, setErrorMsg]   = useState('');
   const [targetName, setTargetName] = useState('');
+  // Your own face, once registered, can only be replaced by your manager / team lead
+  const [lockedOwnFace, setLockedOwnFace] = useState(false);
 
   // Determine who we're registering (ignore a non-numeric :userId)
   const parsedId     = userId ? parseInt(userId, 10) : NaN;
@@ -62,6 +64,10 @@ export function FaceSetupPage() {
         .catch(() => setTargetName('Employee'));
     } else {
       setTargetName(user?.fullName ?? 'Your face');
+      if (user?.role !== 'Manager')
+        api.get('/face/descriptor')
+          .then(r => setLockedOwnFace(!!r.data.faceRegistered))
+          .catch(() => setLockedOwnFace(false));
     }
   }, [validUserId, user, isSelf]);
 
@@ -232,6 +238,13 @@ export function FaceSetupPage() {
                 })}
               </div>
 
+              {lockedOwnFace && (
+                <p className="p-3.5 rounded-2xl text-sm bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300">
+                  Your face is already registered. To change it, ask your manager or team lead to update it
+                  from <strong>Manager → Face Setup</strong>.
+                </p>
+              )}
+
               <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
                 <button
                   onClick={() => navigate(-1)}
@@ -241,7 +254,8 @@ export function FaceSetupPage() {
                 </button>
                 <button
                   onClick={handleStartCamera}
-                  className="sm:flex-[2] inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition"
+                  disabled={lockedOwnFace}
+                  className="sm:flex-[2] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 transition"
                 >
                   <Camera className="w-4 h-4" /> Open Camera
                 </button>

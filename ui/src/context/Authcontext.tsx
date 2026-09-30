@@ -5,13 +5,15 @@
 //  forcing a full re-login).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../services/api';
 
 interface AuthContextType {
   user:            User | null;
   isAuthenticated: boolean;
+  /** false while the saved session is being restored after a page reload */
+  ready:           boolean;
   login:           (user: User) => void;
   updateUser:      (patch: Partial<User>) => void;   // ← NEW: partial update
   logout:          () => void;
@@ -21,6 +23,18 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // After a reload / new tab: the login cookie is still there, so ask who we are
+  // (the API refreshes an expired access token by itself). No cookie → login page.
+  useEffect(() => {
+    let cancelled = false;
+    authApi.me()
+      .then(me => { if (!cancelled && me) setUser(prev => prev ?? me); })
+      .catch(() => { /* not signed in */ })
+      .finally(() => { if (!cancelled) setReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   const login = useCallback((userData: User) => {
     setUser(userData);
@@ -38,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, updateUser, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, ready, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

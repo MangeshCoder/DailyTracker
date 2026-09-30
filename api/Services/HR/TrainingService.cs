@@ -2,6 +2,7 @@
 using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
+using DailyTrackerAPI.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.HR
@@ -11,7 +12,7 @@ namespace DailyTrackerAPI.Services.HR
     {
         // ── Training CRUD ────────────────────────────────────────────────────
         Task<List<TrainingDto>> GetMyTrainingsAsync(int userId);
-        Task<List<TrainingDto>> GetAllTrainingsAsync();
+        Task<List<TrainingDto>> GetAllTrainingsAsync(HashSet<int>? team);
         Task<List<TrainingDto>> GetTrainingsForUserAsync(int targetUserId);
         Task<TrainingDto> CreateTrainingAsync(int userId, CreateTrainingDto dto);
         Task<TrainingDto?> UpdateTrainingAsync(int id, int userId, string role, UpdateTrainingDto dto);
@@ -19,16 +20,16 @@ namespace DailyTrackerAPI.Services.HR
 
         // ── Certification CRUD ───────────────────────────────────────────────
         Task<List<CertificationDto>> GetMyCertificationsAsync(int userId);
-        Task<List<CertificationDto>> GetAllCertificationsAsync();
+        Task<List<CertificationDto>> GetAllCertificationsAsync(HashSet<int>? team);
         Task<List<CertificationDto>> GetCertificationsForUserAsync(int targetUserId);
-        Task<List<CertificationDto>> GetExpiringCertificationsAsync();
+        Task<List<CertificationDto>> GetExpiringCertificationsAsync(HashSet<int>? team);
         Task<CertificationDto> CreateCertificationAsync(int userId, CreateCertificationDto dto, IFormFile? file);
         Task<CertificationDto?> UpdateCertificationAsync(int id, int userId, string role, UpdateCertificationDto dto);
         Task<bool> DeleteCertificationAsync(int id, int userId, string role);
 
         // ── Stats ────────────────────────────────────────────────────────────
         Task<TrainingStatsDto> GetMyStatsAsync(int userId);
-        Task<TeamTrainingStatsDto> GetTeamStatsAsync();
+        Task<TeamTrainingStatsDto> GetTeamStatsAsync(HashSet<int>? team);
 
         // ── File ─────────────────────────────────────────────────────────────
         Task<(string Key, string MimeType, string FileName)?> GetCertFileInfoAsync(int certId, int requesterId, string role);
@@ -39,6 +40,7 @@ namespace DailyTrackerAPI.Services.HR
     {
         private readonly AppDbContext _db;
         private readonly IFileStorage _files;
+        private readonly ITeamScope _scope;
 
         private const string UploadSubdir = "uploads/certifications";
 
@@ -54,8 +56,9 @@ namespace DailyTrackerAPI.Services.HR
 
         private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
 
-        public TrainingService(AppDbContext db, IFileStorage files)
+        public TrainingService(AppDbContext db, IFileStorage files, ITeamScope scope)
         {
+            _scope = scope;
             _db = db;
             _files = files;
         }
@@ -74,10 +77,11 @@ namespace DailyTrackerAPI.Services.HR
             return list.Select(MapTraining).ToList();
         }
 
-        public async Task<List<TrainingDto>> GetAllTrainingsAsync()
+        public async Task<List<TrainingDto>> GetAllTrainingsAsync(HashSet<int>? team)
         {
             var list = await _db.Trainings
                 .Include(t => t.User)
+                .Where(t => team == null || team.Contains(t.UserId))
                 .OrderByDescending(t => t.StartDate)
                 .ToListAsync();
             return list.Select(MapTraining).ToList();
@@ -93,8 +97,23 @@ namespace DailyTrackerAPI.Services.HR
             return list.Select(MapTraining).ToList();
         }
 
+        private static readonly string[] TrainingStatuses = { "Planned", "InProgress", "Completed", "Cancelled" };
+
+        private static void CheckTraining(string? title, DateTime? start, DateTime? end, decimal? hours, string? status)
+        {
+            if (title != null && string.IsNullOrWhiteSpace(title))
+                throw new InvalidOperationException("Please enter the training title.");
+            if (start.HasValue && end.HasValue && end.Value.Date < start.Value.Date)
+                throw new InvalidOperationException("The end date can't be before the start date.");
+            if (hours is < 0 or > 10000)
+                throw new InvalidOperationException("Duration must be between 0 and 10,000 hours.");
+            if (status != null && !TrainingStatuses.Contains(status))
+                throw new InvalidOperationException("Status must be Planned, InProgress, Completed or Cancelled.");
+        }
+
         public async Task<TrainingDto> CreateTrainingAsync(int userId, CreateTrainingDto dto)
         {
+            CheckTraining(dto.Title ?? "", dto.StartDate, dto.EndDate, dto.DurationHours, dto.Status);
             var t = new Training
             {
                 UserId = userId,
@@ -127,7 +146,8 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (t == null) return null;
-            if (!CanManage(t.UserId, userId, role)) return null;
+            if (!await CanManageAsync(t.UserId, userId)) return null;
+            CheckTraining(dto.Title, dto.StartDate ?? t.StartDate, dto.EndDate ?? t.EndDate, dto.DurationHours, dto.Status);
 
             if (dto.Title != null) t.Title = dto.Title.Trim();
             if (dto.Provider != null) t.Provider = dto.Provider.Trim();
@@ -149,7 +169,7 @@ namespace DailyTrackerAPI.Services.HR
         {
             var t = await _db.Trainings.FindAsync(id);
             if (t == null) return false;
-            if (!CanManage(t.UserId, userId, role)) return false;
+            if (!await CanManageAsync(t.UserId, userId)) return false;
 
             _db.Trainings.Remove(t);
             await _db.SaveChangesAsync();
@@ -170,10 +190,11 @@ namespace DailyTrackerAPI.Services.HR
             return list.Select(MapCert).ToList();
         }
 
-        public async Task<List<CertificationDto>> GetAllCertificationsAsync()
+        public async Task<List<CertificationDto>> GetAllCertificationsAsync(HashSet<int>? team)
         {
             var list = await _db.Certifications
                 .Include(c => c.User)
+                .Where(c => team == null || team.Contains(c.UserId))
                 .OrderByDescending(c => c.IssueDate)
                 .ToListAsync();
             return list.Select(MapCert).ToList();
@@ -189,12 +210,12 @@ namespace DailyTrackerAPI.Services.HR
             return list.Select(MapCert).ToList();
         }
 
-        public async Task<List<CertificationDto>> GetExpiringCertificationsAsync()
+        public async Task<List<CertificationDto>> GetExpiringCertificationsAsync(HashSet<int>? team)
         {
             var cutoff = DateTime.UtcNow.AddDays(30);
             var list = await _db.Certifications
                 .Include(c => c.User)
-                .Where(c =>
+                .Where(c => (team == null || team.Contains(c.UserId)) &&
                     c.ExpiryDate.HasValue &&
                     c.ExpiryDate > DateTime.UtcNow &&
                     c.ExpiryDate <= cutoff &&
@@ -207,6 +228,8 @@ namespace DailyTrackerAPI.Services.HR
         public async Task<CertificationDto> CreateCertificationAsync(
             int userId, CreateCertificationDto dto, IFormFile? file)
         {
+            if (dto.ExpiryDate.HasValue && dto.ExpiryDate.Value.Date < dto.IssueDate.Date)
+                throw new InvalidOperationException("The expiry date can't be before the issue date.");
             // Validate and save file if provided
             string? fileName = null;
             string? filePath = null;
@@ -271,7 +294,7 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(x => x.Id == id);
 
             if (c == null) return null;
-            if (!CanManage(c.UserId, userId, role)) return null;
+            if (!await CanManageAsync(c.UserId, userId)) return null;
 
             if (dto.Name != null) c.Name = dto.Name.Trim();
             if (dto.IssuingOrganization != null) c.IssuingOrganization = dto.IssuingOrganization.Trim();
@@ -290,7 +313,7 @@ namespace DailyTrackerAPI.Services.HR
         {
             var c = await _db.Certifications.FindAsync(id);
             if (c == null) return false;
-            if (!CanManage(c.UserId, userId, role)) return false;
+            if (!await CanManageAsync(c.UserId, userId)) return false;
 
             // Delete the stored file (and its now-empty folder)
             if (!string.IsNullOrEmpty(c.FilePath))
@@ -332,9 +355,11 @@ namespace DailyTrackerAPI.Services.HR
             };
         }
 
-        public async Task<TeamTrainingStatsDto> GetTeamStatsAsync()
+        public async Task<TeamTrainingStatsDto> GetTeamStatsAsync(HashSet<int>? team)
         {
-            var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await _db.Users
+                .Where(u => u.IsActive && u.Role != "Pending" && (team == null || team.Contains(u.Id)))
+                .ToListAsync();
             var trainings = await _db.Trainings.Include(t => t.User).ToListAsync();
             var certs = await _db.Certifications.ToListAsync();
             var now = DateTime.UtcNow;
@@ -378,18 +403,16 @@ namespace DailyTrackerAPI.Services.HR
         {
             var cert = await _db.Certifications.FindAsync(certId);
             if (cert == null || string.IsNullOrEmpty(cert.FilePath)) return null;
-            if (!CanAccess(cert.UserId, requesterId, role)) return null;
+            if (!await CanManageAsync(cert.UserId, requesterId)) return null;
 
             return (cert.FilePath, cert.MimeType ?? "application/octet-stream", cert.FileName ?? "certificate");
         }
 
         // ─── Helpers ──────────────────────────────────────────────────────────
 
-        private static bool CanManage(int ownerId, int userId, string role) =>
-            role == "Manager" || role == "TeamLead" || ownerId == userId;
-
-        private static bool CanAccess(int ownerId, int userId, string role) =>
-            role == "Manager" || role == "TeamLead" || ownerId == userId;
+        /// <summary>The owner, their Manager, or their own Team Lead</summary>
+        private async Task<bool> CanManageAsync(int ownerId, int userId) =>
+            ownerId == userId || await _scope.CanManageAsync(userId, ownerId);
 
         private static TrainingDto MapTraining(Training t) => new()
         {

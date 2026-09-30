@@ -23,6 +23,7 @@ import type {
   ManagerUserDto,
 } from '../types';
 import { SupportMediaDisplay } from '../components/SupportMediaDisplay';
+import { useAuth } from '../context/Authcontext';
 import { useConfirm } from '../hooks/useConfirm';
 import { DatePicker } from '../components/DatePicker';
 import { useNavigate } from 'react-router-dom';
@@ -411,6 +412,7 @@ export const ManagerDashboardPage = () => {
   const [loadingUsers, setLoadingUsers]     = useState(false);
   const [userSearch, setUserSearch]         = useState('');
   const { alert } = useConfirm();
+  const { user } = useAuth();
 
   const loadDaily = async () => {
     setLoading(true);
@@ -480,7 +482,8 @@ export const ManagerDashboardPage = () => {
     { key: 'daily',      label: 'Daily Activity',  icon: ClipboardList },
     { key: 'monthly',    label: 'Monthly Stats',   icon: BarChart3 },
     { key: 'attendance', label: 'Attendance',      icon: CalendarDays },
-    { key: 'User',       label: 'User Management', icon: UserCog },
+    // activating / deactivating people: Managers only
+    ...(user?.role === 'Manager' ? [{ key: 'User' as Tab, label: 'User Management', icon: UserCog }] : []),
   ];
 
   return (

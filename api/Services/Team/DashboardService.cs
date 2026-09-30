@@ -11,7 +11,7 @@ namespace DailyTrackerAPI.Services.Team
     {
         Task<DashboardSummaryDto> GetTodaySummaryAsync(int userId);
         Task<WeeklyReportDto> GetWeeklyReportAsync(int userId);
-        Task<List<TeamMemberActivityDto>> GetTeamActivityAsync();
+        Task<List<TeamMemberActivityDto>> GetTeamActivityAsync(HashSet<int>? onlyUserIds = null);
     }
 
     public class DashboardService : IDashboardService
@@ -60,10 +60,12 @@ namespace DailyTrackerAPI.Services.Team
             };
         }
 
-        public async Task<List<TeamMemberActivityDto>> GetTeamActivityAsync()
+        public async Task<List<TeamMemberActivityDto>> GetTeamActivityAsync(HashSet<int>? onlyUserIds = null)
         {
             var today = AppClock.TodayIst;
-            var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await _db.Users
+                .Where(u => u.IsActive && u.Role != "Pending" && (onlyUserIds == null || onlyUserIds.Contains(u.Id)))
+                .ToListAsync();
             var todayLogs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.LogDate == today)

@@ -174,6 +174,23 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ─── Accounts waiting for approval ────────────────────────────────────────────
+// A newly registered person is "Pending" until a manager assigns a role; until
+// then they can only see who they are, edit their profile and sign out.
+string[] pendingAllowed = { "/api/auth/me", "/api/auth/logout", "/api/auth/refresh", "/api/auth/revoke", "/api/profile/me" };
+app.Use(async (context, next) =>
+{
+    if (context.User.IsInRole("Pending")
+        && (context.Request.Path.StartsWithSegments("/api") || context.Request.Path.StartsWithSegments("/hubs"))
+        && !pendingAllowed.Any(p => context.Request.Path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase)))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { message = "Your account is waiting for a manager's approval." });
+        return;
+    }
+    await next();
+});
 app.UseRateLimiter();
 app.MapControllers();
 

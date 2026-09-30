@@ -144,7 +144,7 @@ namespace DailyTrackerAPI.Controllers
         [HttpGet("assignments"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetAllAssignments()
         {
-            var result = await _assignmentService.GetAllAsync();
+            var result = await _assignmentService.GetAllAsync(User.GetUserId());
             return Ok(result);
         }
 

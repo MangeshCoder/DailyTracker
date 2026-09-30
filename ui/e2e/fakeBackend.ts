@@ -47,6 +47,7 @@ export class FakeBackend {
 
   /** Who logs in (tests can switch the role) */
   me = { ...ME };
+  signedIn = false;
   /** Extra answers for a test: return undefined to fall through to the defaults */
   answer?: (path: string, method: string) => unknown;
 
@@ -109,7 +110,10 @@ export class FakeBackend {
 
     if (url.pathname.endsWith('/negotiate'))
       return json({ connectionId: 'c', connectionToken: 'c', negotiateVersion: 1, availableTransports: [{ transport: 'WebSockets', transferFormats: ['Text', 'Binary'] }] });
-    if (path === '/auth/login') return json({ requiresTwoFactor: false, accessToken: 'test', user: this.me });
+    if (path === '/auth/login') { this.signedIn = true; return json({ requiresTwoFactor: false, accessToken: 'test', user: this.me }); }
+    // session restore after a reload: "who am I?" — only once signed in
+    if (path === '/auth/me') return this.signedIn ? json(this.me) : json({ message: 'Not signed in' }, 401);
+    if (path === '/auth/refresh') return this.signedIn ? json({}) : json({ message: 'Not signed in' }, 401);
     const extra = this.answer?.(path, req.method());
     if (extra !== undefined) return json(extra);
     if (path === '/chat/conversations') return json(this.conversations);

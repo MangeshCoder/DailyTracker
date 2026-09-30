@@ -78,7 +78,7 @@ namespace DailyTrackerAPI.Controllers.HR
         [HttpGet("all"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetAll()
         {
-            var docs = await _svc.GetAllDocumentsAsync();
+            var docs = await _svc.GetAllDocumentsAsync(User.GetUserId());
             return Ok(docs);
         }
 
@@ -86,7 +86,7 @@ namespace DailyTrackerAPI.Controllers.HR
         [HttpGet("user/{userId:int}"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetForUser(int userId)
         {
-            var docs = await _svc.GetDocumentsForUserAsync(userId);
+            var docs = await _svc.GetDocumentsForUserAsync(userId, User.GetUserId());
             return Ok(docs);
         }
 

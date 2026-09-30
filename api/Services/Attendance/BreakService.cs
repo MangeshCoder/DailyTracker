@@ -20,6 +20,8 @@ namespace DailyTrackerAPI.Services.Attendance
         private readonly AppDbContext _db;
         public BreakService(AppDbContext db) { _db = db; }
 
+        private static readonly string[] BreakTypes = { "Tea", "Lunch", "Other" };
+
         public async Task<BreakLogDto?> StartBreakAsync(int userId, StartBreakDto dto)
         {
             var log = await _db.DailyLogs
@@ -27,6 +29,11 @@ namespace DailyTrackerAPI.Services.Attendance
                 .CurrentForAsync(userId);
 
             if (log == null || log.CheckInTime == null) return null;
+            if (log.CheckOutTime != null)
+                throw new Custom.ValidationException("You've already checked out for today.");
+            var breakType = BreakTypes.FirstOrDefault(t => t.Equals(dto.BreakType?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new Custom.ValidationException("Break type must be Tea, Lunch or Other.");
+            dto.BreakType = breakType;
 
             // End any existing active break first
             var activeBreak = log.BreakLogs.FirstOrDefault(b => b.IsActive);
@@ -58,6 +65,7 @@ namespace DailyTrackerAPI.Services.Attendance
 
             var breakLog = await _db.BreakLogs.FirstOrDefaultAsync(b => b.Id == breakId && b.DailyLogId == log.Id);
             if (breakLog == null) return null;
+            if (!breakLog.IsActive) return MapBreakDto(breakLog);   // already ended — keep its real end time
 
             breakLog.EndTime = DateTime.UtcNow;
             breakLog.DurationMinutes = (int)(DateTime.UtcNow - breakLog.StartTime).TotalMinutes;

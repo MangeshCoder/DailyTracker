@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.DTOs;
+using DailyTrackerAPI.Services.Auth;
 using DailyTrackerAPI.Services.Team;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -26,9 +27,11 @@ namespace DailyTrackerAPI.Controllers.Team
     {
         private readonly IManagerService _managerService;
         private readonly IReportService _reportService;
+        private readonly ITeamScope _scope;
 
-        public ManagerController(IManagerService managerService, IReportService reportService)
+        public ManagerController(IManagerService managerService, IReportService reportService, ITeamScope scope)
         {
+            _scope = scope;
             _managerService = managerService;
             _reportService = reportService;
         }
@@ -37,8 +40,8 @@ namespace DailyTrackerAPI.Controllers.Team
         [HttpGet("team/daily")]
         public async Task<IActionResult> GetTeamDaily([FromQuery] DateTime? date)
         {
-            var targetDate = date ?? DateTime.UtcNow;
-            var result = await _managerService.GetTeamDailyActivityAsync(targetDate);
+            var targetDate = date ?? AppClock.TodayIst;
+            var result = await _managerService.GetTeamDailyActivityAsync(targetDate, await MyTeamAsync());
             return Ok(result);
         }
 
@@ -51,7 +54,7 @@ namespace DailyTrackerAPI.Controllers.Team
             if (month == 0) month = AppClock.TodayIst.Month;
             if (year == 0) year = AppClock.TodayIst.Year;
 
-            var result = await _managerService.GetTeamMonthlyStatsAsync(month, year);
+            var result = await _managerService.GetTeamMonthlyStatsAsync(month, year, await MyTeamAsync());
             return Ok(result);
         }
 
@@ -62,6 +65,7 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
             if (month == 0) month = AppClock.TodayIst.Month;
             if (year == 0) year = AppClock.TodayIst.Year;
 
@@ -83,6 +87,7 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
             if (month == 0) month = AppClock.TodayIst.Month;
             if (year == 0) year = AppClock.TodayIst.Year;
 
@@ -97,6 +102,7 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] DateTime? from,
             [FromQuery] DateTime? to)
         {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
             var fromDate = from ?? DateTime.UtcNow.AddDays(-30);
             var toDate = to ?? DateTime.UtcNow;
 
@@ -119,6 +125,7 @@ namespace DailyTrackerAPI.Controllers.Team
             [FromQuery] DateTime? from = null,
             [FromQuery] DateTime? to = null)
         {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
             var fromDate = from ?? DateTime.UtcNow.AddDays(-30);
             var toDate = to ?? DateTime.UtcNow;
 
@@ -134,9 +141,10 @@ namespace DailyTrackerAPI.Controllers.Team
         }
 
         /// <summary>Activate or Deactivate a user</summary>
-        [HttpPut("user/{userId}/toggle-status")]
+        [HttpPut("user/{userId}/toggle-status"), Authorize(Roles = "Manager")]   // deactivating people: Managers only
         public async Task<IActionResult> ToggleUserStatus(int userId)
         {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
             try
             {
                 var result = await _managerService.ToggleUserStatusAsync(userId);
@@ -153,7 +161,7 @@ namespace DailyTrackerAPI.Controllers.Team
         {
             try
             {
-                var users = await _managerService.GetAllUsersForManagerAsync();
+                var users = await _managerService.GetAllUsersForManagerAsync(await MyTeamAsync());
                 return Ok(users);
             }
             catch (KeyNotFoundException)
@@ -181,5 +189,9 @@ namespace DailyTrackerAPI.Controllers.Team
                     $"Report_{safeName}_{period}.html");
             }
         }
+    
+        /// <summary>null = everyone (Manager); a Team Lead only sees their direct reports</summary>
+        private Task<HashSet<int>?> MyTeamAsync() => _scope.ManagedUserIdsAsync(User.GetUserId());
     }
+
 }

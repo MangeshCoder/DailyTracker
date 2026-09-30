@@ -26,9 +26,9 @@ namespace DailyTrackerAPI.Controllers.HR
     //  Endpoints:
     //    GET /api/payroll/my?month=X&year=Y          → own payslip
     //    GET /api/payroll/salary/my                  → own salary config
-    //    GET /api/payroll/team?month=X&year=Y        → full team payroll (Manager/TeamLead)
-    //    GET /api/payroll/salary/team                → all salary configs (Manager/TeamLead)
-    //    PUT /api/payroll/salary/{userId}            → set salary (Manager/TeamLead)
+    //    GET /api/payroll/team?month=X&year=Y        → full team payroll (Manager only)
+    //    GET /api/payroll/salary/team                → all salary configs (Manager only)
+    //    PUT /api/payroll/salary/{userId}            → set salary (Manager only)
     // ─────────────────────────────────────────────────────────────────────────
     [ApiController, Route("api/payroll"), Authorize]
     public class PayrollController : ControllerBase
@@ -93,7 +93,7 @@ namespace DailyTrackerAPI.Controllers.HR
         }
 
         // ── GET /api/payroll/team ─────────────────────────────────────────────
-        [HttpGet("team"), Authorize(Roles = "Manager,TeamLead")]
+        [HttpGet("team"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetTeamPayroll(
             [FromQuery] int? month, [FromQuery] int? year)
         {
@@ -132,7 +132,7 @@ namespace DailyTrackerAPI.Controllers.HR
         /// Manager report: who came in on weekends and holidays this month.
         /// GET /api/payroll/weekend-holiday-report?month=X&year=Y
         /// </summary>
-        [HttpGet("weekend-holiday-report"), Authorize(Roles = "Manager,TeamLead")]
+        [HttpGet("weekend-holiday-report"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetWeekendHolidayReport(
             [FromQuery] int? month, [FromQuery] int? year)
         {
@@ -193,7 +193,7 @@ namespace DailyTrackerAPI.Controllers.HR
         }
 
         // ── GET /api/payroll/salary/team ──────────────────────────────────────
-        [HttpGet("salary/team"), Authorize(Roles = "Manager,TeamLead")]
+        [HttpGet("salary/team"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetTeamSalaries()
         {
             var salaries = await _db.EmployeeSalaries
@@ -206,7 +206,7 @@ namespace DailyTrackerAPI.Controllers.HR
         }
 
         // ── PUT /api/payroll/salary/{userId} ──────────────────────────────────
-        [HttpPut("salary/{userId:int}"), Authorize(Roles = "Manager,TeamLead")]
+        [HttpPut("salary/{userId:int}"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> SetSalary(
             int userId, [FromBody] SetSalaryDto dto)
         {
@@ -327,12 +327,34 @@ namespace DailyTrackerAPI.Controllers.HR
                     daysPaidLeave += leaveDays;
             }
 
-            // Absent = working days not covered by any presence or leave
-            var coveredDays = daysPresent
-                            + daysHalfDay
-                            + daysPaidLeave
-                            + daysUnpaidLeave;
-            var daysAbsent = Math.Max(0, workingDays - coveredDays);
+            // Absent = working days not covered by any presence or leave — counted only
+            // from the joining date up to yesterday, and never on public holidays.
+            var holidays = (await _db.Holidays
+                .Where(h => h.Type == "Public" && h.Date >= from && h.Date <= to)
+                .Select(h => h.Date)
+                .ToListAsync()).Select(d => d.Date).ToHashSet();
+            int WorkDays(DateTime a, DateTime b) =>
+                a > b ? 0 : CountWorkingDays(a, b) - holidays.Count(h => h >= a && h <= b && h.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday);
+
+            var joined = (userObj.JoinDate ?? userObj.CreatedAt).Date;
+            var countFrom = joined > from ? joined : from;
+            var yesterday = AppClock.TodayIst.AddDays(-1);   // today isn't over yet
+            var countTo = yesterday < to ? yesterday : to;
+            var expectedDays = WorkDays(countFrom, countTo);
+
+            int coveredDays = logs.Count(l => l.LogDate.Date >= countFrom && l.LogDate.Date <= countTo
+                                              && l.DayStatus is "Present" or "WFH" or "Weekend" or "Holiday" or "HalfDay");
+            foreach (var leave in leaves)
+            {
+                var a = leave.FromDate.Date < countFrom ? countFrom : leave.FromDate.Date;
+                var b = leave.ToDate.Date > countTo ? countTo : leave.ToDate.Date;
+                coveredDays += WorkDays(a, b);
+            }
+            var daysAbsent = Math.Max(0, expectedDays - coveredDays);
+
+            // Working days of this month before the person joined aren't paid
+            var joinedAfterMonthStart = joined > from;
+            var daysBeforeJoining = joinedAfterMonthStart ? WorkDays(from, joined.AddDays(-1) < to ? joined.AddDays(-1) : to) : 0;
 
             // ── Overtime calculation ───────────────────────────────────────
             int totalOvertimeMinutes = 0;
@@ -359,7 +381,8 @@ namespace DailyTrackerAPI.Controllers.HR
             var halfDayDeduction = daysHalfDay * 0.5m * perDayRate;
             var unpaidLeaveDeduction = daysUnpaidLeave * perDayRate;
             var absentDeduction = daysAbsent * perDayRate;
-            var totalDeductions = halfDayDeduction + unpaidLeaveDeduction + absentDeduction;
+            var notJoinedDeduction = daysBeforeJoining * perDayRate;
+            var totalDeductions = halfDayDeduction + unpaidLeaveDeduction + absentDeduction + notJoinedDeduction;
 
             // ── Net Pay ───────────────────────────────────────────────────
             var netPay = grossEarnings - totalDeductions;
@@ -403,6 +426,15 @@ namespace DailyTrackerAPI.Controllers.HR
                     Label = "Unpaid Leave",
                     Amount = unpaidLeaveDeduction,
                     Note = $"{daysUnpaidLeave} day{(daysUnpaidLeave != 1 ? "s" : "")} × {cur}{perDayRate:N2}",
+                });
+            }
+            if (notJoinedDeduction > 0)
+            {
+                deductions.Add(new PayslipDeductionDto
+                {
+                    Label = "Before Joining",
+                    Amount = notJoinedDeduction,
+                    Note = $"{daysBeforeJoining} working day{(daysBeforeJoining != 1 ? "s" : "")} before {joined:dd MMM} × {cur}{perDayRate:N2}",
                 });
             }
             if (absentDeduction > 0)

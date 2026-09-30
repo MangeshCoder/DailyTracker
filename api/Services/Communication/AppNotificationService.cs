@@ -69,7 +69,9 @@ namespace DailyTrackerAPI.Services.Communication
         public async Task MarkReadAsync(int notifId, int userId)
         {
             var n = await _db.Notifications.FirstOrDefaultAsync(n => n.Id == notifId && n.UserId == userId);
-            if (n != null) { n.IsRead = true; await _db.SaveChangesAsync(); }
+            if (n == null) throw new KeyNotFoundException("Notification not found.");
+            n.IsRead = true;
+            await _db.SaveChangesAsync();
         }
 
         public async Task MarkAllReadAsync(int userId)

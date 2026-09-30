@@ -25,6 +25,7 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.HR;
 using DailyTrackerAPI.Services.Storage;
+using DailyTrackerAPI.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -37,12 +38,17 @@ namespace DailyTrackerAPI.Controllers.Tasks
         private readonly ITrainingService _svc;
 
         private readonly IFileStorage _files;
+        private readonly ITeamScope _scope;
 
-        public TrainingController(ITrainingService svc, IFileStorage files)
+        public TrainingController(ITrainingService svc, IFileStorage files, ITeamScope scope)
         {
             _svc = svc;
             _files = files;
+            _scope = scope;
         }
+
+        /// <summary>null = everyone (Manager); a Team Lead sees only their direct reports</summary>
+        private Task<HashSet<int>?> MyTeamAsync() => _scope.ManagedUserIdsAsync(User.GetUserId());
 
         private string Role => User.FindFirstValue(ClaimTypes.Role) ?? "Developer";
 
@@ -56,11 +62,14 @@ namespace DailyTrackerAPI.Controllers.Tasks
 
         [HttpGet("all"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetAllTrainings() =>
-            Ok(await _svc.GetAllTrainingsAsync());
+            Ok(await _svc.GetAllTrainingsAsync(await MyTeamAsync()));
 
         [HttpGet("user/{userId:int}"), Authorize(Roles = "Manager,TeamLead")]
-        public async Task<IActionResult> GetTrainingsForUser(int userId) =>
-            Ok(await _svc.GetTrainingsForUserAsync(userId));
+        public async Task<IActionResult> GetTrainingsForUser(int userId)
+        {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
+            return Ok(await _svc.GetTrainingsForUserAsync(userId));
+        }
 
         [HttpGet("stats")]
         public async Task<IActionResult> GetMyStats() =>
@@ -68,7 +77,7 @@ namespace DailyTrackerAPI.Controllers.Tasks
 
         [HttpGet("stats/team"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetTeamStats() =>
-            Ok(await _svc.GetTeamStatsAsync());
+            Ok(await _svc.GetTeamStatsAsync(await MyTeamAsync()));
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateTrainingDto dto)
@@ -101,15 +110,18 @@ namespace DailyTrackerAPI.Controllers.Tasks
 
         [HttpGet("certifications/all"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetAllCerts() =>
-            Ok(await _svc.GetAllCertificationsAsync());
+            Ok(await _svc.GetAllCertificationsAsync(await MyTeamAsync()));
 
         [HttpGet("certifications/user/{userId:int}"), Authorize(Roles = "Manager,TeamLead")]
-        public async Task<IActionResult> GetCertsForUser(int userId) =>
-            Ok(await _svc.GetCertificationsForUserAsync(userId));
+        public async Task<IActionResult> GetCertsForUser(int userId)
+        {
+            await _scope.EnsureCanManageAsync(User.GetUserId(), userId);
+            return Ok(await _svc.GetCertificationsForUserAsync(userId));
+        }
 
         [HttpGet("certifications/expiring"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetExpiring() =>
-            Ok(await _svc.GetExpiringCertificationsAsync());
+            Ok(await _svc.GetExpiringCertificationsAsync(await MyTeamAsync()));
 
         /// <summary>
         /// Create certification with optional file. Use multipart/form-data.

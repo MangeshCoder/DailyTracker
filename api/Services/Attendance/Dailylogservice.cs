@@ -136,6 +136,8 @@ namespace DailyTrackerAPI.Services.Attendance
                 .CurrentForAsync(userId);
 
             if (log == null || log.CheckInTime == null) return null;
+            if (log.CheckOutTime != null)
+                throw new Custom.ValidationException("You've already checked out for today.");
 
             // Skip location check for WFH, Weekend, Holiday
             var skipLocation = log.DayStatus is "WFH" or "Weekend" or "Holiday";

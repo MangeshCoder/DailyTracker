@@ -49,14 +49,16 @@ namespace DailyTrackerAPI.Controllers.Attendance
         // ── GET /api/overtime/team ────────────────────────────────────────────
         [HttpGet("team"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetTeamOvertime(
-            [FromQuery] int? month, [FromQuery] int? year)
+            [FromQuery] int? month, [FromQuery] int? year,
+            [FromServices] DailyTrackerAPI.Services.Auth.ITeamScope scope)
         {
-            var now = DateTime.UtcNow;
+            var now = AppClock.TodayIst;
             var m = month ?? now.Month;
             var y = year ?? now.Year;
+            var team = await scope.ManagedUserIdsAsync(User.GetUserId());   // null = everyone
 
             var users = await _db.Users
-                .Where(u => u.IsActive)
+                .Where(u => u.IsActive && u.Role != "Pending" && (team == null || team.Contains(u.Id)))
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 

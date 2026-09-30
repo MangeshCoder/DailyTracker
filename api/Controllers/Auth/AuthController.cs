@@ -285,7 +285,13 @@ namespace DailyTrackerAPI.Controllers.Auth
             var result = await _authSvc.RegisterAsync(registerDto,
                 HttpContext.Connection.RemoteIpAddress?.ToString());
 
-            await _emailService.SendWelcomeEmailAsync(dto.Email, dto.FullName);
+            // the account exists now — a welcome email that fails mustn't turn this into an error
+            try { await _emailService.SendWelcomeEmailAsync(dto.Email, dto.FullName); }
+            catch (Exception ex)
+            {
+                HttpContext.RequestServices.GetRequiredService<ILogger<AuthController>>()
+                    .LogWarning(ex, "Welcome email to {Email} failed (the account was created)", dto.Email);
+            }
 
             return Ok(result);
         }
@@ -413,6 +419,12 @@ namespace DailyTrackerAPI.Controllers.Auth
                 return NotFound("User not found");
 
             var currentManagerId = User.GetUserId();
+
+            if (user.Id == currentManagerId)
+                return BadRequest(new { message = "You can't change your own role — ask another manager." });
+            if (user.Role == "Manager" && dto.Role != "Manager"
+                && !await _db.Users.AnyAsync(u => u.Role == "Manager" && u.IsActive && u.Id != user.Id))
+                return BadRequest(new { message = "This is the only manager — make someone else a manager first." });
 
             if (dto.Role == "Manager")
             {

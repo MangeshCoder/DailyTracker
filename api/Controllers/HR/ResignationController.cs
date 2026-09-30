@@ -36,7 +36,7 @@ namespace DailyTrackerAPI.Controllers.HR
         public async Task<IActionResult> GetMy()
         {
             var result = await _svc.GetMyResignationAsync(User.GetUserId());
-            return result == null ? NotFound(new { message = "No active resignation found." }) : Ok(result);
+            return result == null ? NoContent() : Ok(result);   // none yet is normal, not an error
         }
 
         [HttpDelete("withdraw")]
@@ -52,21 +52,21 @@ namespace DailyTrackerAPI.Controllers.HR
         [HttpGet, Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetAll([FromQuery] string? status = null)
         {
-            var result = await _svc.GetAllAsync(status);
+            var result = await _svc.GetAllAsync(User.GetUserId(), status);
             return Ok(result);
         }
 
         [HttpGet("summary"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetSummary()
         {
-            var result = await _svc.GetSummaryAsync();
+            var result = await _svc.GetSummaryAsync(User.GetUserId());
             return Ok(result);
         }
 
         [HttpGet("{id:int}"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetById(int id)
         {
-            var result = await _svc.GetByIdAsync(id);
+            var result = await _svc.GetByIdAsync(User.GetUserId(), id);
             return result == null ? NotFound() : Ok(result);
         }
 

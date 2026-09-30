@@ -812,7 +812,7 @@ const TeamPayrollView: React.FC<{
 export const PayrollPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const isManager = user?.role === 'Manager' || user?.role === 'TeamLead';
+  const isManager = user?.role === 'Manager';   // payroll & salaries: Managers only
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);

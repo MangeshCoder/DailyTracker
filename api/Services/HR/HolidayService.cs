@@ -25,6 +25,15 @@ namespace DailyTrackerAPI.Services.HR
 
         public async Task<HolidayDto> AddAsync(CreateHolidayDto dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                throw new Custom.ValidationException("Please enter the holiday name.");
+            dto.Type = new[] { "Public", "Optional", "Company" }
+                .FirstOrDefault(t => t.Equals(dto.Type?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new Custom.ValidationException("Type must be Public, Optional or Company.");
+            var existing = await _db.Holidays.FirstOrDefaultAsync(h => h.Date == dto.Date.Date);
+            if (existing != null)
+                throw new Custom.ValidationException($"{dto.Date:dd MMM yyyy} is already a holiday ({existing.Name}).");   // was a database error (500)
+
             var holiday = new Holiday
             {
                 Date = dto.Date.Date,

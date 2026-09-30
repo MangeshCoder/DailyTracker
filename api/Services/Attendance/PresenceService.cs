@@ -24,6 +24,9 @@ namespace DailyTrackerAPI.Services.Attendance
 
         public async Task UpdateAsync(int userId, UpdatePresenceDto dto)
         {
+            dto.Status = new[] { "Online", "Busy", "InMeeting", "Away", "Offline" }
+                .FirstOrDefault(x => x.Equals(dto.Status?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new Custom.ValidationException("Status must be Online, Busy, In Meeting or Away.");
             var presence = await _db.UserPresences.FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (presence == null)

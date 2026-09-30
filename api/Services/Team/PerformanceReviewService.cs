@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Performance;
+using DailyTrackerAPI.Services.Auth;
 using DailyTrackerAPI.Services.Communication;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,9 +29,11 @@ namespace DailyTrackerAPI.Services.Team
     {
         private readonly AppDbContext _db;
         private readonly IAppNotificationService _notify;
+        private readonly ITeamScope _scope;
 
-        public PerformanceReviewService(AppDbContext db, IAppNotificationService notify)
+        public PerformanceReviewService(AppDbContext db, IAppNotificationService notify, ITeamScope scope)
         {
+            _scope = scope;
             _db = db;
             _notify = notify;
         }
@@ -39,6 +42,26 @@ namespace DailyTrackerAPI.Services.Team
 
         public async Task<ReviewCycleDto> CreateCycleAsync(int managerId, CreateReviewCycleDto dto)
         {
+            // ── Check everything before saving anything ─────────────────────
+            if (string.IsNullOrWhiteSpace(dto.Title))
+                throw new Custom.ValidationException("Please give the review cycle a title.");
+            if (dto.EndDate.Date < dto.StartDate.Date)
+                throw new Custom.ValidationException("The end date can't be before the start date.");
+            if (dto.SelfAssessmentDueDate.HasValue
+                && (dto.SelfAssessmentDueDate.Value.Date < dto.StartDate.Date || dto.SelfAssessmentDueDate.Value.Date > dto.EndDate.Date))
+                throw new Custom.ValidationException("The self-assessment due date must be within the cycle.");
+            var revieweeIds = (dto.RevieweeIds ?? new()).Distinct().Where(id => id != managerId).ToList();
+            if (revieweeIds.Count == 0)
+                throw new Custom.ValidationException("Choose at least one employee to review.");
+            var found = await _db.Users
+                .Where(u => revieweeIds.Contains(u.Id) && u.IsActive && u.Role != "Pending")
+                .Select(u => u.Id).ToListAsync();
+            if (found.Count != revieweeIds.Count)
+                throw new Custom.ValidationException("Some of the chosen employees don't exist or aren't active.");
+            foreach (var id in revieweeIds)
+                await _scope.EnsureCanManageAsync(managerId, id);
+            dto.RevieweeIds = revieweeIds;
+
             var cycle = new ReviewCycle
             {
                 Title = dto.Title.Trim(),

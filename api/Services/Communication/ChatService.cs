@@ -972,7 +972,7 @@ namespace DailyTrackerAPI.Services.Communication
         public async Task<List<UserChatProfileDto>> GetUsersForChatAsync(int currentUserId)
         {
             var users = await _db.Users
-                .Where(u => u.Id != currentUserId && u.IsActive)
+                .Where(u => u.Id != currentUserId && u.IsActive && u.Role != "Pending")
                 .OrderBy(u => u.FullName)
                 .AsNoTracking()
                 .ToListAsync();

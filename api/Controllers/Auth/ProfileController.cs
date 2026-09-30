@@ -50,10 +50,11 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (!string.IsNullOrWhiteSpace(dto.FullName))
                 user.FullName = dto.FullName.Trim();
 
-            user.Phone = dto.Phone?.Trim();
-            user.Bio = dto.Bio?.Trim();
-            user.Designation = dto.Designation?.Trim();
-            user.Department = dto.Department?.Trim();
+            // only fields that were sent are changed ("" clears a field; missing = keep)
+            if (dto.Phone != null) user.Phone = dto.Phone.Trim();
+            if (dto.Bio != null) user.Bio = dto.Bio.Trim();
+            if (dto.Designation != null) user.Designation = dto.Designation.Trim();
+            if (dto.Department != null) user.Department = dto.Department.Trim();
 
             if (dto.JoinDate.HasValue)
                 user.JoinDate = dto.JoinDate.Value.ToUniversalTime();
@@ -69,8 +70,9 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (photo == null || photo.Length == 0)
                 return BadRequest(new { message = "No file provided." });
 
-            var allowed = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
-            if (!allowed.Contains(photo.ContentType))
+            // Judge the file by its contents, not its name or declared type
+            var ext = await ImageExtensionAsync(photo);
+            if (ext == null)
                 return BadRequest(new { message = "Only JPEG, PNG, WEBP or GIF images allowed." });
 
             var userId = User.GetUserId();
@@ -80,8 +82,6 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (!string.IsNullOrEmpty(user.ProfilePhotoUrl))
                 await DeleteAvatarFileAsync(user.ProfilePhotoUrl);
 
-            var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
-            if (string.IsNullOrEmpty(ext)) ext = ".jpg";
             var fileName = $"{Guid.NewGuid():N}{ext}";
             await _files.SaveAsync($"uploads/avatars/{fileName}", photo);
 
@@ -198,5 +198,20 @@ namespace DailyTrackerAPI.Controllers.Auth
             try { await _files.DeleteAsync(relativeUrl.TrimStart('/')); }
             catch { /* an old photo that's already gone is fine */ }
         }
+    
+        /// <summary>".jpg" / ".png" / ".gif" / ".webp" from the file's first bytes; null if it isn't one</summary>
+        private static async Task<string?> ImageExtensionAsync(IFormFile file)
+        {
+            var head = new byte[12];
+            await using var stream = file.OpenReadStream();
+            var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false);
+            if (read >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF) return ".jpg";
+            if (read >= 8 && head[0] == 0x89 && head[1] == 0x50 && head[2] == 0x4E && head[3] == 0x47) return ".png";
+            if (read >= 6 && head[0] == 'G' && head[1] == 'I' && head[2] == 'F' && head[3] == '8') return ".gif";
+            if (read >= 12 && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
+                && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P') return ".webp";
+            return null;
+        }
     }
+
 }

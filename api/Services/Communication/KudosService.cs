@@ -29,6 +29,11 @@ namespace DailyTrackerAPI.Services.Communication
         {
             if (fromUserId == dto.ToUserId)
                 throw new InvalidOperationException("You cannot give kudos to yourself.");
+            if (string.IsNullOrWhiteSpace(dto.Message))
+                throw new InvalidOperationException("Please write a short message.");
+            dto.BadgeType = new[] { "GreatWork", "TeamPlayer", "ProblemSolver", "Mentor", "Innovation" }
+                .FirstOrDefault(b => b.Equals(dto.BadgeType?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("Please choose one of the badges.");
 
             var toUser = await _db.Users.FindAsync(dto.ToUserId)
                            ?? throw new KeyNotFoundException("User not found.");

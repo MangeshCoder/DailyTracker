@@ -27,10 +27,29 @@ namespace DailyTrackerAPI.Services.Tasks
             return await _db.DailyLogs.CurrentForAsync(userId);
         }
 
+        private static readonly string[] Statuses = { "InProgress", "Completed", "Blocked", "OnHold" };
+        private static readonly string[] Priorities = { "Low", "Medium", "High", "Critical" };
+
+        /// <summary>Known values only (case-insensitive), time between 0 and 24 h</summary>
+        private static string Pick(string? value, string[] allowed, string what) =>
+            allowed.FirstOrDefault(a => a.Equals(value?.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new Custom.ValidationException($"{what} must be one of: {string.Join(", ", allowed)}.");
+
+        private static int CheckMinutes(int minutes) =>
+            minutes is >= 0 and <= 24 * 60 ? minutes
+            : throw new Custom.ValidationException("Time spent must be between 0 and 1440 minutes.");
+
         public async Task<TaskLogDto?> CreateTaskAsync(int userId, CreateTaskDto dto)
         {
             var log = await GetOrCreateTodayLogAsync(userId);
             if (log == null) return null; // Must check in first
+            if (log.CheckOutTime != null)
+                throw new Custom.ValidationException("You've already checked out for today.");
+            if (string.IsNullOrWhiteSpace(dto.TaskTitle))
+                throw new Custom.ValidationException("Please enter a task title.");
+            dto.Status = Pick(dto.Status, Statuses, "Status");
+            dto.Priority = Pick(dto.Priority, Priorities, "Priority");
+            CheckMinutes(dto.TimeSpentMinutes);
 
             var task = new TaskLog
             {
@@ -57,6 +76,11 @@ namespace DailyTrackerAPI.Services.Tasks
                 .FirstOrDefaultAsync(t => t.Id == taskId && t.DailyLog.UserId == userId);
 
             if (task == null) return null;
+            if (dto.TaskTitle != null && string.IsNullOrWhiteSpace(dto.TaskTitle))
+                throw new Custom.ValidationException("Please enter a task title.");
+            if (dto.Status != null) dto.Status = Pick(dto.Status, Statuses, "Status");
+            if (dto.Priority != null) dto.Priority = Pick(dto.Priority, Priorities, "Priority");
+            if (dto.TimeSpentMinutes.HasValue) CheckMinutes(dto.TimeSpentMinutes.Value);
 
             if (dto.TaskTitle != null) task.TaskTitle = dto.TaskTitle;
             if (dto.Description != null) task.Description = dto.Description;

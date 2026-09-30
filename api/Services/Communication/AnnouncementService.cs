@@ -96,6 +96,10 @@ namespace DailyTrackerAPI.Services.Communication
         {
             var creator = await _db.Users.FindAsync(createdByUserId)
                           ?? throw new KeyNotFoundException("User not found.");
+            if (string.IsNullOrWhiteSpace(dto.Title) || string.IsNullOrWhiteSpace(dto.Content))
+                throw new Custom.ValidationException("Please enter a title and a message.");
+            if (dto.ExpiresAt.HasValue && dto.ExpiresAt.Value <= DateTime.UtcNow)
+                throw new Custom.ValidationException("The expiry date must be in the future.");
 
             var announcement = new Announcement
             {
@@ -148,6 +152,8 @@ namespace DailyTrackerAPI.Services.Communication
         // ── Mark Single Read ──────────────────────────────────────────────────
         public async Task MarkReadAsync(int userId, int announcementId)
         {
+            if (!await _db.Announcements.AnyAsync(a => a.Id == announcementId))
+                throw new KeyNotFoundException("Announcement not found.");   // was a database error (500)
             bool alreadyRead = await _db.AnnouncementReads
                 .AnyAsync(r => r.UserId == userId && r.AnnouncementId == announcementId);
 

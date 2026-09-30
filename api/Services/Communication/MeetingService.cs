@@ -64,6 +64,16 @@ namespace DailyTrackerAPI.Services.Communication
         // ── Create meeting ────────────────────────────────────────────────────
         public async Task<MeetingDto> CreateAsync(int userId, CreateMeetingDto dto)
         {
+            if (string.IsNullOrWhiteSpace(dto.Title))
+                throw new Custom.ValidationException("Please enter a meeting title.");
+            if (dto.DurationMinutes is < 1 or > 24 * 60)
+                throw new Custom.ValidationException("Duration must be between 1 minute and 24 hours.");
+            var invited = (dto.AttendeeIds ?? new()).Distinct().Where(id => id != userId).ToList();
+            var known = await _db.Users.CountAsync(u => invited.Contains(u.Id) && u.IsActive && u.Role != "Pending");
+            if (known != invited.Count)
+                throw new Custom.ValidationException("Some of the invited people don't exist or aren't active.");   // was a database error (500)
+            dto.AttendeeIds = invited;
+
             var meeting = new Meeting
             {
                 Title = dto.Title.Trim(),
@@ -150,7 +160,9 @@ namespace DailyTrackerAPI.Services.Communication
 
             if (attendee == null) return null;
 
-            attendee.Response = dto.Response;
+            attendee.Response = new[] { "Accepted", "Declined", "Tentative", "Maybe", "Pending" }
+                .FirstOrDefault(r => r.Equals(dto.Response?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new Custom.ValidationException("Response must be Accepted, Declined or Tentative.");
             await _db.SaveChangesAsync();
 
             var meeting = await LoadMeeting(meetingId);

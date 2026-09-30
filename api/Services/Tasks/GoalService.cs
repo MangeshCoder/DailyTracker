@@ -31,6 +31,10 @@ namespace DailyTrackerAPI.Services.Tasks
         // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<DailyGoal> SetOrUpdateGoalAsync(int userId, SetGoalDto dto)
         {
+            if (dto.TargetWorkMinutes is < 0 or > 24 * 60 || dto.TargetBreakMinutes is < 0 or > 24 * 60)
+                throw new Custom.ValidationException("Work and break targets must be between 0 and 24 hours.");
+            if (dto.TargetTasksCompleted is < 0 or > 100 || dto.TargetSupportGiven is < 0 or > 100)
+                throw new Custom.ValidationException("Task and support targets must be between 0 and 100.");
             var today = AppClock.TodayIst;
             var goal = await _db.DailyGoals
                 .FirstOrDefaultAsync(g => g.UserId == userId && g.GoalDate == today);

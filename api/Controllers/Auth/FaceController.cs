@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Models.Face_Lock;
+using DailyTrackerAPI.Services.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,8 +24,13 @@ namespace DailyTrackerAPI.Controllers.Auth
     public class FaceController : ControllerBase
     {
         private readonly AppDbContext _db;
+        private readonly ITeamScope _scope;
 
-        public FaceController(AppDbContext db) => _db = db;
+        public FaceController(AppDbContext db, ITeamScope scope)
+        {
+            _db = db;
+            _scope = scope;
+        }
 
         // Same roles the manager area allows (ManagerController + UI ManagerRoute)
         private static bool IsManagerRole(string? role) =>
@@ -41,16 +47,20 @@ namespace DailyTrackerAPI.Controllers.Auth
                 ? dto.TargetUserId.Value   // manager registering on behalf
                 : callerId;                // self-registration
 
-            // Only managers can register other users
-            if (targetId != callerId)
-            {
-                var caller = await _db.Users.FindAsync(callerId);
-                if (!IsManagerRole(caller?.Role))
-                    return Forbid();
-            }
-
             var user = await _db.Users.FindAsync(targetId);
             if (user == null) return NotFound(new { message = "User not found." });
+
+            if (targetId != callerId)
+            {
+                // Someone else's face: their Manager, or their own Team Lead
+                if (!await _scope.CanManageAsync(callerId, targetId))
+                    return StatusCode(403, new { message = "You can only set up faces for people in your own team." });
+            }
+            else if (user.FaceRegistered && user.Role != "Manager")
+            {
+                // Replacing your own registered face (e.g. with someone else's) needs your manager
+                return StatusCode(403, new { message = "Your face is already registered. Ask your manager or team lead to update it." });
+            }
 
             // Validate descriptor is a JSON float array with exactly 128 values
             try
@@ -92,13 +102,9 @@ namespace DailyTrackerAPI.Controllers.Auth
         {
             var callerId = User.GetUserId();
 
-            // Allow self-fetch OR manager fetch
-            if (callerId != userId)
-            {
-                var caller = await _db.Users.FindAsync(callerId);
-                if (!IsManagerRole(caller?.Role))
-                    return Forbid();
-            }
+            // Your own, or someone in the team you manage
+            if (callerId != userId && !await _scope.CanManageAsync(callerId, userId))
+                return StatusCode(403, new { message = "You can only view people in your own team." });
 
             return await GetDescriptorForUser(userId);
         }
@@ -175,8 +181,8 @@ namespace DailyTrackerAPI.Controllers.Auth
         public async Task<IActionResult> GetUserAttempts(int userId, [FromQuery] int days = 30)
         {
             var callerId = User.GetUserId();
-            var caller = await _db.Users.FindAsync(callerId);
-            if (!IsManagerRole(caller?.Role)) return Forbid();
+            if (!await _scope.CanManageAsync(callerId, userId))
+                return StatusCode(403, new { message = "You can only view people in your own team." });
 
             var from = DateTime.UtcNow.AddDays(-days);
 
@@ -206,11 +212,12 @@ namespace DailyTrackerAPI.Controllers.Auth
             var callerId = User.GetUserId();
             var caller = await _db.Users.FindAsync(callerId);
             if (!IsManagerRole(caller?.Role)) return Forbid();
+            var team = await _scope.ManagedUserIdsAsync(callerId);   // null = everyone
 
             var todayStart = AppClock.TodayStartUtc;
 
             var attempts = await _db.FaceAttemptLogs
-                .Where(f => !f.Success && f.AttemptedAt >= todayStart)
+                .Where(f => !f.Success && f.AttemptedAt >= todayStart && (team == null || team.Contains(f.UserId)))
                 .OrderByDescending(f => f.AttemptedAt)
                 .Select(f => new FaceAttemptLogDto
                 {

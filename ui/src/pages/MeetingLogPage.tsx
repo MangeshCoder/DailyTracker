@@ -1,7 +1,7 @@
 import { getHubBaseUrl } from '../context/SignalRContext';
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { managerApi, meetingApi } from '../services/api';
+import { chatApi, meetingApi } from '../services/api';
 import { useAuth } from '../context/Authcontext';
 import { useToast } from '../context/ToastContext';
 import type {
@@ -1092,8 +1092,9 @@ export const MeetingLogPage: React.FC = () => {
 
   // All active users for attendee picker
   const { data: allUsersRaw } = useQuery({
-    queryKey: ['users-simple'],
-    queryFn: () => managerApi.getAllUsers().then((r) => r.data),
+    queryKey: ['meeting-people'],
+    // the chat people list is open to everyone (the manager list isn't)
+    queryFn: () => chatApi.getUsers(),
     staleTime: 300_000,
   });
   const allUsers: { id: number; fullName: string }[] = allUsersRaw ?? [];

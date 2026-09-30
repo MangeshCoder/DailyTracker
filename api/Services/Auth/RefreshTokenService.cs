@@ -122,17 +122,15 @@ namespace DailyTrackerAPI.Services.Auth
 
         public async Task<LoginResponseDto> LoginAsync(string email, string password, string? ipAddress, string? deviceToken = null)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email && u.IsActive)
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email)
                 ?? throw new UnauthorizedAccessException("Invalid email or password.");
 
             if (!BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
                 throw new UnauthorizedAccessException("Invalid email or password.");
 
-            if (user == null)
-                throw new UnauthorizedAccessException("Invalid credentials.");
-
+            // only after the right password: say why they can't sign in
             if (!user.IsActive)
-                throw new UnauthorizedAccessException("Your account is deactivated. Contact manager.");
+                throw new UnauthorizedAccessException("Your account is deactivated. Please contact your manager.");
 
             // Check if 2FA is enabled
             var twoFactorEnabled = await _twoFactor.IsTwoFactorEnabledAsync(user.Id);

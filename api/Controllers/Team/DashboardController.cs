@@ -42,9 +42,9 @@ namespace DailyTrackerAPI.Controllers.Team
         /// <returns></returns>
         [HttpGet("team")]
         [Authorize(Roles = "TeamLead,Manager")]
-        public async Task<IActionResult> GetTeamActivity()
+        public async Task<IActionResult> GetTeamActivity([FromServices] DailyTrackerAPI.Services.Auth.ITeamScope scope)
         {
-            var result = await _dashboardService.GetTeamActivityAsync();
+            var result = await _dashboardService.GetTeamActivityAsync(await scope.ManagedUserIdsAsync(User.GetUserId()));
             return Ok(result);
         }
     }

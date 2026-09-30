@@ -58,6 +58,17 @@ namespace DailyTrackerAPI.Services.Tasks
             if (log == null) return null;
 
             // ── Validate engineer and developer ───────────────────────────────
+            if (dto.SupportEngineerId == dto.SupportedDeveloperId)
+                throw new Custom.ValidationException("Support is between two different people.");
+            if (userId != dto.SupportEngineerId && userId != dto.SupportedDeveloperId)
+                throw new Custom.ValidationException("You can only log support you gave or received.");
+            if (string.IsNullOrWhiteSpace(dto.IssueDescription))
+                throw new Custom.ValidationException("Please describe the issue.");
+            if (dto.TimeSpentMinutes is < 0 or > 24 * 60)
+                throw new Custom.ValidationException("Time spent must be between 0 and 1440 minutes.");
+            if (log.CheckOutTime != null)
+                throw new Custom.ValidationException("You've already checked out for today.");
+
             var engineer = await _db.Users.FindAsync(dto.SupportEngineerId);
             var developer = await _db.Users.FindAsync(dto.SupportedDeveloperId);
             if (engineer == null || developer == null) return null;

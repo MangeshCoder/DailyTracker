@@ -8,6 +8,7 @@ using DailyTrackerAPI.Models.Tasks;
 using DailyTrackerAPI.Services.AI;
 using DailyTrackerAPI.Services.Attendance;
 using DailyTrackerAPI.Services.HR;
+using DailyTrackerAPI.Services.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,9 +26,16 @@ namespace DailyTrackerAPI.Controllers.Communication
         private readonly ILeaveService _leaveService;
         private readonly IWFHRequestService _wfhService;
         private readonly ILogger<AiChatController> _logger;
+        private readonly ITaskService _tasks;
+        private readonly IBreakService _breaks;
+        private readonly IGoalService _goals;
 
-        public AiChatController(IAiService aiService, AppDbContext db, ILeaveService leaveService, IWFHRequestService wfhService, ILogger<AiChatController> logger)
+        public AiChatController(IAiService aiService, AppDbContext db, ILeaveService leaveService, IWFHRequestService wfhService, ILogger<AiChatController> logger,
+            ITaskService tasks, IBreakService breaks, IGoalService goals)
         {
+            _tasks = tasks;
+            _breaks = breaks;
+            _goals = goals;
             _aiService = aiService;
             _db = db;
             _leaveService = leaveService;
@@ -129,116 +137,65 @@ namespace DailyTrackerAPI.Controllers.Communication
                     });
                 }
 
-                // ── 1. Create Task (Only if checked in) ──────────────────────
+                // ── 1–4. Tasks and breaks: the same services (and rules) as the normal screens ──
+                string Text(string key, string fallback) =>
+                    request.Payload.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v?.ToString()) ? v!.ToString()! : fallback;
+                int Number(string key, int fallback) =>
+                    request.Payload.TryGetValue(key, out var v) && int.TryParse(v?.ToString(), out var n) ? n : fallback;
+
                 if (request.Type == "CREATE_TASK")
                 {
-                    var taskTitle = request.Payload.TryGetValue("taskTitle", out var titleObj) ? titleObj?.ToString() : "New Task";
-                    var priority = request.Payload.TryGetValue("priority", out var prioObj) ? prioObj?.ToString() : "Medium";
-                    var minutes = request.Payload.TryGetValue("timeSpentMinutes", out var minObj) && int.TryParse(minObj?.ToString(), out var m) ? m : 30;
-
-                    var task = new TaskLog
+                    var created = await _tasks.CreateTaskAsync(userId, new CreateTaskDto
                     {
-                        DailyLogId = todayLog!.Id,
-                        TaskTitle = taskTitle ?? "AI Task",
-                        Priority = priority ?? "Medium",
+                        TaskTitle = Text("taskTitle", "New Task"),
+                        Priority = Text("priority", "Medium"),
                         Status = "InProgress",
-                        TimeSpentMinutes = minutes,
-                        CreatedAt = DateTime.UtcNow
-                    };
-                    _db.TaskLogs.Add(task);
-                    await _db.SaveChangesAsync();
-
-                    return Ok(new { success = true, message = $"Task \"{task.TaskTitle}\" created successfully!" });
+                        TimeSpentMinutes = Number("timeSpentMinutes", 30),
+                    });
+                    return created == null
+                        ? BadRequest(new { success = false, message = "Please check in first before logging tasks." })
+                        : Ok(new { success = true, message = $"Task \"{created.TaskTitle}\" created successfully!" });
                 }
 
-                // ── 2. Update Task Status ────────────────────────────────────
                 if (request.Type == "UPDATE_TASK_STATUS")
                 {
-                    var status = request.Payload.TryGetValue("status", out var sObj) ? sObj?.ToString() : "Completed";
-                    int taskId = 0;
-                    if (request.Payload.TryGetValue("taskId", out var tIdObj))
+                    var taskId = Number("taskId", 0);
+                    if (taskId <= 0)
                     {
-                        int.TryParse(tIdObj?.ToString(), out taskId);
-                    }
-
-                    TaskLog? task = null;
-                    if (taskId > 0)
-                    {
-                        task = await _db.TaskLogs
-                            .FirstOrDefaultAsync(t => t.Id == taskId && t.DailyLogId == todayLog!.Id);
-                    }
-                    else
-                    {
-                        var title = request.Payload.TryGetValue("taskTitle", out var titleObj) ? titleObj?.ToString() : "";
-                        task = await _db.TaskLogs
-                            .Where(t => t.DailyLogId == todayLog!.Id && (string.IsNullOrWhiteSpace(title) || t.TaskTitle.Contains(title)))
+                        var title = Text("taskTitle", "");
+                        taskId = await _db.TaskLogs
+                            .Where(t => t.DailyLogId == todayLog!.Id && (title == "" || t.TaskTitle.Contains(title)))
                             .OrderByDescending(t => t.Id)
+                            .Select(t => t.Id)
                             .FirstOrDefaultAsync();
                     }
-
-                    if (task == null)
-                    {
-                        return NotFound(new { success = false, message = "No matching task found for today." });
-                    }
-
-                    task.Status = status ?? "Completed";
-                    if (task.Status == "Completed")
-                    {
-                        task.CompletedAt = DateTime.UtcNow;
-                    }
-
-                    await _db.SaveChangesAsync();
-                    return Ok(new { success = true, message = $"Task \"{task.TaskTitle}\" marked as {task.Status}!" });
+                    var updated = taskId > 0
+                        ? await _tasks.UpdateTaskAsync(userId, taskId, new UpdateTaskDto { Status = Text("status", "Completed") })
+                        : null;
+                    return updated == null
+                        ? NotFound(new { success = false, message = "No matching task found for today." })
+                        : Ok(new { success = true, message = $"Task \"{updated.TaskTitle}\" marked as {updated.Status}!" });
                 }
 
-                // ── 3. Start Break ──────────────────────────────────────────
                 if (request.Type == "START_BREAK")
                 {
-                    var breakType = request.Payload.TryGetValue("breakType", out var bObj) ? bObj?.ToString() : "Tea";
-
-                    var breaks = await _db.BreakLogs.Where(b => b.DailyLogId == todayLog!.Id).ToListAsync();
-                    var existingActive = breaks.FirstOrDefault(b => b.IsActive || b.EndTime == null);
-                    if (existingActive != null)
-                    {
-                        return BadRequest(new { success = false, message = $"You are already on an active {existingActive.BreakType} break." });
-                    }
-
-                    var newBreak = new BreakLog
-                    {
-                        DailyLogId = todayLog!.Id,
-                        BreakType = breakType ?? "Tea",
-                        StartTime = DateTime.UtcNow,
-                        IsActive = true,
-                        DurationMinutes = 0
-                    };
-                    _db.BreakLogs.Add(newBreak);
-                    await _db.SaveChangesAsync();
-
-                    return Ok(new { success = true, message = $"Started {newBreak.BreakType} break at {newBreak.StartTime:hh:mm tt}!" });
+                    var started = await _breaks.StartBreakAsync(userId, new StartBreakDto { BreakType = Text("breakType", "Tea") });
+                    return started == null
+                        ? BadRequest(new { success = false, message = "Please check in first before taking a break." })
+                        : Ok(new { success = true, message = $"Started {started.BreakType} break!" });
                 }
 
-                // ── 4. End Break ────────────────────────────────────────────
                 if (request.Type == "END_BREAK")
                 {
-                    var activeBreak = await _db.BreakLogs
-                        .FirstOrDefaultAsync(b => b.DailyLogId == todayLog!.Id && (b.IsActive || b.EndTime == null));
-
-                    if (activeBreak == null)
-                    {
-                        return BadRequest(new { success = false, message = "You do not have any active breaks right now." });
-                    }
-
-                    activeBreak.EndTime = DateTime.UtcNow;
-                    activeBreak.IsActive = false;
-                    activeBreak.DurationMinutes = (int)Math.Max(1, (activeBreak.EndTime.Value - activeBreak.StartTime).TotalMinutes);
-
-                    var allBreaks = await _db.BreakLogs.Where(b => b.DailyLogId == todayLog!.Id).ToListAsync();
-                    todayLog!.TotalBreakMinutes = allBreaks.Sum(b => b.DurationMinutes);
-                    await _db.SaveChangesAsync();
-
-                    return Ok(new { success = true, message = $"Ended {activeBreak.BreakType} break. Duration: {activeBreak.DurationMinutes} minutes." });
+                    var activeId = await _db.BreakLogs
+                        .Where(b => b.DailyLogId == todayLog!.Id && b.IsActive)
+                        .Select(b => b.Id)
+                        .FirstOrDefaultAsync();
+                    var ended = activeId > 0 ? await _breaks.EndBreakAsync(userId, activeId) : null;
+                    return ended == null
+                        ? BadRequest(new { success = false, message = "You do not have any active breaks right now." })
+                        : Ok(new { success = true, message = $"Ended {ended.BreakType} break. Duration: {ended.DurationMinutes} minutes." });
                 }
-
                 // ── 5. Apply Leave (Allowed before check-in) ─────────────────
                 if (request.Type == "APPLY_LEAVE")
                 {
@@ -338,115 +295,35 @@ namespace DailyTrackerAPI.Controllers.Communication
                     }
                 }
 
-                // ── 7. Check In ─────────────────────────────────────────────
-                if (request.Type == "CHECK_IN")
-                {
-                    // yesterday's still-open shift doesn't count as checked in today
-                    if (todayLog != null && todayLog.LogDate != today) { todayLog = null; isCheckedIn = false; }
-                    if (isCheckedIn)
-                    {
-                        return BadRequest(new { success = false, message = "You are already checked in for today." });
-                    }
-
-                    if (todayLog == null)
-                    {
-                        todayLog = new DailyLog
-                        {
-                            UserId = userId,
-                            LogDate = today,
-                            CheckInTime = DateTime.UtcNow,
-                            DayStatus = "Present",
-                            Notes = "Checked in via AI Copilot",
-                            TotalWorkMinutes = 0,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        _db.DailyLogs.Add(todayLog);
-                    }
-                    else
-                    {
-                        todayLog.CheckInTime = DateTime.UtcNow;
-                        todayLog.DayStatus = "Present";
-                    }
-
-                    await _db.SaveChangesAsync();
-                    return Ok(new { success = true, message = "Successfully checked in for today!" });
-                }
-
-                // ── 8. Check Out ────────────────────────────────────────────
-                if (request.Type == "CHECK_OUT")
-                {
-                    // 1. Guard against duplicate checkout
-                    if (todayLog!.CheckOutTime != null)
-                    {
-                        return BadRequest(new { success = false, message = $"You have already checked out for today at {todayLog.CheckOutTime.Value:hh:mm tt} UTC." });
-                    }
-
-                    // 2. Automatically close any active break
-                    var breakLogs = await _db.BreakLogs.Where(b => b.DailyLogId == todayLog.Id).ToListAsync();
-                    var activeBreak = breakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
-                    if (activeBreak != null)
-                    {
-                        activeBreak.EndTime = DateTime.UtcNow;
-                        activeBreak.DurationMinutes = (int)Math.Max(1, (DateTime.UtcNow - activeBreak.StartTime).TotalMinutes);
-                        activeBreak.IsActive = false;
-                    }
-
-                    // 3. Compute accurate total break minutes
-                    int totalBreakMinutes = breakLogs.Sum(b => b.DurationMinutes);
-                    todayLog.TotalBreakMinutes = totalBreakMinutes;
-
-                    // 4. Set check-out time & calculate net total work minutes (Elapsed Time minus Break Time)
-                    todayLog.CheckOutTime = DateTime.UtcNow;
-                    var totalElapsedMinutes = (int)(todayLog.CheckOutTime.Value - todayLog.CheckInTime!.Value).TotalMinutes;
-                    todayLog.TotalWorkMinutes = Math.Max(0, totalElapsedMinutes - totalBreakMinutes);
-
-                    await _db.SaveChangesAsync();
-
-                    int hours = todayLog.TotalWorkMinutes / 60;
-                    int mins = todayLog.TotalWorkMinutes % 60;
-                    return Ok(new
-                    {
-                        success = true,
-                        message = $"Successfully checked out! Worked: {hours}h {mins}m (Breaks: {totalBreakMinutes}m)."
-                    });
-                }
+                // ── 7–8. Check in / out: only from the dashboard (face + office location are checked there)
+                if (request.Type is "CHECK_IN" or "CHECK_OUT")
+                    return BadRequest(new { success = false, message = "Please use the Check In / Check Out button — your face and location are verified there." });
 
                 // ── 9. Set Daily Goal ───────────────────────────────────────
                 if (request.Type == "CREATE_GOAL")
                 {
-                    int tasksTarget = request.Payload.TryGetValue("targetTasks", out var ttObj) && int.TryParse(ttObj?.ToString(), out var tg) ? tg : 5;
-                    int workHours = request.Payload.TryGetValue("targetHours", out var whObj) && int.TryParse(whObj?.ToString(), out var wh) ? wh : 8;
-
-                    var goal = await _db.DailyGoals.FirstOrDefaultAsync(g => g.UserId == userId && g.GoalDate == today);
-                    if (goal == null)
+                    int tasksTarget = Number("targetTasks", 5);
+                    int workHours = Number("targetHours", 8);
+                    await _goals.SetOrUpdateGoalAsync(userId, new SetGoalDto
                     {
-                        goal = new DailyGoal
-                        {
-                            UserId = userId,
-                            GoalDate = today,
-                            TargetTasksCompleted = tasksTarget,
-                            TargetWorkMinutes = workHours * 60,
-                            ProductivityScore = 0
-                        };
-                        _db.DailyGoals.Add(goal);
-                    }
-                    else
-                    {
-                        goal.TargetTasksCompleted = tasksTarget;
-                        goal.TargetWorkMinutes = workHours * 60;
-                    }
-
-                    await _db.SaveChangesAsync();
+                        TargetTasksCompleted = tasksTarget,
+                        TargetWorkMinutes = workHours * 60,
+                        TargetBreakMinutes = 60,
+                    });
                     return Ok(new { success = true, message = $"Daily goal set: {tasksTarget} tasks and {workHours} hours!" });
                 }
-
                 // ── 10. Submit EOD ──────────────────────────────────────────
                 if (request.Type == "SUBMIT_EOD")
                 {
-                    return Ok(new { success = true, message = "EOD report draft prepared and saved for submission!" });
+                    return BadRequest(new { success = false, message = "Please submit your EOD report from the EOD Reports page (AI Help can draft it for you there)." });   // used to say "saved" without saving anything
                 }
 
                 return BadRequest(new { success = false, message = $"Unknown action type: {request.Type}" });
+            }
+            catch (Exception ex) when (ex is Custom.ValidationException or InvalidOperationException)
+            {
+                // a rule of the normal screen said no (e.g. already checked out) — show why
+                return BadRequest(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {

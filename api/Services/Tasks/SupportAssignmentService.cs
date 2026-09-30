@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Tasks;
+using DailyTrackerAPI.Services.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services.Tasks
@@ -9,7 +10,7 @@ namespace DailyTrackerAPI.Services.Tasks
     {
         Task<SupportAssignmentDto> AssignAsync(int managerId, CreateSupportAssignmentDto dto);
         Task<bool> DeactivateAsync(int managerId, int assignmentId);
-        Task<List<SupportAssignmentDto>> GetAllAsync();
+        Task<List<SupportAssignmentDto>> GetAllAsync(int viewerId);
         Task<List<SupportAssignmentDto>> GetByEngineerAsync(int engineerId);
         Task<List<SupportAssignmentDto>> GetByDeveloperAsync(int developerId);
     }
@@ -17,12 +18,26 @@ namespace DailyTrackerAPI.Services.Tasks
     public class SupportAssignmentService : ISupportAssignmentService
     {
         private readonly AppDbContext _db;
+        private readonly ITeamScope _scope;
 
-        public SupportAssignmentService(AppDbContext db) => _db = db;
+        public SupportAssignmentService(AppDbContext db, ITeamScope scope)
+        {
+            _db = db;
+            _scope = scope;
+        }
 
         public async Task<SupportAssignmentDto> AssignAsync(
             int managerId, CreateSupportAssignmentDto dto)
         {
+            if (dto.SupportEngineerId == dto.DeveloperId)
+                throw new Custom.ValidationException("The support engineer and the developer must be different people.");
+            var people = await _db.Users
+                .Where(u => (u.Id == dto.SupportEngineerId || u.Id == dto.DeveloperId) && u.IsActive && u.Role != "Pending")
+                .CountAsync();
+            if (people != 2)
+                throw new Custom.ValidationException("Choose two active team members.");
+            await _scope.EnsureCanManageAsync(managerId, dto.DeveloperId);
+
             var assignment = new SupportAssignment
             {
                 SupportEngineerId = dto.SupportEngineerId,
@@ -45,6 +60,7 @@ namespace DailyTrackerAPI.Services.Tasks
         {
             var assignment = await _db.SupportAssignments.FindAsync(assignmentId);
             if (assignment == null) return false;
+            await _scope.EnsureCanManageAsync(managerId, assignment.DeveloperId);
 
             assignment.IsActive = false;
             assignment.UpdatedAt = DateTime.UtcNow;
@@ -52,9 +68,11 @@ namespace DailyTrackerAPI.Services.Tasks
             return true;
         }
 
-        public async Task<List<SupportAssignmentDto>> GetAllAsync()
+        public async Task<List<SupportAssignmentDto>> GetAllAsync(int viewerId)
         {
+            var team = await _scope.ManagedUserIdsAsync(viewerId);   // null = everyone
             var list = await _db.SupportAssignments
+                .Where(a => team == null || team.Contains(a.DeveloperId))
                 .Include(a => a.SupportEngineer)
                 .Include(a => a.Developer)
                 .Include(a => a.AssignedByManager)

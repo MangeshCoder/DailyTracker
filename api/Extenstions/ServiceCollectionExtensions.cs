@@ -11,6 +11,8 @@ using DailyTrackerAPI.Services.Monitoring;
 using DailyTrackerAPI.Services.Tasks;
 using DailyTrackerAPI.Services.Team;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
@@ -29,6 +31,7 @@ namespace DailyTrackerAPI.Extensions
         {
             // ── Infrastructure ────────────────────────────────────────────────
             services.AddScoped<JwtHelper>();
+            services.AddScoped<ITeamScope, TeamScope>();   // who may manage whom
             services.AddScoped<INotificationSender, SignalRNotificationSender>();
             services.AddScoped<IMediaStorageService, MediaStorageService>();
 
@@ -139,6 +142,32 @@ namespace DailyTrackerAPI.Extensions
                             }
 
                             return Task.CompletedTask;
+                        },
+
+                        // A valid token isn't enough: the account must still be active and
+                        // have the same role (someone who left, was deactivated or had
+                        // their role changed can't keep using an old token for 7 days).
+                        // Checked against the database at most every 30 s per user.
+                        OnTokenValidated = async context =>
+                        {
+                            var idText = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                            var role = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                            if (!int.TryParse(idText, out var userId)) { context.Fail("Invalid token."); return; }
+
+                            var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+                            var current = await cache.GetOrCreateAsync($"auth-user:{userId}", async entry =>
+                            {
+                                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30);
+                                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                                return await db.Users.AsNoTracking()
+                                    .Where(u => u.Id == userId)
+                                    .Select(u => new { u.IsActive, u.Role })
+                                    .FirstOrDefaultAsync();
+                            });
+                            if (current == null || !current.IsActive)
+                                context.Fail("This account is no longer active.");
+                            else if (role != null && current.Role != role)
+                                context.Fail("Your role has changed — please sign in again.");
                         }
                     };
                 });

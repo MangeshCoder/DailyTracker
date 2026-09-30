@@ -2,6 +2,8 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Services.Communication;
+using DailyTrackerAPI.Services.Auth;
+using DailyTrackerAPI.Helpers;
 using Microsoft.EntityFrameworkCore;
 using DailyTrackerAPI.Helpers;
 namespace DailyTrackerAPI.Services.HR
@@ -15,9 +17,9 @@ namespace DailyTrackerAPI.Services.HR
         Task<bool> WithdrawAsync(int userId);
 
         // Manager
-        Task<ResignationSummaryDto> GetSummaryAsync();
-        Task<List<ResignationDto>> GetAllAsync(string? status = null);
-        Task<ResignationDto?> GetByIdAsync(int id);
+        Task<ResignationSummaryDto> GetSummaryAsync(int viewerId);
+        Task<List<ResignationDto>> GetAllAsync(int viewerId, string? status = null);
+        Task<ResignationDto?> GetByIdAsync(int viewerId, int id);
         Task<ResignationDto?> ReviewAsync(int managerId, int id, ReviewResignationDto dto);
         Task<ResignationDto?> CompleteExitAsync(int managerId, int id, CompleteExitDto dto);
 
@@ -32,6 +34,7 @@ namespace DailyTrackerAPI.Services.HR
     {
         private readonly AppDbContext _db;
         private readonly IAppNotificationService _notify;
+        private readonly ITeamScope _scope;
 
         // Default checklist items auto-created when manager accepts a resignation
         private static readonly string[] DefaultChecklistTasks =
@@ -46,8 +49,9 @@ namespace DailyTrackerAPI.Services.HR
             "Company assets returned",
         };
 
-        public ResignationService(AppDbContext db, IAppNotificationService notify)
+        public ResignationService(AppDbContext db, IAppNotificationService notify, ITeamScope scope)
         {
+            _scope = scope;
             _db = db;
             _notify = notify;
         }
@@ -129,9 +133,9 @@ namespace DailyTrackerAPI.Services.HR
         //  MANAGER
         // ══════════════════════════════════════════════════════════════════════
 
-        public async Task<ResignationSummaryDto> GetSummaryAsync()
+        public async Task<ResignationSummaryDto> GetSummaryAsync(int viewerId)
         {
-            var all = await ResignationQuery().ToListAsync();
+            var all = await (await TeamQueryAsync(viewerId)).ToListAsync();
             return new ResignationSummaryDto
             {
                 PendingCount = all.Count(r => r.Status == "Pending"),
@@ -146,9 +150,9 @@ namespace DailyTrackerAPI.Services.HR
             };
         }
 
-        public async Task<List<ResignationDto>> GetAllAsync(string? status = null)
+        public async Task<List<ResignationDto>> GetAllAsync(int viewerId, string? status = null)
         {
-            var query = ResignationQuery();
+            var query = await TeamQueryAsync(viewerId);
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(r => r.Status == status);
 
@@ -156,9 +160,9 @@ namespace DailyTrackerAPI.Services.HR
             return list.Select(r => MapDto(r, 0)).ToList();
         }
 
-        public async Task<ResignationDto?> GetByIdAsync(int id)
+        public async Task<ResignationDto?> GetByIdAsync(int viewerId, int id)
         {
-            var r = await ResignationQuery().FirstOrDefaultAsync(r => r.Id == id);
+            var r = await (await TeamQueryAsync(viewerId)).FirstOrDefaultAsync(r => r.Id == id);
             return r == null ? null : MapDto(r, 0);
         }
 
@@ -166,13 +170,22 @@ namespace DailyTrackerAPI.Services.HR
         {
             var r = await ResignationQuery().FirstOrDefaultAsync(r => r.Id == id);
             if (r == null) return null;
+            await EnsureReviewerAsync(managerId, r);
             if (r.Status != "Pending")
                 throw new InvalidOperationException($"Resignation is already {r.Status}.");
 
-            if (dto.Decision == "Accepted" && !dto.NoticePeriodEndDate.HasValue)
-                throw new InvalidOperationException("NoticePeriodEndDate is required when accepting.");
+            // only two possible decisions (anything else used to leave it stuck for ever)
+            var decision = new[] { "Accepted", "Rejected" }
+                .FirstOrDefault(d => d.Equals(dto.Decision?.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException("Decision must be Accepted or Rejected.");
+            dto.Decision = decision;
 
-            r.Status = dto.Decision; // "Accepted" | "Rejected"
+            if (decision == "Accepted" && !dto.NoticePeriodEndDate.HasValue)
+                throw new InvalidOperationException("Please choose the last working day (notice period end) when accepting.");
+            if (decision == "Accepted" && dto.NoticePeriodEndDate!.Value.Date < AppClock.TodayIst)
+                throw new InvalidOperationException("The last working day can't be in the past.");
+
+            r.Status = decision;
             r.ReviewedByUserId = managerId;
             r.ReviewNote = dto.ReviewNote?.Trim();
             r.ReviewedAt = DateTime.UtcNow;
@@ -217,6 +230,7 @@ namespace DailyTrackerAPI.Services.HR
         {
             var r = await ResignationQuery().FirstOrDefaultAsync(r => r.Id == id);
             if (r == null) return null;
+            await EnsureReviewerAsync(managerId, r);
             if (r.Status != "Accepted")
                 throw new InvalidOperationException("Only accepted resignations can be completed.");
 
@@ -249,9 +263,11 @@ namespace DailyTrackerAPI.Services.HR
         {
             var item = await _db.ExitChecklistItems
                 .Include(i => i.CompletedBy)
+                .Include(i => i.Resignation)
                 .FirstOrDefaultAsync(i => i.Id == itemId);
 
             if (item == null) return null;
+            await EnsureReviewerAsync(managerId, item.Resignation);
 
             item.IsCompleted = !item.IsCompleted;
             item.CompletedAt = item.IsCompleted ? DateTime.UtcNow : null;
@@ -268,8 +284,11 @@ namespace DailyTrackerAPI.Services.HR
         public async Task<ExitChecklistItemDto?> AddChecklistItemAsync(
             int managerId, int resignationId, AddChecklistItemDto dto)
         {
-            var exists = await _db.Resignations.AnyAsync(r => r.Id == resignationId);
-            if (!exists) return null;
+            var resignation = await _db.Resignations.FirstOrDefaultAsync(r => r.Id == resignationId);
+            if (resignation == null) return null;
+            await EnsureReviewerAsync(managerId, resignation);
+            if (string.IsNullOrWhiteSpace(dto.Task))
+                throw new InvalidOperationException("Please describe the checklist task.");
 
             var item = new ExitChecklistItem
             {
@@ -284,14 +303,30 @@ namespace DailyTrackerAPI.Services.HR
 
         public async Task<bool> DeleteChecklistItemAsync(int managerId, int itemId)
         {
-            var item = await _db.ExitChecklistItems.FindAsync(itemId);
+            var item = await _db.ExitChecklistItems.Include(i => i.Resignation).FirstOrDefaultAsync(i => i.Id == itemId);
             if (item == null) return false;
+            await EnsureReviewerAsync(managerId, item.Resignation);
             _db.ExitChecklistItems.Remove(item);
             await _db.SaveChangesAsync();
             return true;
         }
 
         // ─── Helpers ──────────────────────────────────────────────────────────
+
+        /// <summary>Resignations of the people this viewer manages (a Manager: everyone's)</summary>
+        private async Task<IQueryable<Resignation>> TeamQueryAsync(int viewerId)
+        {
+            var team = await _scope.ManagedUserIdsAsync(viewerId);
+            return ResignationQuery().Where(r => r.UserId != viewerId && (team == null || team.Contains(r.UserId)));
+        }
+
+        /// <summary>Not your own, and only for someone in your team</summary>
+        private async Task EnsureReviewerAsync(int reviewerId, Resignation r)
+        {
+            if (r.UserId == reviewerId)
+                throw new UnauthorizedAccessException("You can't process your own resignation.");
+            await _scope.EnsureCanManageAsync(reviewerId, r.UserId);
+        }
 
         private IQueryable<Resignation> ResignationQuery() =>
             _db.Resignations

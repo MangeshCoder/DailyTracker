@@ -30,6 +30,8 @@ namespace DailyTrackerAPI.Services.Tasks
             var log = await _db.DailyLogs.CurrentForAsync(userId)
                 ?? throw new InvalidOperationException("You must check in before submitting EOD report.");
             var today = log.LogDate;   // the work day, even when submitted after midnight
+            if (string.IsNullOrWhiteSpace(dto.WhatWasDone))
+                throw new InvalidOperationException("Please write what you did today.");
 
             // Update or create
             var existing = await _db.EODReports.FirstOrDefaultAsync(r => r.UserId == userId && r.ReportDate == today);
@@ -69,6 +71,7 @@ namespace DailyTrackerAPI.Services.Tasks
             }
 
             await _db.SaveChangesAsync();
+            existing.User ??= (await _db.Users.FindAsync(userId))!;   // name on the saved report
             return await MapReport(existing);
         }
 

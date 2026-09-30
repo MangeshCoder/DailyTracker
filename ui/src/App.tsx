@@ -159,15 +159,58 @@ const AiChatWidget = lazy(() =>
 // ROUTE GUARDS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const RestoringSession = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+    <div className="w-8 h-8 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" aria-label="Loading" />
+  </div>
+);
+
+/** Registered but no role yet: nothing to use until a manager approves */
+const WaitingForApproval = () => {
+  const { user, logout } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+      <div className="max-w-md w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4 shadow-sm">
+        <div className="text-4xl">⏳</div>
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white">Waiting for approval</h1>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Hi {user?.fullName?.split(' ')[0] ?? 'there'}, your account is created. A manager needs to assign your role
+          before you can start using DailyTracker. Please check back after they approve you.
+        </p>
+        <div className="flex gap-2 justify-center pt-2">
+          <button type="button" onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white">
+            Check again
+          </button>
+          <button type="button" onClick={logout}
+            className="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  const { isAuthenticated, ready, user } = useAuth();
+  if (!isAuthenticated) return ready ? <Navigate to="/login" replace /> : <RestoringSession />;
+  if (user?.role === 'Pending') return <WaitingForApproval />;
+  return <>{children}</>;
 };
 
 const ManagerRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const { user, isAuthenticated, ready } = useAuth();
+  if (!isAuthenticated) return ready ? <Navigate to="/login" replace /> : <RestoringSession />;
   if (user?.role !== 'Manager' && user?.role !== 'TeamLead') return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
+/** Manager-only pages (Team Leads are sent to the team dashboard) */
+const ManagerOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isAuthenticated, ready } = useAuth();
+  if (!isAuthenticated) return ready ? <Navigate to="/login" replace /> : <RestoringSession />;
+  if (user?.role !== 'Manager') return <Navigate to={user?.role === 'TeamLead' ? '/manager' : '/'} replace />;
   return <>{children}</>;
 };
 
@@ -513,21 +556,21 @@ const AppRoutes = () => {
           <Route
             path="manager/eod-reviews"
             element={
-              <ManagerRoute>
+              <ManagerOnlyRoute>
                 <Suspense fallback={<SkeletonDashboard />}>
                   <ManagerEODReviewPage />
                 </Suspense>
-              </ManagerRoute>
+              </ManagerOnlyRoute>
             }
           />
           <Route
             path="manager/assign-role"
             element={
-              <ManagerRoute>
+              <ManagerOnlyRoute>
                 <Suspense fallback={<SkeletonDashboard />}>
                   <AssignRole />
                 </Suspense>
-              </ManagerRoute>
+              </ManagerOnlyRoute>
             }
           />
           <Route
