@@ -418,9 +418,9 @@ const DayCell: React.FC<{
   // Weekend cell with no activity
   if (isWeekend && !hasCheckins) {
     return (
-      <div className="bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl p-2 sm:p-2.5 min-h-[92px] sm:min-h-[105px] border border-dashed border-slate-200/60 dark:border-slate-800/60 flex flex-col justify-between opacity-70">
+      <div className="bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl p-2 sm:p-2.5 min-h-[92px] sm:min-h-[105px] border border-dashed border-slate-200/60 dark:border-slate-800/60 flex flex-col justify-between">
         <div className="flex items-center justify-between">
-          <span className="text-slate-400 dark:text-slate-600 text-xs font-semibold">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold">
             {dateNum}
           </span>
           {day.isHoliday && <span className="text-[10px]">🎉</span>}
@@ -793,7 +793,7 @@ export const TeamCalendarPage: React.FC = () => {
                 key={d}
                 className={`text-center text-xs font-bold py-1.5 ${
                   idx >= 5
-                    ? 'text-orange-500/80 dark:text-orange-400/80'
+                    ? 'text-orange-600 dark:text-orange-400'
                     : 'text-slate-500 dark:text-slate-400'
                 }`}
               >

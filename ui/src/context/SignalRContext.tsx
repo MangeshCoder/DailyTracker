@@ -45,7 +45,9 @@ export function getHubBaseUrl(): string {
 }
 
 export const SignalRProvider = ({ children }: { children: ReactNode }) => {
-  const { isAuthenticated } = useAuth();   // ← FIX 2: watch auth state
+  const { isAuthenticated: signedIn, user } = useAuth();   // ← FIX 2: watch auth state
+  // an account waiting for approval can't use live updates yet (the server refuses it)
+  const isAuthenticated = signedIn && user?.role !== 'Pending';
   const [isConnected, setIsConnected]  = useState(false);
   const connectionRef = useRef<import('@microsoft/signalr').HubConnection | null>(null);
   const listenersRef  = useRef<Map<string, Set<(...args: unknown[]) => void>>>(new Map());

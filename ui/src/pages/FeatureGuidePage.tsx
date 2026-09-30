@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { GUIDE_VERSION } from '../utils/guide';
 
 interface GuideEdition {
   id: 'english' | 'marathi';
@@ -33,45 +34,46 @@ interface GuideEdition {
   features: string[];
 }
 
+
 const EDITIONS: GuideEdition[] = [
   {
     id: 'english',
-    title: 'DailyTracker v2 Feature Guide',
+    title: 'DailyTracker v2 User Guide',
     nativeTitle: 'English Edition',
     filename: 'DailyTracker_v2_Feature_Guide.pdf',
-    pdfUrl: '/DailyTracker_v2_Feature_Guide.pdf',
-    pages: 40,
-    size: '40 KB',
-    badge: 'Comprehensive (40 Pages)',
-    summary: 'Full feature documentation detailing all modules: attendance clocking, biometric face setup, manager approvals, WFH policies, leave workflows, and security settings.',
+    pdfUrl: `/DailyTracker_v2_Feature_Guide.pdf?v=${GUIDE_VERSION}`,
+    pages: 18,
+    size: '210 KB',
+    badge: '18 pages · updated 1 Oct 2026',
+    summary: 'Every feature explained in plain words with exact steps — your working day, leave and comp-off, WFH, expenses, payroll, chat, AI Help — plus a section for team leads and managers.',
     features: [
-      'Task Tracking & Kanban Boards',
-      'Face Biometric & 2FA Setup',
-      'WFH Application & Approval Flow',
-      'Leave Management & Public Holidays',
-      'Team Directory & Org Hierarchy',
-      'Manager EOD Reviews & Ratings'
-    ]
+      "What's new: comp-off, expenses, Excel",
+      'Check-in, breaks & forgotten check-out',
+      'Leave, comp-off & WFH requests',
+      'Expense claims & your payslip',
+      'Chat, meetings & AI Help',
+      'Approvals, hand-over & onboarding (managers)',
+    ],
   },
   {
     id: 'marathi',
     title: 'DailyTracker v2 वापरकर्ता मार्गदर्शिका',
     nativeTitle: 'मराठी आवृत्ती (Marathi Edition)',
     filename: 'DailyTracker_v2_Feature_Guide_Marathi.pdf',
-    pdfUrl: '/DailyTracker_v2_Feature_Guide_Marathi.pdf',
-    pages: 15,
-    size: '188 KB',
-    badge: 'मराठी भाषांतर (१५+ पाने)',
-    summary: 'सर्व वैशिष्ट्यांचे संपूर्ण मराठी मार्गदर्शक: उपस्थिती नोंदणी, चेहरा ओळख (बायोमेट्रिक), WFH अर्ज, रजा व्यवस्थापन आणि मॅनेजर मंजुरी प्रक्रिया.',
+    pdfUrl: `/DailyTracker_v2_Feature_Guide_Marathi.pdf?v=${GUIDE_VERSION}`,
+    pages: 18,
+    size: '331 KB',
+    badge: '१८ पाने · १ ऑक्टोबर २०२६',
+    summary: 'प्रत्येक सुविधा सोप्या शब्दांत, नेमक्या पायऱ्यांसह — कामाचा दिवस, रजा व कॉम्प-ऑफ, WFH, खर्च, पगार, चॅट, AI Help — आणि टीम लीड व मॅनेजरसाठी स्वतंत्र भाग.',
     features: [
-      'दैनंदिन कामे (Tasks) व प्रगती',
-      'बायोमेट्रिक चेहरा ओळख व 2FA सुरक्षा',
-      'घरून काम (WFH) अर्ज व मंजुरी',
-      'रजा व्यवस्थापन आणि सुट्ट्यांची यादी',
-      'संघ कॅलेंडर व सहकाऱ्यांची माहिती',
-      'दिवसाअखेर अहवाल (EOD) सादर करणे'
-    ]
-  }
+      'नवीन: कॉम्प-ऑफ, खर्च, Excel',
+      'चेक-इन, ब्रेक आणि चेक-आउट विसरल्यास',
+      'रजा, कॉम्प-ऑफ आणि WFH अर्ज',
+      'खर्चाचे दावे आणि पे-स्लिप',
+      'चॅट, मीटिंग आणि AI Help',
+      'मंजुरी, सोपवणे आणि ऑनबोर्डिंग (मॅनेजर)',
+    ],
+  },
 ];
 
 export const FeatureGuidePage: React.FC = () => {
@@ -91,7 +93,7 @@ export const FeatureGuidePage: React.FC = () => {
     );
 
     try {
-      const response = await fetch(`${edition.pdfUrl}?download=true`);
+      const response = await fetch(`${edition.pdfUrl}&download=true`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -118,7 +120,7 @@ export const FeatureGuidePage: React.FC = () => {
     } catch (err: any) {
       console.error('Download error:', err);
       const link = document.createElement('a');
-      link.href = `${edition.pdfUrl}?download=true`;
+      link.href = `${edition.pdfUrl}&download=true`;
       link.download = edition.filename;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -135,58 +137,58 @@ export const FeatureGuidePage: React.FC = () => {
       icon: Clock,
       title: selectedEdition === 'marathi' ? 'वेळ व उपस्थिती' : 'Time & Attendance',
       desc: selectedEdition === 'marathi'
-        ? 'रिअल-टाइम चेक-इन/आउट, सेकंदांसह लाईव्ह टाइमर, जिओफेन्सिंग व ब्रेक ट्रॅकिंग'
-        : 'Real-time check-in/out, live timer with seconds, geofencing & break tracking'
+        ? 'ऑफिसजवळ चेक-इन, ब्रेक, चेक-आउट; विसरल्यास ॲप दिवस बंद करते व सकाळी तुम्ही वेळ पक्की करता'
+        : "Check-in at the office, breaks and check-out; a forgotten check-out is closed for you and confirmed next morning",
     },
     {
       icon: Camera,
-      title: selectedEdition === 'marathi' ? 'बायोमेट्रिक फेशियल पडताळणी' : 'Biometric Facial Verification',
+      title: selectedEdition === 'marathi' ? 'चेहरा ओळख' : 'Face Check-in',
       desc: selectedEdition === 'marathi'
-        ? 'वेबकॅमद्वारे चेहऱ्याची पडताळणी, १२८-डायमेंशनल एम्बेडिंग्ज व सुरक्षित हजेरी'
-        : 'Webcam facial verification, 128D embeddings & anti-spoofing protection'
+        ? 'एकदा चेहरा नोंदवा; चेक-इनला कॅमेऱ्याद्वारे पडताळणी — दुसऱ्याच्या नावाने हजेरी टळते'
+        : "Register your face once; the camera confirms it's you at check-in, so nobody can check in for you",
     },
     {
       icon: Layers,
-      title: selectedEdition === 'marathi' ? 'कार्य व्यवस्थापन व कानबान' : 'Task Tracking & Kanban',
+      title: selectedEdition === 'marathi' ? 'कामे व EOD' : 'Tasks & EOD Report',
       desc: selectedEdition === 'marathi'
-        ? 'ड्रॅग-अँड-ड्रॉप कानबान बोर्ड, स्प्रिंट माइलस्टोन्स, टास्क प्राधान्य व वेळ अंदाज'
-        : 'Drag-and-drop Kanban board, sprint milestones, task priorities & time logs'
+        ? 'प्राधान्य, टायमर, टेम्पलेट, Kanban बोर्ड आणि AI च्या मदतीने दिवसअखेरचा अहवाल'
+        : "Tasks with priorities, timers, templates and a Kanban board; an AI-drafted end-of-day report",
     },
     {
       icon: CalendarCheck,
-      title: selectedEdition === 'marathi' ? 'सुट्टी व WFH कार्यप्रवाह' : 'Leave & WFH Workflows',
+      title: selectedEdition === 'marathi' ? 'रजा, कॉम्प-ऑफ व WFH' : 'Leave, Comp-off & WFH',
       desc: selectedEdition === 'marathi'
-        ? 'मल्टी-टियर मंजुरी साखळी, सुट्टी शिल्लक ट्रॅकिंग व १-क्लिक सुरक्षित ईमेल टोकन्स'
-        : 'Multi-level approval chains, leave balances & 1-click email action tokens'
+        ? 'रजेची शिल्लक, सुट्टीला काम केल्याबद्दल कॉम्प-ऑफ, WFH / अर्धा दिवस आणि ई-मेलवरून मंजुरी'
+        : "Leave balances, comp-off for weekend work, WFH / half days and one-click email approval",
     },
     {
       icon: CreditCard,
-      title: selectedEdition === 'marathi' ? 'पेरोल आणि वेतनपत्रिका' : 'Payroll & Digital Payslips',
+      title: selectedEdition === 'marathi' ? 'खर्च व पगार' : 'Expenses & Payroll',
       desc: selectedEdition === 'marathi'
-        ? 'स्वयंचलित सीटीसी गणना, मूळ वेतन, एचआरए, पीएफ/पीटी कपात व डिजिटल पेस्लिप'
-        : 'Automated CTC calculations, allowances, PF/PT deductions & instant downloads'
+        ? 'बिल जोडून खर्चाचा दावा; मंजूर रक्कम पगारासोबत; स्पष्ट पे-स्लिप आणि Excel'
+        : "Claim expenses with the bill; approved amounts are paid with your salary; a clear payslip and Excel files",
     },
     {
       icon: ShieldCheck,
-      title: selectedEdition === 'marathi' ? 'सुरक्षा आणि 2FA' : 'Security & Two-Factor Auth',
+      title: selectedEdition === 'marathi' ? 'सुरक्षा' : 'Security',
       desc: selectedEdition === 'marathi'
-        ? 'TOTP Google/Microsoft Authenticator, रिकव्हरी कीज व रोल-बेस्ड परवानग्या'
-        : 'TOTP Authenticator apps, emergency recovery codes & role-based RBAC'
+        ? '2FA (Authenticator / ई-मेल कोड), ब्राउझर बंद केल्यावर व ३० मिनिटे निष्क्रिय राहिल्यावर लॉग-आउट'
+        : "Two-step sign-in (authenticator or email codes); signed out when the browser closes or after 30 idle minutes",
     },
     {
       icon: MessageSquare,
-      title: selectedEdition === 'marathi' ? 'रिअल-टाइम चॅट आणि सहयोग' : 'Real-time Team Chat',
+      title: selectedEdition === 'marathi' ? 'चॅट व AI Help' : 'Chat & AI Help',
       desc: selectedEdition === 'marathi'
-        ? 'सार्वजनिक चॅनेल्स, १:१ थेट संदेश, ऑनलाइन उपस्थिती स्थिती व फाइल देवाणघेवाण'
-        : 'Public channels, 1:1 direct messages, presence indicators & attachment sharing'
+        ? 'फाइल, पोल, @mention, पिन व शोधासह चॅट; प्रश्न विचारा किंवा AI कडून कामे करून घ्या'
+        : "Chat with files, polls, @mentions, pins and search; ask AI Help questions or let it do things for you",
     },
     {
       icon: Sparkles,
-      title: selectedEdition === 'marathi' ? 'एआय कोपायलट सहाय्यक' : 'AI Copilot Assistant',
+      title: selectedEdition === 'marathi' ? 'मॅनेजरसाठी' : 'For Managers',
       desc: selectedEdition === 'marathi'
-        ? 'नैसर्गिक संभाषणात्मक टास्क निर्मिती, उपस्थिती विश्लेषण व १-क्लिक जलद कृती'
-        : 'Conversational task creation, attendance insights & 1-click quick actions'
-    }
+        ? 'सर्व विनंत्या एकाच ठिकाणी, रजेवर जाताना मंजुरी सोपवणे, नवीन कर्मचाऱ्यांचे ऑनबोर्डिंग'
+        : "One queue for every request, hand over approvals when away, and onboarding checklists for new joiners",
+    },
   ];
 
   return (
@@ -199,13 +201,13 @@ export const FeatureGuidePage: React.FC = () => {
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider text-blue-100 border border-white/20">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            Official Documentation & User Manuals
+            User Guides · updated 1 October 2026
           </div>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-            DailyTracker v2 Feature Guides & Docs Hub
+            DailyTracker v2 User Guides
           </h1>
           <p className="text-blue-100 text-sm sm:text-base leading-relaxed">
-            Access, view in-app, or download full user guides in both English and Marathi. Learn how to manage attendance, face setup, WFH requests, tasks, and manager approvals.
+            Read in the app or download the guide in English or Marathi — how to use every feature, step by step, including what's new: comp-off, expense claims, Excel downloads, onboarding and approval hand-over.
           </p>
         </div>
       </div>
@@ -325,7 +327,7 @@ export const FeatureGuidePage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <a
-              href={`${activeGuide.pdfUrl}?download=true`}
+              href={`${activeGuide.pdfUrl}&download=true`}
               target="_blank"
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold border transition-colors ${
@@ -380,8 +382,8 @@ export const FeatureGuidePage: React.FC = () => {
           <Sparkles className="w-4 h-4 text-blue-500" />
           <h2 className="text-base font-bold">
             {selectedEdition === 'marathi'
-              ? 'दैनिक ट्रॅकर v2 मुख्य घटक व वैशिष्ट्ये'
-              : 'DailyTracker v2 Enterprise Architecture & Feature Matrix'}
+              ? 'DailyTracker v2 मधील मुख्य सुविधा'
+              : 'What DailyTracker v2 does'}
           </h2>
         </div>
 

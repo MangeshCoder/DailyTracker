@@ -112,7 +112,9 @@ export const CHAT_DOCK_EVENT = 'chat-dock:toggle';
 export const AI_WIDGET_EVENT = 'ai-widget:toggle';
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated: signedIn } = useAuth();
+  // an account waiting for approval can't chat yet (the server refuses it)
+  const isAuthenticated = signedIn && user?.role !== 'Pending';
   const { toast } = useToast();
   const qc = useQueryClient();
   const location = useLocation();

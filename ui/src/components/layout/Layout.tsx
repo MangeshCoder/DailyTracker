@@ -16,6 +16,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { ChatProvider } from '../../context/ChatContext';
 import { ChatDock } from '../chat/ChatDock';
 import { IdleSignOut } from '../IdleSignOut';
+import { GUIDE_VERSION } from '../../utils/guide';
 
 const LayoutShell = () => {
   const { user, logout } = useAuth();
@@ -146,7 +147,7 @@ const LayoutShell = () => {
           icon: '📥',
           isDownload: true,
           downloadName: 'DailyTracker_v2_Feature_Guide.pdf',
-          badgeLabel: '40P',
+          badgeLabel: '18P',
         },
         {
           to: '/DailyTracker_v2_Feature_Guide_Marathi.pdf',
@@ -154,7 +155,7 @@ const LayoutShell = () => {
           icon: '📥',
           isDownload: true,
           downloadName: 'DailyTracker_v2_Feature_Guide_Marathi.pdf',
-          badgeLabel: '१५P',
+          badgeLabel: '१८P',
         },
         { to: '/security', label: 'Security & 2FA', icon: '🔐' },
       ],
@@ -187,7 +188,7 @@ const LayoutShell = () => {
       if ((item as any).isDownload) {
         const downloadName = (item as any).downloadName || 'DailyTracker_v2_Feature_Guide.pdf';
         const badgeLabel = (item as any).badgeLabel || 'PDF';
-        const downloadUrl = `${item.to}?download=true`;
+        const downloadUrl = `${item.to}?v=${GUIDE_VERSION}&download=true`;
         return (
           <a
             key={item.to}
@@ -411,7 +412,7 @@ const LayoutShell = () => {
                           {section.items.map((item) => {
                             if ((item as any).isDownload) {
                               const downloadName = (item as any).downloadName || 'DailyTracker_v2_Feature_Guide.pdf';
-                              const downloadUrl = `${item.to}?download=true`;
+                              const downloadUrl = `${item.to}?v=${GUIDE_VERSION}&download=true`;
                               return (
                                 <a
                                   key={item.to}
