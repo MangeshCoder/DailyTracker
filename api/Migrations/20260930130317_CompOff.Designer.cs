@@ -3,6 +3,7 @@ using System;
 using DailyTrackerAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DailyTrackerAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930130317_CompOff")]
+    partial class CompOff
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1677,83 +1680,6 @@ namespace DailyTrackerAPI.Migrations
                     b.ToTable("LeaveRequests");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.HR.OnboardingPlan", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("BuddyUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("CreatedById")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BuddyUserId");
-
-                    b.HasIndex("CreatedById");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("OnboardingPlans");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.HR.OnboardingTask", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("DoneAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int?>("DoneById")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("citext");
-
-                    b.Property<string>("Owner")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("citext");
-
-                    b.Property<int>("PlanId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("citext");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PlanId");
-
-                    b.ToTable("OnboardingTasks");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.HR.Resignation", b =>
                 {
                     b.Property<int>("Id")
@@ -3164,43 +3090,6 @@ namespace DailyTrackerAPI.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.HR.OnboardingPlan", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "Buddy")
-                        .WithMany()
-                        .HasForeignKey("BuddyUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Buddy");
-
-                    b.Navigation("CreatedBy");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.HR.OnboardingTask", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.HR.OnboardingPlan", "Plan")
-                        .WithMany("Tasks")
-                        .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Plan");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.HR.Resignation", b =>
                 {
                     b.HasOne("DailyTrackerAPI.Models.Auth.User", "ReviewedBy")
@@ -3480,11 +3369,6 @@ namespace DailyTrackerAPI.Migrations
                     b.Navigation("ActionItems");
 
                     b.Navigation("Attendees");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.HR.OnboardingPlan", b =>
-                {
-                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.HR.Resignation", b =>

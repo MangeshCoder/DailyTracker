@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from 'react';
-import { reportApi, downloadBlob } from '../services/api';
+import { reportApi, downloadBlob, exportApi } from '../services/api';
 import type { UserFullReport, AttendanceDay } from '../types';
 import { useAuth } from '../context/Authcontext';
 import { DatePicker } from '../components/DatePicker';
@@ -41,6 +41,8 @@ import {
 } from 'lucide-react';
 import { localDate } from '../utils/date';
 import { Select } from '../components/ui/Select';
+import { ExcelButton } from '../components/ExcelButton';
+import { FileSpreadsheet } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -148,7 +150,7 @@ export const MyReportPage = () => {
   const [loading, setLoading] = useState(false);
   const [calLoading, setCalLoading] = useState(false);
   const [downloading, setDownloading] = useState('');
-  const [format, setFormat] = useState<'pdf' | 'docx'>('pdf');
+  const [format, setFormat] = useState<'pdf' | 'docx' | 'xlsx'>('pdf');
 
   const loadReport = async () => {
     setLoading(true);
@@ -177,7 +179,7 @@ export const MyReportPage = () => {
     setDownloading(format);
     try {
       const res = await reportApi.downloadMyReport(format, from, to);
-      const ext = format === 'docx' ? 'docx' : 'html';
+      const ext = format === 'pdf' ? 'html' : format;
       const name = `MyReport_${user?.fullName?.replace(/\s/g, '_')}_${from}_${to}.${ext}`;
       downloadBlob(res.data, name);
     } finally {
@@ -347,8 +349,8 @@ export const MyReportPage = () => {
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">Download My Report</h3>
               </div>
-              <div className="grid grid-cols-2 gap-2 p-1 mb-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                {(['pdf', 'docx'] as const).map(f => (
+              <div className="grid grid-cols-3 gap-2 p-1 mb-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                {(['pdf', 'docx', 'xlsx'] as const).map(f => (
                   <button
                     key={f}
                     onClick={() => setFormat(f)}
@@ -358,8 +360,8 @@ export const MyReportPage = () => {
                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    {f === 'pdf' ? <Globe className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-                    {f === 'pdf' ? 'PDF' : 'Word'}
+                    {f === 'pdf' ? <Globe className="w-4 h-4" /> : f === 'xlsx' ? <FileSpreadsheet className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                    {f === 'pdf' ? 'PDF' : f === 'xlsx' ? 'Excel' : 'Word'}
                   </button>
                 ))}
               </div>
@@ -414,6 +416,11 @@ export const MyReportPage = () => {
                 </div>
               ) : (
                 <AttendanceCalendar days={calDays} />
+              )}
+              {!calLoading && (
+                <ExcelButton className="w-full justify-center mt-4" label="Download month (Excel)"
+                  fetch={() => exportApi.myAttendance(month, year)}
+                  fileName={`My_Attendance_${year}-${String(month).padStart(2, '0')}.xlsx`} />
               )}
             </CardContent>
           </Card>

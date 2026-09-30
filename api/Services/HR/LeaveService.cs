@@ -51,6 +51,7 @@ namespace DailyTrackerAPI.Services.HR
         private readonly IEmailService _email;
         private readonly IEmailActionService _emailAction;
         private readonly ILogger<LeaveService> _logger;
+        private readonly ICompOffService _compOff;
 
         private static readonly string[] ReviewStatuses = { "Approved", "Rejected" };
 
@@ -70,8 +71,10 @@ namespace DailyTrackerAPI.Services.HR
             INotificationSender notif,
             IEmailService email,
             IEmailActionService emailAction,
-            ILogger<LeaveService> logger)
+            ILogger<LeaveService> logger,
+            ICompOffService compOff)
         {
+            _compOff = compOff;
             _db = db;
             _notif = notif;
             _email = email;
@@ -166,6 +169,10 @@ namespace DailyTrackerAPI.Services.HR
                 Reason = dto.Reason,
                 Status = "Pending"
             };
+
+            // Comp-off leave is paid for by comp-off days earned on weekends / holidays
+            if (leave.LeaveType == "CompOff")
+                await _compOff.ReserveForLeaveAsync(leave, WorkingDays(leave.FromDate, leave.ToDate, holidays));
 
             _db.LeaveRequests.Add(leave);
             await _db.SaveChangesAsync();
@@ -262,6 +269,7 @@ namespace DailyTrackerAPI.Services.HR
                 throw new ValidationException("You can't review your own leave request — another manager needs to review it.");
 
             leave.Status = status;
+            if (status == "Rejected") await _compOff.ReleaseForLeaveAsync(leave.Id);   // the comp-off days can be used again
             leave.ReviewedByUserId = managerId;
             leave.ReviewNote = dto.ReviewNote;
             leave.ReviewedAt = DateTime.UtcNow;
@@ -287,6 +295,7 @@ namespace DailyTrackerAPI.Services.HR
                 .FirstOrDefaultAsync(l => l.Id == leaveId && l.UserId == userId && l.Status == "Pending")
                 ?? throw new ValidationException("Leave request not found or cannot be cancelled.");
 
+            await _compOff.ReleaseForLeaveAsync(leave.Id);
             _db.LeaveRequests.Remove(leave);
             await _db.SaveChangesAsync();
         }
@@ -337,6 +346,14 @@ namespace DailyTrackerAPI.Services.HR
                     .ToListAsync();
             }
 
+            var today = AppClock.TodayIst;
+            var compOffAvailable = await _db.CompOffCredits
+                .Where(c => c.Status == "Approved" && c.UsedByLeaveId == null && c.ExpiresOn >= today
+                            && (userId == null || c.UserId == userId))
+                .GroupBy(c => c.UserId)
+                .Select(g => new { g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.Count);
+
             // Index leaves by userId for O(1) lookup
             var leavesByUser = leaves.GroupBy(l => l.UserId)
                                .ToDictionary(g => g.Key, g => g.ToList());
@@ -349,8 +366,9 @@ namespace DailyTrackerAPI.Services.HR
 
                 var balances = new List<LeaveTypeBalanceItem>();
 
-                foreach (var (leaveType, entitlement) in Entitlements)
+                foreach (var (leaveType, typeEntitlement) in Entitlements)
                 {
+                    var entitlement = typeEntitlement;
                     var typeLeaves = userLeaves.Where(l => l.LeaveType == leaveType).ToList();
 
                     int used = 0;
@@ -368,6 +386,14 @@ namespace DailyTrackerAPI.Services.HR
 
                     bool isUnlimited = entitlement == 0;
                     int remaining = isUnlimited ? 0 : Math.Max(0, entitlement - used);
+
+                    // Comp-off: what you can take is what you earned and haven't used yet
+                    if (leaveType == "CompOff")
+                    {
+                        isUnlimited = false;
+                        remaining = compOffAvailable.GetValueOrDefault(user.Id);
+                        entitlement = remaining + used;
+                    }
 
                     balances.Add(new LeaveTypeBalanceItem
                     {
@@ -409,6 +435,15 @@ namespace DailyTrackerAPI.Services.HR
         //
         // BEFORE: only skipped Saturday + Sunday
         // AFTER:  skips Saturday + Sunday + any date in the holidays HashSet
+        private static List<DateTime> WorkingDays(DateTime from, DateTime to, HashSet<DateTime> holidays)
+        {
+            var days = new List<DateTime>();
+            for (var date = from.Date; date <= to.Date; date = date.AddDays(1))
+                if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday && !holidays.Contains(date))
+                    days.Add(date);
+            return days;
+        }
+
         private static int CountWorkingDays(DateTime from, DateTime to, HashSet<DateTime> holidays)
         {
             int count = 0;

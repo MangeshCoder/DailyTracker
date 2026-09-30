@@ -1,4 +1,4 @@
-using DailyTrackerAPI.Models.Attendance;
+﻿using DailyTrackerAPI.Models.Attendance;
 using DailyTrackerAPI.Models.Auth;
 using DailyTrackerAPI.Models.Communication;
 using DailyTrackerAPI.Models.Face_Lock;
@@ -41,6 +41,9 @@ namespace DailyTrackerAPI.Data
         public DbSet<Kudos> Kudos { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<LeaveEmailAction> LeaveEmailActions { get; set; }
+        public DbSet<CompOffCredit> CompOffCredits { get; set; }
+        public DbSet<OnboardingPlan> OnboardingPlans { get; set; }
+        public DbSet<OnboardingTask> OnboardingTasks { get; set; }
 
         // ─── Feature 10: Attendance Enhanced ─────────────────────────────────
         public DbSet<Holiday> Holidays { get; set; }
@@ -240,6 +243,33 @@ namespace DailyTrackerAPI.Data
                  .OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(l => l.ReviewedBy).WithMany().HasForeignKey(l => l.ReviewedByUserId)
                  .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ── Comp-off: one credit per weekend / holiday day worked
+            mb.Entity<CompOffCredit>(e => {
+                e.HasIndex(c => c.DailyLogId).IsUnique();
+                e.HasIndex(c => new { c.UserId, c.Status });
+                e.Property(c => c.Status).HasMaxLength(20);
+                e.Property(c => c.Occasion).HasMaxLength(100);
+                e.Property(c => c.ReviewNote).HasMaxLength(300);
+                e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(c => c.DailyLog).WithMany().HasForeignKey(c => c.DailyLogId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(c => c.UsedByLeave).WithMany().HasForeignKey(c => c.UsedByLeaveId).OnDelete(DeleteBehavior.SetNull);
+                e.HasOne(c => c.ReviewedBy).WithMany().HasForeignKey(c => c.ReviewedById).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ── Onboarding: one checklist per new joiner
+            mb.Entity<OnboardingPlan>(e => {
+                e.HasIndex(p => p.UserId).IsUnique();
+                e.HasOne(p => p.User).WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(p => p.Buddy).WithMany().HasForeignKey(p => p.BuddyUserId).OnDelete(DeleteBehavior.SetNull);
+                e.HasOne(p => p.CreatedBy).WithMany().HasForeignKey(p => p.CreatedById).OnDelete(DeleteBehavior.Restrict);
+                e.HasMany(p => p.Tasks).WithOne(t => t.Plan).HasForeignKey(t => t.PlanId).OnDelete(DeleteBehavior.Cascade);
+            });
+            mb.Entity<OnboardingTask>(e => {
+                e.Property(t => t.Title).HasMaxLength(200);
+                e.Property(t => t.Kind).HasMaxLength(20);
+                e.Property(t => t.Owner).HasMaxLength(20);
             });
 
             // ── LateArrivalReason

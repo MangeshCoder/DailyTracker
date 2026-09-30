@@ -95,6 +95,44 @@ namespace DailyTrackerAPI.Controllers.HR
             return Ok(new { message = "Leave updated successfully" });
         }
 
+        /// <summary>
+        /// Leave as an Excel file for a year: requests, balances and comp-off.
+        /// A manager gets everyone's; everybody else gets their own.
+        /// </summary>
+        [HttpGet("export")]
+        public async Task<IActionResult> Export([FromQuery] int year, [FromServices] ICompOffService compOff)
+        {
+            if (year < 2000) year = AppClock.TodayIst.Year;
+            var userId = User.GetUserId();
+            var isManager = User.IsInRole("Manager");
+            var from = new DateTime(year, 1, 1);
+            var to = new DateTime(year, 12, 31);
+
+            var leaves = (isManager ? await _leaveSvc.GetAllLeavesAsync(null, userId) : await _leaveSvc.GetMyLeavesAsync(userId))
+                .Where(l => l.FromDate <= to && l.ToDate >= from)
+                .OrderBy(l => l.UserName).ThenBy(l => l.FromDate).ToList();
+            var balances = year == AppClock.TodayIst.Year
+                ? await _leaveSvc.GetAnnualBalanceAsync(isManager ? null : userId)
+                : new List<LeaveBalanceDto>();
+            var credits = isManager ? await compOff.GetTeamAsync(userId) : (await compOff.GetMineAsync(userId)).Credits;
+
+            DateTime? Ist(DateTime? utc) => utc is DateTime u ? AppClock.ToIst(u) : null;
+            var writer = new XlsxWriter()
+                .AddSheet("Leave requests", new[] { "Employee", "Type", "From", "To", "Days", "Status", "Reason", "Applied on (IST)", "Reviewed by", "Review note", "Reviewed on (IST)" },
+                    leaves.Select(l => new object?[] { l.UserName, l.LeaveType, l.FromDate.Date, l.ToDate.Date, l.LeaveDays, l.Status, l.Reason,
+                        Ist(l.AppliedAt), l.ReviewerName, l.ReviewNote, Ist(l.ReviewedAt) }));
+            if (balances.Count > 0)
+                writer.AddSheet($"Balance {year}", new[] { "Employee", "Type", "Entitlement", "Used (incl. pending)", "Pending", "Remaining" },
+                    balances.SelectMany(b => b.Balances.Select(t => new object?[] { b.UserName, t.LeaveType,
+                        t.IsUnlimited ? "No limit" : t.Entitlement, t.Used, t.Pending, t.IsUnlimited ? "No limit" : t.Remaining })));
+            writer.AddSheet("Comp-off", new[] { "Employee", "Day worked", "Occasion", "Hours worked", "State", "Use by", "Taken on", "Decided by", "Note" },
+                credits.Where(c => c.WorkDate.Year == year || c.ExpiresOn.Year == year).OrderBy(c => c.UserName).ThenBy(c => c.WorkDate)
+                    .Select(c => new object?[] { c.UserName, c.WorkDate.Date, c.Occasion, Math.Round(c.WorkMinutes / 60.0, 2), c.State,
+                        c.ExpiresOn.Date, c.UsedOn?.Date, c.ReviewerName, c.ReviewNote }));
+
+            return File(writer.ToBytes(), XlsxWriter.ContentType, $"{(isManager ? "Team_Leave" : "My_Leave")}_{year}.xlsx");
+        }
+
         // ── CHANGED: calls GetAnnualBalanceAsync ───────────────────────────────
         [HttpGet("balance")]
         public async Task<IActionResult> GetBalance()

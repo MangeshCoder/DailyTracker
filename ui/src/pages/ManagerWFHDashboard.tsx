@@ -9,6 +9,7 @@ import { PendingRequestsPanel } from '../components/PendingRequestsPanel';
 import { PendingLeavePanel, TeamLeaveHistory, usePendingLeave } from '../components/PendingLeavePanel';
 import { useAuth } from '../context/Authcontext';
 import { PendingCorrectionsPanel, usePendingCorrections } from '../components/PendingCorrectionsPanel';
+import { PendingCompOffPanel, usePendingCompOff } from '../components/CompOffPanel';
 import { TeamMonthlyAttendances } from '../components/TeamMonthlyAttendance';
 import { AllRequestsHistory } from '../components/AllRequestsHistory';
 import {
@@ -43,8 +44,9 @@ export const ManagerWFHDashboard: React.FC = () => {
   const canReviewLeave = useAuth().user?.role === 'Manager';
   const { data: pendingLeave = [] } = usePendingLeave(canReviewLeave);
   const { data: pendingCorrections = [] } = usePendingCorrections();
+  const { data: pendingCompOff = [] } = usePendingCompOff();
   const pendingCount = pendingRequests.length + pendingLeave.filter(l => l.canReview !== false).length
-    + pendingCorrections.length;
+    + pendingCorrections.length + pendingCompOff.length;
 
   interface DashboardTab {
     key: 'today' | 'pending' | 'monthly' | 'history';
@@ -171,6 +173,7 @@ export const ManagerWFHDashboard: React.FC = () => {
           <div className="space-y-8">
             {canReviewLeave && <PendingLeavePanel />}
             <PendingCorrectionsPanel />
+            <PendingCompOffPanel />
             <section aria-label="WFH and half-day requests" className="space-y-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">WFH &amp; half-day requests</h3>
               <PendingRequestsPanel />

@@ -297,7 +297,28 @@ export const leaveApi = {
   reviewFromEmail: (token: string, status: string) => api.post('/leave/email-review', { token, status })
 };
 
+// ─── Comp-off: days off earned by working on weekends / holidays ─────────────
+export const compOffApi = {
+  getMine: () => api.get('/compoff/my'),
+  getPending: () => api.get('/compoff/pending'),
+  getTeam: () => api.get('/compoff/team'),
+  review: (id: number, d: { status: 'Approved' | 'Rejected'; note?: string }) => api.put(`/compoff/${id}/review`, d),
+};
+
 // ─── Holidays (Feature 10) ────────────────────────────────────────────────────
+// ─── Onboarding: a new joiner's getting-started checklist ─────────────────────
+export const onboardingApi = {
+  getMine: () => api.get('/onboarding/my'),
+  getTeam: () => api.get('/onboarding'),
+  getCandidates: () => api.get('/onboarding/candidates'),
+  start: (d: { userId: number; buddyUserId?: number | null }) => api.post('/onboarding', d),
+  setBuddy: (planId: number, buddyUserId: number | null) => api.put(`/onboarding/${planId}/buddy`, { buddyUserId }),
+  addTask: (planId: number, d: { title: string; owner: 'Employee' | 'Manager' }) => api.post(`/onboarding/${planId}/tasks`, d),
+  cancel: (planId: number) => api.delete(`/onboarding/${planId}`),
+  tick: (taskId: number, done: boolean) => api.put(`/onboarding/tasks/${taskId}`, { done }),
+  removeTask: (taskId: number) => api.delete(`/onboarding/tasks/${taskId}`),
+};
+
 export const holidayApi = {
   getByYear: (year = new Date().getFullYear()) => api.get(`/holidays?year=${year}`),
   isToday: () => api.get('/holidays/today'),
@@ -395,6 +416,17 @@ export const reportApi = {
 export const auditApi = {
   getLogs: (userId?: number, entity?: string, take = 50) =>
     api.get('/audit', { params: { userId, entity, take } }),
+};
+
+// ─── Excel downloads ──────────────────────────────────────────────────────────
+export const exportApi = {
+  teamAttendance: (month: number, year: number) =>
+    api.get('/wfh-requests/team-monthly/export', { params: { month, year }, responseType: 'blob' }),
+  myAttendance: (month: number, year: number) =>
+    api.get('/report/my/attendance/export', { params: { month, year }, responseType: 'blob' }),
+  leave: (year: number) => api.get('/leave/export', { params: { year }, responseType: 'blob' }),
+  payroll: (month: number, year: number) =>
+    api.get('/payroll/team/export', { params: { month, year }, responseType: 'blob' }),
 };
 
 // ─── Helper: download blob ────────────────────────────────────────────────────

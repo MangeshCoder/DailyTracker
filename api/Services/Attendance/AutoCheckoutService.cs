@@ -196,7 +196,7 @@ namespace DailyTrackerAPI.Services.Attendance
             await _db.SaveChangesAsync();
 
             var employee = await _db.Users.FindAsync(userId);
-            var approvers = await ApproversAsync(userId);
+            var approvers = await _scope.ApproversAsync(userId);
             if (approvers.Count > 0)
                 await BestEffortAsync("correction notice", () => _notify.CreateForUsersAsync(approvers,
                     "🕒 Check-out correction",
@@ -219,7 +219,7 @@ namespace DailyTrackerAPI.Services.Attendance
             foreach (var d in rows)
             {
                 var own = d.UserId == reviewerId;
-                if (own && !await MayReviewOwnAsync(reviewerId)) continue;
+                if (own && !await _scope.MayReviewOwnAsync(reviewerId)) continue;
                 result.Add(new CheckoutCorrectionDto
                 {
                     LogId = d.Id,
@@ -247,7 +247,7 @@ namespace DailyTrackerAPI.Services.Attendance
                 throw new InvalidOperationException("This correction was already decided.");
             if (log.UserId == reviewerId)
             {
-                if (!await MayReviewOwnAsync(reviewerId))
+                if (!await _scope.MayReviewOwnAsync(reviewerId))
                     throw new UnauthorizedAccessException("You can't approve your own correction — your manager decides it.");
             }
             else await _scope.EnsureCanManageAsync(reviewerId, log.UserId);
@@ -281,23 +281,6 @@ namespace DailyTrackerAPI.Services.Attendance
                 dto.Status == "Approved" ? "✅ Check-out corrected" : "Check-out correction declined", msg,
                 dto.Status == "Approved" ? "Success" : "Warning", "/history"));
         }
-
-        // ── Who decides ──────────────────────────────────────────────────────
-
-        /// <summary>The person's own manager / team lead, else every active manager (not themselves)</summary>
-        private async Task<List<int>> ApproversAsync(int userId)
-        {
-            var user = await _db.Users.FindAsync(userId);
-            if (user?.ManagerId is int mid && mid != userId
-                && await _db.Users.AnyAsync(u => u.Id == mid && u.IsActive && (u.Role == "Manager" || u.Role == "TeamLead")))
-                return new() { mid };
-            return await _db.Users.Where(u => u.Role == "Manager" && u.IsActive && u.Id != userId).Select(u => u.Id).ToListAsync();
-        }
-
-        /// <summary>Only when nobody else could decide (e.g. the only manager)</summary>
-        private async Task<bool> MayReviewOwnAsync(int userId) =>
-            await _db.Users.AnyAsync(u => u.Id == userId && u.IsActive && (u.Role == "Manager" || u.Role == "TeamLead"))
-            && (await ApproversAsync(userId)).Count == 0;
 
         private async Task BestEffortAsync(string what, Func<Task> action)
         {

@@ -20,6 +20,12 @@ namespace DailyTrackerAPI.Services.Auth
         Task EnsureCanManageAsync(int actorId, int targetUserId);
 
         Task<bool> IsManagerAsync(int actorId);
+
+        /// <summary>Who decides this person's requests: their own manager / team lead, else every active manager (never themselves)</summary>
+        Task<List<int>> ApproversAsync(int userId);
+
+        /// <summary>A manager / team lead may decide their own request only when nobody else could</summary>
+        Task<bool> MayReviewOwnAsync(int userId);
     }
 
     public class TeamScope : ITeamScope
@@ -49,6 +55,19 @@ namespace DailyTrackerAPI.Services.Auth
             var ids = await ManagedUserIdsAsync(actorId);
             return ids == null || ids.Contains(targetUserId);
         }
+
+        public async Task<List<int>> ApproversAsync(int userId)
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user?.ManagerId is int mid && mid != userId
+                && await _db.Users.AnyAsync(u => u.Id == mid && u.IsActive && (u.Role == "Manager" || u.Role == "TeamLead")))
+                return new() { mid };
+            return await _db.Users.Where(u => u.Role == "Manager" && u.IsActive && u.Id != userId).Select(u => u.Id).ToListAsync();
+        }
+
+        public async Task<bool> MayReviewOwnAsync(int userId) =>
+            await _db.Users.AnyAsync(u => u.Id == userId && u.IsActive && (u.Role == "Manager" || u.Role == "TeamLead"))
+            && (await ApproversAsync(userId)).Count == 0;
 
         public async Task EnsureCanManageAsync(int actorId, int targetUserId)
         {

@@ -13,6 +13,8 @@ import { useState } from 'react';
 import { Card } from './ui/Card';
 import { CalendarRange, Inbox } from 'lucide-react';
 import { Select } from './ui/Select';
+import { ExcelButton } from './ExcelButton';
+import { exportApi } from '../services/api';
 
 const SELECT_CLS =
   'appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ' +
@@ -68,6 +70,8 @@ export const TeamMonthlyAttendances = () => {
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </Select>
         </div>
+        <ExcelButton className="ml-auto" fetch={() => exportApi.teamAttendance(month, year)}
+          fileName={`Team_Attendance_${year}-${String(month).padStart(2, '0')}.xlsx`} />
       </div>
 
       {isLoading ? (

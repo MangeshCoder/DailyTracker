@@ -62,6 +62,8 @@ namespace DailyTrackerAPI.Extensions
 
             // ── HR & Leave ────────────────────────────────────────────────────
             services.AddScoped<ILeaveService, LeaveService>();
+            services.AddScoped<ICompOffService, CompOffService>();
+            services.AddScoped<IOnboardingService, OnboardingService>();   // new joiners' checklist   // comp-off for weekend / holiday work
             services.AddScoped<IHolidayService, HolidayService>();
             services.AddScoped<IResignationService, ResignationService>();
 

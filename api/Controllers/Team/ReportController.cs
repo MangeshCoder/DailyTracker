@@ -60,6 +60,21 @@ namespace DailyTrackerAPI.Controllers.Team
             var safeName = report.User.FullName.Replace(" ", "_");
             var period = $"{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}";
 
+            if (format.Equals("xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                var bytes = new XlsxWriter()
+                    .AddSheet("Summary", new[] { "Employee", "From", "To", "Working days", "Days present", "Attendance %",
+                                                 "Total hours", "Avg hours / day", "Tasks completed", "Tasks logged", "Support given" },
+                        new[] { new object?[] { report.User.FullName, report.FromDate.Date, report.ToDate.Date, report.TotalWorkingDays,
+                            report.DaysPresent, Math.Round(report.AttendancePercentage, 1), report.TotalWorkHours,
+                            Math.Round(report.AverageDailyHours, 2), report.TotalTasksCompleted, report.TotalTasksLogged, report.TotalSupportGiven } })
+                    .AddSheet("Daily", new[] { "Date", "Day", "Status", "Check-in (IST)", "Check-out (IST)", "Work hours", "Break minutes", "Tasks", "Support", "Notes" },
+                        report.DailyEntries.OrderBy(e => e.Date).Select(e => new object?[] { e.Date.Date, e.Date.DayOfWeek.ToString(), e.DayStatus,
+                            e.CheckIn, e.CheckOut, e.WorkHours, e.BreakMinutes, string.Join("; ", e.TasksSummary), string.Join("; ", e.SupportSummary), e.Notes }))
+                    .ToBytes();
+                return File(bytes, XlsxWriter.ContentType, $"MyReport_{safeName}_{period}.xlsx");
+            }
+
             if (format.Equals("docx", StringComparison.OrdinalIgnoreCase))
             {
                 var bytes = _reportService.GenerateWordReport(report);
@@ -87,6 +102,29 @@ namespace DailyTrackerAPI.Controllers.Team
             var userId = User.GetUserId();
             var result = await _managerService.GetUserMonthlyAttendanceAsync(userId, month, year);
             return Ok(result);
+        }
+
+        /// <summary>My attendance for a month as an Excel file</summary>
+        [HttpGet("my/attendance/export")]
+        public async Task<IActionResult> ExportMyAttendance([FromQuery] int month = 0, [FromQuery] int year = 0)
+        {
+            if (month is < 1 or > 12) month = AppClock.TodayIst.Month;
+            if (year < 2000) year = AppClock.TodayIst.Year;
+            var userId = User.GetUserId();
+            var summary = await _managerService.GetUserMonthlyAttendanceAsync(userId, month, year);
+            var days = await _managerService.GetUserAttendanceCalendarAsync(userId, month, year);
+            var label = new DateTime(year, month, 1).ToString("MMMM yyyy");
+
+            var bytes = new XlsxWriter()
+                .AddSheet("Summary", new[] { "Employee", "Month", "Working days", "Present", "WFH", "Half day", "Absent",
+                                             "Weekend days worked", "Holidays worked", "Attendance %", "Total hours", "Avg hours / day", "Tasks completed" },
+                    new[] { new object?[] { summary.User.FullName, label, summary.WorkingDaysInMonth, summary.DaysPresent, summary.DaysWFH,
+                        summary.DaysHalfDay, summary.DaysAbsent, summary.DaysWeekend, summary.DaysHoliday, Math.Round(summary.AttendancePercentage, 1),
+                        summary.TotalWorkHours, Math.Round(summary.AverageDailyHours, 2), summary.TotalTasksCompleted } })
+                .AddSheet("Daily", new[] { "Date", "Day", "Status", "Check-in (IST)", "Check-out (IST)", "Work hours", "Tasks completed" },
+                    days.Select(d => new object?[] { d.Date, d.Date.DayOfWeek.ToString(), d.Status, d.CheckIn, d.CheckOut, d.WorkHours, d.TasksCompleted }))
+                .ToBytes();
+            return File(bytes, XlsxWriter.ContentType, $"My_Attendance_{label.Replace(" ", "_")}.xlsx");
         }
 
         /// <summary>Get current user's attendance calendar for a month.</summary>

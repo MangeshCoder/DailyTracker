@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { apiErrorMessage } from '../utils/apiError';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { leaveApi, holidayApi } from '../services/api';
+import { leaveApi, holidayApi, exportApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/Authcontext';
 import {
@@ -31,6 +31,8 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { Select } from '../components/ui/Select';
 import { useNavigate } from 'react-router-dom';
 import { usePendingLeave } from '../components/PendingLeavePanel';
+import { MyCompOffPanel } from '../components/CompOffPanel';
+import { ExcelButton } from '../components/ExcelButton';
 
 // ─── Leave type visual configuration ─────────────────────────────────────────
 interface LeaveTypeConfig {
@@ -68,7 +70,7 @@ const LEAVE_CONFIG: Record<string, LeaveTypeConfig> = {
     badgeBg: 'bg-purple-500/10 dark:bg-purple-500/15',
     badgeText: 'text-purple-700 dark:text-purple-300 border-purple-500/25',
     barColor: 'from-purple-500 to-indigo-500',
-    description: 'Compensatory leave for weekend/overtime duty',
+    description: 'Earned by working on a weekend or holiday',
   },
   Unpaid: {
     icon: '💸',
@@ -107,7 +109,7 @@ const LeaveTypeCard = ({ item }: { item: LeaveTypeBalanceItem }) => {
               {item.leaveType}
             </h4>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
-              {item.isUnlimited ? 'No Cap' : `${item.entitlement}d quota`}
+              {item.isUnlimited ? 'No Cap' : item.leaveType === 'CompOff' ? `${item.entitlement}d earned` : `${item.entitlement}d quota`}
             </p>
           </div>
         </div>
@@ -385,6 +387,7 @@ export const LeaveManagementPage: React.FC = () => {
       qc.invalidateQueries({ queryKey: ['myLeaves'] });
       qc.invalidateQueries({ queryKey: ['pendingLeave'] });
       qc.invalidateQueries({ queryKey: ['leaveBalance'] });
+      qc.invalidateQueries({ queryKey: ['myCompOff'] });
     },
   });
 
@@ -396,6 +399,7 @@ export const LeaveManagementPage: React.FC = () => {
       qc.invalidateQueries({ queryKey: ['myLeaves'] });
       qc.invalidateQueries({ queryKey: ['pendingLeave'] });
       qc.invalidateQueries({ queryKey: ['leaveBalance'] });
+      qc.invalidateQueries({ queryKey: ['myCompOff'] });
     },
   });
 
@@ -467,6 +471,9 @@ export const LeaveManagementPage: React.FC = () => {
         ]}
         badge={{ label: 'Annual Quota Active', variant: 'emerald' }}
         actions={
+          <div className="flex flex-wrap items-center gap-2">
+          <ExcelButton fetch={() => exportApi.leave(new Date().getFullYear())}
+            fileName={`${isManager ? 'Team' : 'My'}_Leave_${new Date().getFullYear()}.xlsx`} />
           <button
             type="button"
             onClick={() => setShowApply(!showApply)}
@@ -488,6 +495,7 @@ export const LeaveManagementPage: React.FC = () => {
               </>
             )}
           </button>
+          </div>
         }
       />
 
@@ -529,6 +537,9 @@ export const LeaveManagementPage: React.FC = () => {
         isManager={isManager}
         isLoading={balanceLoading}
       />
+
+      {/* ── Comp-off earned on weekends / holidays ── */}
+      <MyCompOffPanel />
 
       {/* ── Apply Leave Form (Collapsible Card) ── */}
       {showApply && (

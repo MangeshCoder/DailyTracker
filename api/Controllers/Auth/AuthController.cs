@@ -1,4 +1,4 @@
-using DailyTrackerAPI.Data;
+﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Auth;
@@ -416,11 +416,13 @@ namespace DailyTrackerAPI.Controllers.Auth
 
         [Authorize(Roles = "Manager")]
         [HttpPost("assign-role")]
-        public async Task<IActionResult> AssignRole(AssignRoleDto dto)
+        public async Task<IActionResult> AssignRole(AssignRoleDto dto,
+            [FromServices] DailyTrackerAPI.Services.HR.IOnboardingService onboarding)
         {
             var user = await _db.Users.FindAsync(dto.UserId);
             if (user == null)
                 return NotFound("User not found");
+            var isNewJoiner = user.Role == "Pending";
 
             var currentManagerId = User.GetUserId();
 
@@ -446,6 +448,9 @@ namespace DailyTrackerAPI.Controllers.Auth
             }
 
             await _db.SaveChangesAsync();
+
+            // a newly approved account gets its getting-started checklist
+            if (isNewJoiner) await onboarding.StartForNewJoinerAsync(currentManagerId, user.Id);
 
             return Ok("Role assigned successfully");
         }

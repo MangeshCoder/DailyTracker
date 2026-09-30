@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { payrollApi } from '../services/api';
+import { payrollApi, exportApi } from '../services/api';
 import { useAuth } from '../context/Authcontext';
 import { useToast } from '../context/ToastContext';
 import type {
@@ -31,6 +31,7 @@ import {
   Coins
 } from 'lucide-react';
 import { Select } from '../components/ui/Select';
+import { ExcelButton } from '../components/ExcelButton';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -613,6 +614,8 @@ const TeamPayrollView: React.FC<{
                 {teamData.membersConfigured} active packages · {teamData.membersNotConfigured} pending setup
               </p>
             </div>
+            <ExcelButton fetch={() => exportApi.payroll(teamData.month, teamData.year)}
+              fileName={`Payroll_${teamData.monthLabel.replace(' ', '_')}.xlsx`} />
           </div>
         </CardHeader>
 

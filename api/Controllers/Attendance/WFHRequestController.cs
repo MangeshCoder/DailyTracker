@@ -198,6 +198,35 @@ namespace DailyTrackerAPI.Controllers.Attendance
             return Ok(result);
         }
 
+        /// <summary>Monthly team attendance as an Excel file: a summary per person and every day</summary>
+        [HttpGet("team-monthly/export")]
+        [Authorize(Roles = "Manager,TeamLead,Admin")]
+        public async Task<IActionResult> ExportTeamMonthly(
+            [FromServices] DailyTrackerAPI.Services.Team.IManagerService managerService,
+            [FromQuery] int month = 0, [FromQuery] int year = 0)
+        {
+            var now = AppClock.TodayIst;
+            month = month is >= 1 and <= 12 ? month : now.Month;
+            year = year > 2000 ? year : now.Year;
+            var team = await _wfhService.GetTeamMonthlyAttendanceAsync(User.GetUserId(), month, year);
+
+            var daily = new List<object?[]>();
+            foreach (var m in team.OrderBy(m => m.FullName))
+                foreach (var d in await managerService.GetUserAttendanceCalendarAsync(m.UserId, month, year))
+                    daily.Add(new object?[] { m.FullName, d.Date, d.Date.DayOfWeek.ToString(), d.Status, d.CheckIn, d.CheckOut, d.WorkHours, d.TasksCompleted });
+
+            var label = new DateTime(year, month, 1).ToString("MMMM yyyy");
+            var bytes = new XlsxWriter()
+                .AddSheet("Summary", new[] { "Employee", "Role", "Working days", "Present", "WFH", "Half day", "On leave", "Absent",
+                                             "Weekend days worked", "Holidays worked", "Attendance %", "Total hours", "Avg hours / day", "Tasks completed" },
+                    team.OrderBy(m => m.FullName).Select(m => new object?[] { m.FullName, m.Role, m.WorkingDaysInMonth, m.DaysPresent, m.DaysWFH,
+                        m.DaysHalfDay, m.DaysOnLeave, m.DaysAbsent, m.DaysWeekend, m.DaysHoliday, Math.Round(m.AttendancePercentage, 1),
+                        m.TotalWorkHours, Math.Round(m.AverageDailyHours, 2), m.TotalTasksCompleted }))
+                .AddSheet("Daily", new[] { "Employee", "Date", "Day", "Status", "Check-in (IST)", "Check-out (IST)", "Work hours", "Tasks completed" }, daily)
+                .ToBytes();
+            return File(bytes, XlsxWriter.ContentType, $"Team_Attendance_{label.Replace(" ", "_")}.xlsx");
+        }
+
         [AllowAnonymous]
         [HttpPost("review")]
         public async Task<IActionResult> ReviewFromEmail(string token, string status,

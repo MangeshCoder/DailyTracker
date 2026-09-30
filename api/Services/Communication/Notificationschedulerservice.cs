@@ -3,6 +3,7 @@ using DailyTrackerAPI.Models.Communication;
 using Microsoft.EntityFrameworkCore;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Attendance;
+using DailyTrackerAPI.Services.HR;
 
 namespace DailyTrackerAPI.Services.Communication
 {
@@ -75,6 +76,7 @@ namespace DailyTrackerAPI.Services.Communication
         private const string JOB_LOG = "LOG_REMINDER";
         private const string JOB_CHECKOUT = "CHECKOUT_REMINDER";
         private const string JOB_AUTO_CLOSE = "AUTO_CHECKOUT";
+        private const string JOB_COMP_OFF = "COMP_OFF";
 
         // (IST hour, IST minute, job key)
         private static readonly (int Hour, int Min, string Key)[] _schedule =
@@ -85,6 +87,7 @@ namespace DailyTrackerAPI.Services.Communication
             (18, 0,  JOB_LOG),
             (19, 0,  JOB_CHECKOUT),     // still checked in at 7 PM → reminder
             (5,  0,  JOB_AUTO_CLOSE),   // shifts nobody checked out of → closed at the last proof of work
+            (5,  15, JOB_COMP_OFF),     // weekend / holiday work → comp-off days; expiry reminders
         };
 
         public NotificationSchedulerService(
@@ -131,7 +134,7 @@ namespace DailyTrackerAPI.Services.Communication
                     // 15:00 is noise, so skip it once it's more than a few hours late
                     var scheduledAt = nowIst.Date.AddHours(hour).AddMinutes(min);
                     // (closing forgotten shifts is still right when late — only reminders go stale)
-                    if (key != JOB_AUTO_CLOSE && nowIst - scheduledAt > MaxLateness)
+                    if (key is not (JOB_AUTO_CLOSE or JOB_COMP_OFF) && nowIst - scheduledAt > MaxLateness)
                     {
                         _logger.LogInformation("[Scheduler] Skipped {Job}: {Late:g} late", key, nowIst - scheduledAt);
                         continue;
@@ -173,6 +176,11 @@ namespace DailyTrackerAPI.Services.Communication
                     case JOB_CHECKOUT: await RunCheckoutReminderAsync(db, svc, ct); break;
                     case JOB_AUTO_CLOSE:
                         await scope.ServiceProvider.GetRequiredService<IAutoCheckoutService>().CloseForgottenShiftsAsync(null, ct);
+                        break;
+                    case JOB_COMP_OFF:
+                        var compOff = scope.ServiceProvider.GetRequiredService<ICompOffService>();
+                        await compOff.SyncAsync(null, ct);
+                        await compOff.SendExpiryRemindersAsync(ct);
                         break;
                 }
 

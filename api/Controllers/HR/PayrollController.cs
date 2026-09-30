@@ -128,6 +128,32 @@ namespace DailyTrackerAPI.Controllers.HR
             });
         }
 
+        /// <summary>Team payroll for a month as an Excel file (one row per person)</summary>
+        [HttpGet("team/export"), Authorize(Roles = "Manager")]
+        public async Task<IActionResult> ExportTeamPayroll([FromQuery] int? month, [FromQuery] int? year)
+        {
+            var now = AppClock.TodayIst;
+            var m = month is >= 1 and <= 12 ? month.Value : now.Month;
+            var y = year is > 2000 ? year.Value : now.Year;
+            var users = await _db.Users.Where(u => u.IsActive && u.Role != "Pending").OrderBy(u => u.FullName).ToListAsync();
+            var rows = new List<PayslipDto>();
+            foreach (var u in users) rows.Add(await BuildPayslipAsync(u.Id, m, y, u));
+
+            var label = new DateTime(y, m, 1).ToString("MMMM yyyy");
+            var bytes = new XlsxWriter()
+                .AddSheet($"Payroll {label}", new[] { "Employee", "Email", "Role", "Salary set", "Currency", "Monthly salary", "Working days",
+                        "Per-day rate", "Days present", "Half days", "Paid leave", "Unpaid leave", "Absent", "Weekend days worked", "Holidays worked",
+                        "Overtime", "Basic earnings", "Overtime pay", "Gross", "Unpaid-leave deduction", "Absent deduction", "Total deductions", "Net pay" },
+                    rows.Select(p => new object?[] { p.FullName, p.Email, p.Role, p.SalaryConfigured, p.Currency, p.MonthlySalary, p.WorkingDaysInMonth,
+                        p.PerDayRate, p.DaysPresent, p.DaysHalfDay, p.DaysPaidLeave, p.DaysUnpaidLeave, p.DaysAbsent, p.DaysWeekend, p.DaysHoliday,
+                        p.OvertimeHours, p.BasicEarnings, p.OvertimePay, p.GrossEarnings, p.UnpaidLeaveDeduction, p.AbsentDeduction, p.TotalDeductions, p.NetPay })
+                    .Append(new object?[] { "TOTAL", null, null, null, null, rows.Sum(p => p.MonthlySalary), null, null, null, null, null, null, null, null, null,
+                        null, rows.Sum(p => p.BasicEarnings), rows.Sum(p => p.OvertimePay), rows.Sum(p => p.GrossEarnings), rows.Sum(p => p.UnpaidLeaveDeduction),
+                        rows.Sum(p => p.AbsentDeduction), rows.Sum(p => p.TotalDeductions), rows.Sum(p => p.NetPay) }))
+                .ToBytes();
+            return File(bytes, XlsxWriter.ContentType, $"Payroll_{label.Replace(" ", "_")}.xlsx");
+        }
+
         /// <summary>
         /// Manager report: who came in on weekends and holidays this month.
         /// GET /api/payroll/weekend-holiday-report?month=X&year=Y

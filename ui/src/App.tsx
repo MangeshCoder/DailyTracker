@@ -133,6 +133,9 @@ const UserDetailPage = lazy(() =>
 const FeatureGuidePage = lazy(() =>
   import('./pages/FeatureGuidePage').then(m => ({ default: m.FeatureGuidePage }))
 );
+const OnboardingPage = lazy(() =>
+  import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage }))
+);
 const LeaveManagementPage = lazy(() =>
   import('./pages/LeaveManagementPage').then(m => ({ default: m.LeaveManagementPage }))
 );
@@ -539,6 +542,16 @@ const AppRoutes = () => {
               <ManagerRoute>
                 <Suspense fallback={<SkeletonDashboard />}>
                   <ManagerWFHDashboard />
+                </Suspense>
+              </ManagerRoute>
+            }
+          />
+          <Route
+            path="manager/onboarding"
+            element={
+              <ManagerRoute>
+                <Suspense fallback={<SkeletonDashboard />}>
+                  <OnboardingPage />
                 </Suspense>
               </ManagerRoute>
             }
