@@ -160,6 +160,21 @@ app.Use(async (context, next) =>
 // Vite's /assets/* files have a content hash in their name → cache for a year;
 // index.html and the service worker must always be re-checked.
 app.UseDefaultFiles();      // "/" → index.html (only when the built UI is in wwwroot)
+// Face-recognition model files have no extension (…-shard1), which the normal
+// static-file handler refuses — they'd fall through to index.html and the face
+// engine would read a web page as model data.
+var modelsDir = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), "models");
+if (Directory.Exists(modelsDir))
+{
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(modelsDir),
+        RequestPath = "/models",
+        ServeUnknownFileTypes = true,
+        DefaultContentType = "application/octet-stream",
+        OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "public, max-age=604800",
+    });
+}
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -261,7 +276,7 @@ using (var scope = app.Services.CreateScope())
 // Real files (/assets/x.js) and API, hub, upload and health URLs never fall back to it.
 if (File.Exists(Path.Combine(app.Environment.WebRootPath ?? "", "index.html")))
 {
-    app.MapFallbackToFile("{*path:nonfile:regex(^(?!api/|hubs/|uploads/|health|swagger).*$)}", "index.html",
+    app.MapFallbackToFile("{*path:nonfile:regex(^(?!api/|hubs/|uploads/|models/|health|swagger).*$)}", "index.html",
         new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache" });
 }
 

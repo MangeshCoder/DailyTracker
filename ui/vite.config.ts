@@ -67,7 +67,7 @@ export default defineConfig({
         globIgnores: ['**/face-api-*.js'],
         // Hosted, the API shares this address: links to it (downloads, health
         // checks …) must reach the server, not get the app's index.html
-        navigateFallbackDenylist: [/^\/api\//, /^\/hubs\//, /^\/uploads\//, /^\/health/, /^\/swagger/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/hubs\//, /^\/uploads\//, /^\/models\//, /^\/health/, /^\/swagger/],
 
         runtimeCaching: [
           // ── face-api.js chunk + ML models — CacheFirst (hashed / static files)
@@ -77,9 +77,11 @@ export default defineConfig({
               /\/assets\/face-api-.*\.js$/.test(url.pathname),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'face-api-cache',
+              // v2: the old cache may hold a web page instead of the model files
+              // (the server used to answer them with index.html) — start fresh
+              cacheName: 'face-api-cache-v2',
               expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 }, // 30 days
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
 

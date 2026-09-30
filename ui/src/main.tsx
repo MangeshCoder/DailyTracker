@@ -20,3 +20,6 @@ createRoot(document.getElementById('root')!).render(
     <PWAUpdatePrompt />
   </StrictMode>
 );
+// The old face-model cache may hold a web page instead of the model files
+// (see vite.config.ts face-api-cache-v2) — remove it once.
+if ('caches' in window) caches.delete('face-api-cache').catch(() => { /* not there */ });

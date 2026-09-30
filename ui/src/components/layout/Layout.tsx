@@ -24,7 +24,8 @@ const LayoutShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
-  const [openSections, setOpenSections] = useState<string[]>(['General', 'System & Docs']);
+  // every section starts collapsed (after login or a reload); click a heading to open it
+  const [openSections, setOpenSections] = useState<string[]>([]);
   const [floatingSection, setFloatingSection] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isManager = user?.role === 'Manager' || user?.role === 'TeamLead';
