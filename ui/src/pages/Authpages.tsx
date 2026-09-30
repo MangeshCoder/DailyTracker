@@ -285,7 +285,7 @@ export const LoginPage = () => {
               </div>
 
               <h1 className="text-4xl xl:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-                One place for your team's <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 dark:from-blue-400 dark:via-sky-300 dark:to-indigo-300">daily work</span>
+                One place for your team's <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">daily work</span>
               </h1>
               <p className="mt-4 text-base xl:text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-xl">
                 Attendance with face and GPS verification, tasks and EOD reports, leave and WFH requests, and live team analytics — all in one app.

@@ -446,7 +446,7 @@ const LayoutShell = () => {
             className={`flex items-center gap-2.5 p-2 cursor-pointer rounded-xl transition hover:bg-slate-100 dark:hover:bg-slate-900 ${collapsed ? 'md:justify-center' : ''}`}
             title="Account & Documentation Menu"
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs font-bold text-white ring-2 ring-white dark:ring-slate-950 shrink-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white ring-2 ring-white dark:ring-slate-950 shrink-0">
               {initials}
             </div>
 

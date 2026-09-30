@@ -108,7 +108,7 @@ export const PendingRequestsPanel: React.FC = () => {
         icon: 'error',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#B32BEF',
+        confirmButtonColor: '#D0800C',
       });
     },
   });
@@ -151,7 +151,7 @@ export const PendingRequestsPanel: React.FC = () => {
         icon: 'error',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#B32BEF',
+        confirmButtonColor: '#D0800C',
       });
     },
   });

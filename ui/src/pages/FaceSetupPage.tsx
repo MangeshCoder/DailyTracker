@@ -286,7 +286,7 @@ export function FaceSetupPage() {
                     </p>
                     <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
                         style={{ width: `${(progress / 5) * 100}%` }}
                       />
                     </div>

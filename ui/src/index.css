@@ -62,8 +62,8 @@ input[type="date"]:focus,
 input[type="datetime-local"]:focus,
 input[type="month"]:focus,
 input[type="time"]:focus {
-  border-color: #B32BEF;            /* blue-500 */
-  box-shadow: 0 0 0 2px rgba(179, 43, 239, 0.25);
+  border-color: #D0800C;            /* blue-500 */
+  box-shadow: 0 0 0 2px rgba(208, 128, 12, 0.25);
 }
 
 /* Make the calendar icon white on Chrome/Edge/Safari */
@@ -109,7 +109,7 @@ input[type="date"]::-webkit-datetime-edit-day-field:focus,
 input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
 input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
 input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus {
-  background-color: #B32BEF;  /* blue-500 highlight on focused segment */
+  background-color: #D0800C;  /* blue-500 highlight on focused segment */
   border-radius: 2px;
 }
 /* ── Light mode readability ──────────────────────────────────────────────────
@@ -117,4 +117,4 @@ input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus {
    in light mode — use one shade darker. :where() keeps this at the same strength
    as the utility itself, so hover/focus colours and dark mode are unaffected. */
 :where(html:not(.dark)) .text-slate-400 { color: rgb(107 119 160); } /* slate-500 */
-:where(html:not(.dark)) .text-amber-600 { color: rgb(180 83 9); }    /* amber-700 */
+:where(html:not(.dark)) .text-amber-600 { color: rgb(148 107 6); }   /* amber-700 (yellow) */

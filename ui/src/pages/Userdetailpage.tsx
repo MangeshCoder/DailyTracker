@@ -147,7 +147,7 @@ const AttendanceCalendar = ({
 const AttendanceRing = ({ pct, label }: { pct: number; label: string }) => {
   const r = 34;
   const c = 2 * Math.PI * r;
-  const color = pct >= 90 ? '#10b981' : pct >= 75 ? '#f59e0b' : '#f43f5e';
+  const color = pct >= 90 ? '#10b981' : pct >= 75 ? '#EAB308' : '#f43f5e';
   const textCls = pct >= 90 ? 'text-emerald-600 dark:text-emerald-400' : pct >= 75 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
 
   return (

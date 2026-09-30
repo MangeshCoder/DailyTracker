@@ -38,7 +38,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
         icon: 'success',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        iconColor: '#B32BEF',
+        iconColor: '#D0800C',
         timer: 2000,
         showConfirmButton: false,
       });
@@ -50,7 +50,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
         icon: 'error',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#B32BEF',
+        confirmButtonColor: '#D0800C',
       });
     },
   });

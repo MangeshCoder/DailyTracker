@@ -47,7 +47,7 @@ export const MyWFHRequests: React.FC = () => {
         icon: 'success',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        iconColor: '#B32BEF',
+        iconColor: '#D0800C',
         timer: 2000,
         showConfirmButton: false,
       });
@@ -59,7 +59,7 @@ export const MyWFHRequests: React.FC = () => {
         icon: 'error',
         background: 'rgb(11, 23, 57)',
         color: '#ffffff',
-        confirmButtonColor: '#B32BEF',
+        confirmButtonColor: '#D0800C',
       });
     },
   });

@@ -248,9 +248,9 @@ export const DashboardPage = () => {
         text:  'Are you sure you want to check out for today?',
         icon:  'question',
         ...swalTheme,
-        iconColor: '#B32BEF',
+        iconColor: '#D0800C',
         showCancelButton:   true,
-        confirmButtonColor: '#B32BEF',
+        confirmButtonColor: '#D0800C',
         cancelButtonColor:  '#96A3D0',
         confirmButtonText:  'Yes, check out',
         cancelButtonText:   'Cancel',
@@ -560,7 +560,7 @@ export const DashboardPage = () => {
 
               <div className="h-2.5 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500 transition-all duration-700"
+                  className="h-full rounded-full bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-500 transition-all duration-700"
                   style={{ width: `${workPercent}%` }}
                 />
               </div>

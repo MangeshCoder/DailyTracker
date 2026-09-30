@@ -30,9 +30,9 @@ const POPUP_CLASS = 'font-sans !rounded-2xl';
 const ICON_COLORS: Record<SweetAlertIcon, string> = {
   success:  '#10b981',
   error:    '#f43f5e',
-  warning:  '#f59e0b',
-  info:     '#B32BEF',
-  question: '#B32BEF',
+  warning:  '#EAB308',
+  info:     '#D0800C',
+  question: '#D0800C',
 };
 
 export function useConfirm() {
@@ -61,7 +61,7 @@ export function useConfirm() {
       showCancelButton:   true,
       reverseButtons:     true,
       focusCancel:        isDanger,
-      confirmButtonColor: isDanger ? '#e11d48' : '#9A1BD6',
+      confirmButtonColor: isDanger ? '#e11d48' : '#B35F00',
       cancelButtonColor:  isDarkMode() ? '#4E5A80' : '#96A3D0',
       confirmButtonText:  options?.confirmText ?? 'Yes, continue',
       cancelButtonText:   options?.cancelText  ?? 'Cancel',
@@ -118,7 +118,7 @@ export function useConfirm() {
       text:               message,
       icon,
       iconColor:          ICON_COLORS[icon],
-      confirmButtonColor: '#9A1BD6',
+      confirmButtonColor: '#B35F00',
       confirmButtonText:  'OK',
     });
   };

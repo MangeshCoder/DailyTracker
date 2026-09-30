@@ -124,7 +124,7 @@ const WeekChart: React.FC<{
           >
             <span
               className={`text-[10px] font-bold ${
-                hasOt ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400'
+                hasOt ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400'
               }`}
             >
               {hasOt ? w.totalOvertimeHours : '–'}
