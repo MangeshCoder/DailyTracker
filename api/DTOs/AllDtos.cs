@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace DailyTrackerAPI.DTOs
 {
@@ -1594,6 +1594,8 @@ namespace DailyTrackerAPI.DTOs
         public decimal BasicEarnings { get; set; }
         public decimal OvertimePay { get; set; }
         public decimal GrossEarnings { get; set; }
+        /// <summary>Approved expense claims paid back with this salary (not taxed, added after deductions)</summary>
+        public decimal Reimbursements { get; set; }
 
         // Deductions
         public decimal UnpaidLeaveDeduction { get; set; }

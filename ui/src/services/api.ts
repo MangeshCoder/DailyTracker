@@ -319,6 +319,25 @@ export const onboardingApi = {
   removeTask: (taskId: number) => api.delete(`/onboarding/tasks/${taskId}`),
 };
 
+// ─── Expense claims: bills paid back with the salary ──────────────────────────
+export const expenseApi = {
+  submit: (form: FormData) => api.post('/expenses', form, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getMine: () => api.get('/expenses/my'),
+  cancel: (id: number) => api.delete(`/expenses/${id}`),
+  receipt: (id: number) => api.get(`/expenses/${id}/receipt`, { responseType: 'blob' }),
+  getPending: () => api.get('/expenses/pending'),
+  getTeam: (year: number) => api.get('/expenses/team', { params: { year } }),
+  review: (id: number, d: { status: 'Approved' | 'Rejected'; note?: string }) => api.put(`/expenses/${id}/review`, d),
+  export: (year: number) => api.get('/expenses/export', { params: { year }, responseType: 'blob' }),
+};
+
+// ─── Approval delegation: someone decides while a manager is away ─────────────
+export const delegationApi = {
+  getMine: () => api.get('/delegations/my'),
+  create: (d: { toUserId: number; startDate: string; endDate: string; note?: string }) => api.post('/delegations', d),
+  cancel: (id: number) => api.delete(`/delegations/${id}`),
+};
+
 export const holidayApi = {
   getByYear: (year = new Date().getFullYear()) => api.get(`/holidays?year=${year}`),
   isToday: () => api.get('/holidays/today'),

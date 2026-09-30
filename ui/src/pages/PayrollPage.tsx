@@ -515,6 +515,16 @@ const PayslipCard: React.FC<{ payslip: PayslipDto }> = ({ payslip }) => {
                 −{fmt(payslip.totalDeductions, cur)}
               </span>
             </div>
+            {(payslip.reimbursements ?? 0) > 0 && (
+              <div className="flex justify-between text-xs sm:text-sm">
+                <span className="text-slate-600 dark:text-slate-400 font-medium">
+                  Reimbursements (expense claims)
+                </span>
+                <span className="text-teal-600 dark:text-teal-400 font-semibold">
+                  +{fmt(payslip.reimbursements ?? 0, cur)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between pt-2.5 border-t border-slate-200 dark:border-slate-700">
               <span className="text-slate-900 dark:text-white font-bold text-sm">
                 Net Pay (Payable)

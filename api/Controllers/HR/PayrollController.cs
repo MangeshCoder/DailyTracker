@@ -3,6 +3,7 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Models.Auth;
 using DailyTrackerAPI.Models.HR;
+using DailyTrackerAPI.Services.HR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ namespace DailyTrackerAPI.Controllers.HR
     //    OvertimePay    = (OvertimeMinutes / 60) × HourlyRate × OvertimeMultiplier
     //    GrossEarnings  = BasicEarnings + OvertimePay
     //    Deductions     = (DaysUnpaidLeave + DaysAbsent) × PerDayRate
-    //    NetPay         = GrossEarnings − Deductions
+    //    NetPay         = GrossEarnings − Deductions + Reimbursements (approved expense claims)
     //
     //  Endpoints:
     //    GET /api/payroll/my?month=X&year=Y          → own payslip
@@ -35,7 +36,12 @@ namespace DailyTrackerAPI.Controllers.HR
     {
         private readonly AppDbContext _db;
 
-        public PayrollController(AppDbContext db) => _db = db;
+        private readonly IExpenseService _expenses;
+        public PayrollController(AppDbContext db, IExpenseService expenses)
+        {
+            _db = db;
+            _expenses = expenses;
+        }
 
         // ── GET /api/payroll/my ───────────────────────────────────────────────
         [HttpGet("my")]
@@ -143,13 +149,13 @@ namespace DailyTrackerAPI.Controllers.HR
             var bytes = new XlsxWriter()
                 .AddSheet($"Payroll {label}", new[] { "Employee", "Email", "Role", "Salary set", "Currency", "Monthly salary", "Working days",
                         "Per-day rate", "Days present", "Half days", "Paid leave", "Unpaid leave", "Absent", "Weekend days worked", "Holidays worked",
-                        "Overtime", "Basic earnings", "Overtime pay", "Gross", "Unpaid-leave deduction", "Absent deduction", "Total deductions", "Net pay" },
+                        "Overtime", "Basic earnings", "Overtime pay", "Gross", "Unpaid-leave deduction", "Absent deduction", "Total deductions", "Reimbursements", "Net pay" },
                     rows.Select(p => new object?[] { p.FullName, p.Email, p.Role, p.SalaryConfigured, p.Currency, p.MonthlySalary, p.WorkingDaysInMonth,
                         p.PerDayRate, p.DaysPresent, p.DaysHalfDay, p.DaysPaidLeave, p.DaysUnpaidLeave, p.DaysAbsent, p.DaysWeekend, p.DaysHoliday,
-                        p.OvertimeHours, p.BasicEarnings, p.OvertimePay, p.GrossEarnings, p.UnpaidLeaveDeduction, p.AbsentDeduction, p.TotalDeductions, p.NetPay })
+                        p.OvertimeHours, p.BasicEarnings, p.OvertimePay, p.GrossEarnings, p.UnpaidLeaveDeduction, p.AbsentDeduction, p.TotalDeductions, p.Reimbursements, p.NetPay })
                     .Append(new object?[] { "TOTAL", null, null, null, null, rows.Sum(p => p.MonthlySalary), null, null, null, null, null, null, null, null, null,
                         null, rows.Sum(p => p.BasicEarnings), rows.Sum(p => p.OvertimePay), rows.Sum(p => p.GrossEarnings), rows.Sum(p => p.UnpaidLeaveDeduction),
-                        rows.Sum(p => p.AbsentDeduction), rows.Sum(p => p.TotalDeductions), rows.Sum(p => p.NetPay) }))
+                        rows.Sum(p => p.AbsentDeduction), rows.Sum(p => p.TotalDeductions), rows.Sum(p => p.Reimbursements), rows.Sum(p => p.NetPay) }))
                 .ToBytes();
             return File(bytes, XlsxWriter.ContentType, $"Payroll_{label.Replace(" ", "_")}.xlsx");
         }
@@ -411,7 +417,9 @@ namespace DailyTrackerAPI.Controllers.HR
             var totalDeductions = halfDayDeduction + unpaidLeaveDeduction + absentDeduction + notJoinedDeduction;
 
             // ── Net Pay ───────────────────────────────────────────────────
-            var netPay = grossEarnings - totalDeductions;
+            // approved expense claims are paid back on top (they are not salary)
+            var reimbursements = await _expenses.ReimbursementForAsync(userId, month, year);
+            var netPay = grossEarnings - totalDeductions + reimbursements;
 
             // ── Build readable line items ─────────────────────────────────
             var cur = CurrencySymbol(currency);
@@ -501,6 +509,7 @@ namespace DailyTrackerAPI.Controllers.HR
                 BasicEarnings = Math.Round(basicEarnings, 2),
                 OvertimePay = Math.Round(overtimePay, 2),
                 GrossEarnings = Math.Round(grossEarnings, 2),
+                Reimbursements = Math.Round(reimbursements, 2),
                 UnpaidLeaveDeduction = Math.Round(unpaidLeaveDeduction, 2),
                 AbsentDeduction = Math.Round(absentDeduction, 2),
                 TotalDeductions = Math.Round(totalDeductions, 2),
@@ -919,7 +928,11 @@ namespace DailyTrackerAPI.Controllers.HR
                               <tr>
                                 <td class='s-label'>Total Deductions</td>
                                 <td class='s-value' style='color:#dc2626'>−{Fmt(p.TotalDeductions)}</td>
-                              </tr>
+                              </tr>{(p.Reimbursements > 0 ? $@"
+                              <tr>
+                                <td class='s-label'>Reimbursements (approved expense claims)</td>
+                                <td class='s-value' style='color:#0d9488'>+{Fmt(p.Reimbursements)}</td>
+                              </tr>" : "")}
                               <tr class='s-total'>
                                 <td class='s-label'>NET PAY</td>
                                 <td class='s-value'>{Fmt(p.NetPay)}</td>

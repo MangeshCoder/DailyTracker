@@ -51,14 +51,18 @@ namespace DailyTrackerAPI.Controllers.HR
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
-        [HttpGet("all"), Authorize(Roles = "Manager")]
-        public async Task<IActionResult> GetAll([FromQuery] string? status)
+        // leave is decided by Managers — and by a team lead while covering for an away Manager
+        [HttpGet("all"), Authorize(Roles = "Manager,TeamLead")]
+        public async Task<IActionResult> GetAll([FromQuery] string? status,
+            [FromServices] DailyTrackerAPI.Services.Auth.ITeamScope scope)
         {
+            if (!User.IsInRole("Manager") && !await scope.ActsForManagerAsync(User.GetUserId()))
+                return StatusCode(403, new { message = "Leave requests are decided by managers." });
             var leaves = await _leaveSvc.GetAllLeavesAsync(status, User.GetUserId());
             return Ok(leaves);
         }
 
-        [HttpPut("{id}/review"), Authorize(Roles = "Manager")]
+        [HttpPut("{id}/review"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> Review(int id, [FromBody] ReviewLeaveDto dto)
         {
             await _leaveSvc.ReviewAsync(id, User.GetUserId(), dto);

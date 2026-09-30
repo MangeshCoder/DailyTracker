@@ -40,8 +40,12 @@ namespace DailyTrackerAPI.Services.Attendance
         private readonly IEmailService _emailService;
         private readonly IConfiguration _config;
 
-        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger, IEmailService emailService, IConfiguration config)
+        private readonly DailyTrackerAPI.Services.Auth.ITeamScope _scope;
+
+        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger, IEmailService emailService, IConfiguration config,
+            DailyTrackerAPI.Services.Auth.ITeamScope scope)
         {
+            _scope = scope;
             _config = config;
             _db = db;
             _logger = logger;
@@ -132,15 +136,9 @@ namespace DailyTrackerAPI.Services.Attendance
         /// <summary>Assigned manager if valid, otherwise all active managers (never the requester)</summary>
         private async Task<List<Models.Auth.User>> GetApproversAsync(Models.Auth.User employee)
         {
-            if (employee.ManagerId.HasValue && employee.ManagerId != employee.Id)
-            {
-                var assigned = await _db.Users.FirstOrDefaultAsync(u => u.Id == employee.ManagerId && u.IsActive
-                    && (u.Role == "Manager" || u.Role == "TeamLead" || u.Role == "Admin"));
-                if (assigned != null) return new() { assigned };
-            }
-            return await _db.Users
-                .Where(u => u.Role == "Manager" && u.IsActive && u.Id != employee.Id)
-                .ToListAsync();
+            // the shared rule (own manager / team lead, else every manager; someone away → their delegate)
+            var ids = await _scope.ApproversAsync(employee.Id);
+            return await _db.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
         }
 
         /// <summary>
@@ -287,6 +285,8 @@ namespace DailyTrackerAPI.Services.Attendance
         public async Task<List<WFHRequestDto>> GetPendingRequestsAsync(int managerId)
         {
             var teamUserIds = await GetTeamUserIds(managerId);
+            foreach (var away in await _scope.ActingForAsync(managerId))   // covering for someone on leave
+                teamUserIds.AddRange((await GetTeamUserIds(away)).Where(id => id != away && id != managerId && !teamUserIds.Contains(id)));
 
             // Own requests only when nobody else can review them
             var manager = await _db.Users.FindAsync(managerId);
@@ -590,15 +590,8 @@ namespace DailyTrackerAPI.Services.Attendance
                 return;
             }
 
-            var isManager = await _db.Users
-                .AnyAsync(u => u.Id == employeeUserId
-                    && (u.ManagerId == managerId || managerId == employeeUserId));
-
-            // Also allow if manager has Manager/TeamLead role 
-            var managerUser = await _db.Users.FindAsync(managerId);
-            bool isManagerRole = managerUser?.Role is "Manager" or "TeamLead" or "Admin";
-
-            if (!isManager && !isManagerRole)
+            // a Manager decides for anyone, a team lead for their own team (plus anyone they cover for)
+            if (!await _scope.CanManageAsync(managerId, employeeUserId))
                 throw new UnauthorizedAccessException("You do not have permission to review this request.");
         }
 

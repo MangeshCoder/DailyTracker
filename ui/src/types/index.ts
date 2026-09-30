@@ -801,6 +801,7 @@ export interface PayslipDto {
   basicEarnings:      number;
   overtimePay:        number;
   grossEarnings:      number;
+  reimbursements?:    number;   // approved expense claims paid with this salary
   unpaidLeaveDeduction: number;
   absentDeduction:    number;
   totalDeductions:    number;

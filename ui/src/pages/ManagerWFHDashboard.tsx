@@ -10,6 +10,8 @@ import { PendingLeavePanel, TeamLeaveHistory, usePendingLeave } from '../compone
 import { useAuth } from '../context/Authcontext';
 import { PendingCorrectionsPanel, usePendingCorrections } from '../components/PendingCorrectionsPanel';
 import { PendingCompOffPanel, usePendingCompOff } from '../components/CompOffPanel';
+import { PendingExpensesPanel, usePendingExpenses } from '../components/ExpensePanels';
+import { DelegationPanel, useMyDelegations } from '../components/DelegationPanel';
 import { TeamMonthlyAttendances } from '../components/TeamMonthlyAttendance';
 import { AllRequestsHistory } from '../components/AllRequestsHistory';
 import {
@@ -41,12 +43,16 @@ export const ManagerWFHDashboard: React.FC = () => {
   });
 
   // leave applications wait here too, so one place covers every request
-  const canReviewLeave = useAuth().user?.role === 'Manager';
+  // (a team lead covering for an away Manager decides leave too)
+  const { data: delegations } = useMyDelegations();
+  const canReviewLeave = useAuth().user?.role === 'Manager'
+    || !!delegations?.actingFor?.some(d => d.fromRole === 'Manager');
   const { data: pendingLeave = [] } = usePendingLeave(canReviewLeave);
   const { data: pendingCorrections = [] } = usePendingCorrections();
   const { data: pendingCompOff = [] } = usePendingCompOff();
+  const { data: pendingExpenses = [] } = usePendingExpenses();
   const pendingCount = pendingRequests.length + pendingLeave.filter(l => l.canReview !== false).length
-    + pendingCorrections.length + pendingCompOff.length;
+    + pendingCorrections.length + pendingCompOff.length + pendingExpenses.length;
 
   interface DashboardTab {
     key: 'today' | 'pending' | 'monthly' | 'history';
@@ -84,7 +90,7 @@ export const ManagerWFHDashboard: React.FC = () => {
       {/* ── Page Header ── */}
       <PageHeader
         title="Manager Attendance & Requests Hub"
-        description="Monitor real-time team attendance and approve or reject leave, WFH, half-day and check-out corrections in one place."
+        description="Monitor real-time team attendance and approve leave, WFH, half-days, comp-off, expenses and check-out corrections in one place."
         breadcrumbs={[
           { label: 'Workspace', href: '/' },
           { label: 'Management' },
@@ -103,12 +109,15 @@ export const ManagerWFHDashboard: React.FC = () => {
         }
       />
 
+      {/* ── Away? hand over approvals / covering for someone ── */}
+      <DelegationPanel />
+
       {/* ── KPI Stat Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Pending Approval"
           value={pendingCount}
-          subtitle="Leave, WFH & check-outs"
+          subtitle="Leave, WFH, expenses & more"
           icon={Clock}
           color="amber"
         />
@@ -174,6 +183,7 @@ export const ManagerWFHDashboard: React.FC = () => {
             {canReviewLeave && <PendingLeavePanel />}
             <PendingCorrectionsPanel />
             <PendingCompOffPanel />
+            <PendingExpensesPanel />
             <section aria-label="WFH and half-day requests" className="space-y-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">WFH &amp; half-day requests</h3>
               <PendingRequestsPanel />

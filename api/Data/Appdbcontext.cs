@@ -44,6 +44,8 @@ namespace DailyTrackerAPI.Data
         public DbSet<CompOffCredit> CompOffCredits { get; set; }
         public DbSet<OnboardingPlan> OnboardingPlans { get; set; }
         public DbSet<OnboardingTask> OnboardingTasks { get; set; }
+        public DbSet<ExpenseClaim> ExpenseClaims { get; set; }
+        public DbSet<ApprovalDelegation> ApprovalDelegations { get; set; }
 
         // ─── Feature 10: Attendance Enhanced ─────────────────────────────────
         public DbSet<Holiday> Holidays { get; set; }
@@ -270,6 +272,31 @@ namespace DailyTrackerAPI.Data
                 e.Property(t => t.Title).HasMaxLength(200);
                 e.Property(t => t.Kind).HasMaxLength(20);
                 e.Property(t => t.Owner).HasMaxLength(20);
+            });
+
+            // ── Expense claims: bills paid back with the salary
+            mb.Entity<ExpenseClaim>(e => {
+                e.HasIndex(c => new { c.UserId, c.Status });
+                e.HasIndex(c => new { c.PayYear, c.PayMonth });
+                e.Property(c => c.Amount).HasPrecision(12, 2);
+                e.Property(c => c.Category).HasMaxLength(20);
+                e.Property(c => c.Status).HasMaxLength(20);
+                e.Property(c => c.Description).HasMaxLength(500);
+                e.Property(c => c.ReceiptKey).HasMaxLength(300);
+                e.Property(c => c.ReceiptFileName).HasMaxLength(260);
+                e.Property(c => c.ReceiptMimeType).HasMaxLength(100);
+                e.Property(c => c.ReviewNote).HasMaxLength(300);
+                e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(c => c.ReviewedBy).WithMany().HasForeignKey(c => c.ReviewedById).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ── Approval delegation: someone else decides while a manager is away
+            mb.Entity<ApprovalDelegation>(e => {
+                e.HasIndex(d => new { d.ToUserId, d.StartDate, d.EndDate });
+                e.HasIndex(d => new { d.FromUserId, d.StartDate, d.EndDate });
+                e.Property(d => d.Note).HasMaxLength(300);
+                e.HasOne(d => d.From).WithMany().HasForeignKey(d => d.FromUserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(d => d.To).WithMany().HasForeignKey(d => d.ToUserId).OnDelete(DeleteBehavior.Cascade);
             });
 
             // ── LateArrivalReason

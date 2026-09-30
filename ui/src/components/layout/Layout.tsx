@@ -126,6 +126,7 @@ const LayoutShell = () => {
       items: [
         { to: '/leave', label: 'Leave', icon: '🗓️' },
         { to: '/request', label: 'WFH Requests', icon: '🏡' },
+        { to: '/expenses', label: 'Expenses', icon: '🧾' },
         { to: '/wfh-summary', label: 'WFH Summary', icon: '🏠' },
         { to: '/payroll', label: 'Payroll', icon: '💰' },
         { to: '/documents', label: 'Documents', icon: '📄' },

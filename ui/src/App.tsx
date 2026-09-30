@@ -133,6 +133,9 @@ const UserDetailPage = lazy(() =>
 const FeatureGuidePage = lazy(() =>
   import('./pages/FeatureGuidePage').then(m => ({ default: m.FeatureGuidePage }))
 );
+const ExpensesPage = lazy(() =>
+  import('./pages/ExpensesPage').then(m => ({ default: m.ExpensesPage }))
+);
 const OnboardingPage = lazy(() =>
   import('./pages/OnboardingPage').then(m => ({ default: m.OnboardingPage }))
 );
@@ -384,6 +387,14 @@ const AppRoutes = () => {
             element={
               <Suspense fallback={<SkeletonDashboard />}>
                 <LeaveManagementPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="expenses"
+            element={
+              <Suspense fallback={<SkeletonDashboard />}>
+                <ExpensesPage />
               </Suspense>
             }
           />

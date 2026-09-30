@@ -52,6 +52,8 @@ namespace DailyTrackerAPI.Services.HR
         private readonly IEmailActionService _emailAction;
         private readonly ILogger<LeaveService> _logger;
         private readonly ICompOffService _compOff;
+        private readonly ITeamScope _scope;
+        private readonly IAppNotificationService _appNotify;
 
         private static readonly string[] ReviewStatuses = { "Approved", "Rejected" };
 
@@ -72,8 +74,12 @@ namespace DailyTrackerAPI.Services.HR
             IEmailService email,
             IEmailActionService emailAction,
             ILogger<LeaveService> logger,
-            ICompOffService compOff)
+            ICompOffService compOff,
+            ITeamScope scope,
+            IAppNotificationService appNotify)
         {
+            _scope = scope;
+            _appNotify = appNotify;
             _compOff = compOff;
             _db = db;
             _notif = notif;
@@ -191,6 +197,14 @@ namespace DailyTrackerAPI.Services.HR
                 .Where(u => u.Role == "Manager" && u.IsActive && u.Id != userId)
                 .ToListAsync();
 
+            // managers who are away: the person covering for them sees it too
+            foreach (var manager in managers)
+                if (await _scope.DelegateOfAsync(manager.Id) is int cover && cover != userId && !managers.Any(m => m.Id == cover))
+                    await BestEffortAsync("covering approver notice", () => _appNotify.CreateAsync(cover,
+                        "🗓️ Leave request to decide",
+                        $"{user.FullName} applied for {leave.LeaveType} leave ({leave.FromDate:d MMM} – {leave.ToDate:d MMM}). You're covering for {manager.FullName}.",
+                        "Info", "/manager/wfh-dashboard"));
+
             foreach (var manager in managers)
             {
                 await BestEffortAsync($"email to manager {manager.Id}", async () =>
@@ -260,6 +274,12 @@ namespace DailyTrackerAPI.Services.HR
 
             var manager = await _db.Users.FindAsync(managerId)
                 ?? throw new ValidationException("Manager not found");
+            // a Manager decides leave; a team lead only while covering for an away Manager (never their own)
+            var coversForManager = manager.Role != "Manager" && await _scope.ActsForManagerAsync(managerId);
+            if (manager.Role != "Manager" && !coversForManager)
+                throw new UnauthorizedAccessException("Leave requests are decided by managers.");
+            if (coversForManager && leave.UserId == managerId)
+                throw new UnauthorizedAccessException("You can't approve your own leave — a manager needs to.");
 
             var status = ReviewStatuses.FirstOrDefault(s => s.Equals(dto.Status?.Trim(), StringComparison.OrdinalIgnoreCase))
                 ?? throw new ValidationException("Status must be Approved or Rejected.");
