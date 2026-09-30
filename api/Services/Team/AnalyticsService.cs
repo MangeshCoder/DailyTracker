@@ -162,7 +162,7 @@ namespace DailyTrackerAPI.Services.Team
                 .ToListAsync();
 
             return completedTasks
-                .GroupBy(dt => dt.ToLocalTime().Hour)
+                .GroupBy(dt => dt.ToIstTime().Hour)
                 .Select(g => new PeakHourDto
                 {
                     Hour = g.Key,

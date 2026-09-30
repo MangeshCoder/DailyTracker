@@ -56,13 +56,13 @@ import {
   ArrowRight,
   Activity,
 } from 'lucide-react';
+import { utcDate } from '../utils/date';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
-  const utcDate = new Date(dateString + 'Z');
-  return utcDate.toLocaleTimeString('en-IN', {
+  return utcDate(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit', minute: '2-digit',
     hour12: true, timeZone: 'Asia/Kolkata',
   });

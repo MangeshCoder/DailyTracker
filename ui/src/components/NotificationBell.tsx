@@ -12,6 +12,7 @@ import type { AppNotification } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useSignalR } from '../context/SignalRContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { utcDate } from '../utils/date';
 import {
   Bell,
   CheckCircle2,
@@ -195,7 +196,7 @@ export const NotificationBell = () => {
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{n.title}</p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                        {new Date(n.createdAt).toLocaleTimeString()}
+                        {utcDate(n.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </p>
                     </div>
                     {!n.isRead && <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0" />}

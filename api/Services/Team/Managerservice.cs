@@ -190,9 +190,9 @@ namespace DailyTrackerAPI.Services.Team
                 Date = log.LogDate,
                 DayStatus = log.DayStatus,
                 CheckIn = log.CheckInTime.HasValue
-                    ? log.CheckInTime.Value.ToLocalTime().ToString("hh:mm tt") : "--",
+                    ? log.CheckInTime.Value.ToIstTime().ToString("hh:mm tt") : "--",
                 CheckOut = log.CheckOutTime.HasValue
-                    ? log.CheckOutTime.Value.ToLocalTime().ToString("hh:mm tt") : "--",
+                    ? log.CheckOutTime.Value.ToIstTime().ToString("hh:mm tt") : "--",
                 WorkHours = FormatMinutes(log.TotalWorkMinutes),
                 BreakMinutes = log.TotalBreakMinutes,
                 TasksSummary = log.TaskLogs
@@ -266,8 +266,8 @@ namespace DailyTrackerAPI.Services.Team
                     {
                         Date = day,
                         Status = log.DayStatus,
-                        CheckIn = log.CheckInTime?.ToLocalTime().ToString("hh:mm tt"),
-                        CheckOut = log.CheckOutTime?.ToLocalTime().ToString("hh:mm tt"),
+                        CheckIn = log.CheckInTime?.ToIstTime().ToString("hh:mm tt"),
+                        CheckOut = log.CheckOutTime?.ToIstTime().ToString("hh:mm tt"),
                         WorkHours = FormatMinutes(log.TotalWorkMinutes),
                         TasksCompleted = log.TaskLogs.Count(t => t.Status == "Completed")
                     });
@@ -369,8 +369,8 @@ namespace DailyTrackerAPI.Services.Team
             {
                 User = MapUserDto(user),
                 DayStatus = log.DayStatus,
-                CheckInTime = log.CheckInTime?.ToLocalTime().ToString("hh:mm tt"),
-                CheckOutTime = log.CheckOutTime?.ToLocalTime().ToString("hh:mm tt"),
+                CheckInTime = log.CheckInTime?.ToIstTime().ToString("hh:mm tt"),
+                CheckOutTime = log.CheckOutTime?.ToIstTime().ToString("hh:mm tt"),
                 WorkHours = FormatMinutes(workMins),
                 TotalBreakMinutes = log.BreakLogs.Where(b => !b.IsActive).Sum(b => b.DurationMinutes),
                 TasksTotal = log.TaskLogs.Count,

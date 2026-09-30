@@ -52,6 +52,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { Select as StyledSelect } from '../components/ui/Select';
+import { utcDate } from '../utils/date';
 
 const supportTypes = ['Technical', 'CodeReview', 'Debugging', 'Deployment', 'Other'];
 
@@ -65,8 +66,7 @@ const SUPPORT_TYPE_STYLE: Record<string, { icon: React.ElementType; cls: string;
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
-  const utcDate = new Date(dateString + 'Z');
-  return utcDate.toLocaleTimeString('en-IN', {
+  return utcDate(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit', minute: '2-digit',
     hour12: true, timeZone: 'Asia/Kolkata',
   });

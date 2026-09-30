@@ -1,3 +1,4 @@
+using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Storage;
 using DailyTrackerAPI.Custom;
 using DailyTrackerAPI.Data;
@@ -35,12 +36,17 @@ builder.Services.AddStackExchangeRedisCache(o =>
 builder.Services.AddMemoryCache();
 
 // ─── SignalR ──────────────────────────────────────────────────────────────────
-builder.Services.AddSignalR();
+// (every time is sent as UTC "…Z" — see UtcDateTimeConverter; the app shows India time)
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new UtcDateTimeConverter()));
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
-        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
+    {
+        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        o.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+    });
 
 // ─── All grouped service registrations (see Extensions/ServiceCollectionExtensions.cs)
 builder.Services.AddApplicationServices();

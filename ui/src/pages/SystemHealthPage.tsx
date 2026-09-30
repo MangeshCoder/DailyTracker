@@ -32,7 +32,7 @@ const utc = (s: string) => new Date(/[zZ]|[+-]\d\d:\d\d$/.test(s) ? s : s + 'Z')
 
 const formatWhen = (s: string) =>
   utc(s).toLocaleString('en-IN', {
-    day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
+    day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
   });
 
 const timeAgo = (s?: string | null) => {

@@ -31,6 +31,7 @@ import {
   Inbox,
   X,
 } from 'lucide-react';
+import { utcDate } from '../utils/date';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -43,9 +44,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
-  // Force treat backend time as UTC
-  const utcDate = new Date(dateString + 'Z');
-  return utcDate.toLocaleTimeString('en-IN', {
+  return utcDate(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,

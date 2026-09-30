@@ -748,7 +748,7 @@ const ChatBubble = ({
           </>
         )}
         <p className={`text-[10px] mt-1.5 ${isUser ? "text-blue-100 text-right" : "text-slate-400 dark:text-slate-500"}`}>
-          {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {msg.timestamp.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}
         </p>
       </div>
     </div>
@@ -945,7 +945,7 @@ export const AiChatWidget = () => {
         const checkInMsg: Message = {
           id: Date.now().toString(),
           role: "assistant",
-          content: `✅ **Checked In**: Face verified! Checked in for today at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Have a great day!`,
+          content: `✅ **Checked In**: Face verified! Checked in for today at ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}. Have a great day!`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, checkInMsg]);
@@ -960,7 +960,7 @@ export const AiChatWidget = () => {
         const checkOutMsg: Message = {
           id: Date.now().toString(),
           role: "assistant",
-          content: `🚪 **Checked Out**: Face verified! Checked out for today at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Great job today!`,
+          content: `🚪 **Checked Out**: Face verified! Checked out for today at ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}. Great job today!`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, checkOutMsg]);

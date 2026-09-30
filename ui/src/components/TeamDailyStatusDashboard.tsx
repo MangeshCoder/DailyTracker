@@ -16,12 +16,11 @@ import { DatePicker } from './DatePicker';
 import { Card } from './ui/Card';
 import { StatCard } from './ui/StatCard';
 import { Building2, Home, SunMoon, Hourglass, Clock, Users, Inbox, Palmtree } from 'lucide-react';
+import { utcDate } from '../utils/date';
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
-  // Force treat backend time as UTC
-  const utcDate = new Date(dateString + 'Z');
-  return utcDate.toLocaleTimeString('en-IN', {
+  return utcDate(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,

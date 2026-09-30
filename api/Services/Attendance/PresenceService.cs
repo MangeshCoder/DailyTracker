@@ -73,7 +73,7 @@ namespace DailyTrackerAPI.Services.Attendance
                     StatusMessage = p?.StatusMessage,
                     UpdatedAt = p?.UpdatedAt ?? DateTime.MinValue,
                     IsCheckedInToday = log != null,
-                    CheckInTime = log?.CheckInTime?.ToLocalTime().ToString("hh:mm tt")
+                    CheckInTime = log?.CheckInTime?.ToIstTime().ToString("hh:mm tt")
                 };
             }).ToList();
         }

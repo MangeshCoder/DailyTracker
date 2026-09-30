@@ -17,6 +17,7 @@ import { eodApi, aiChatApi } from '../services/api';
 import type { CreateEODReportDto } from '../types';
 import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, CardContent, StatusBadge } from '../components/ui';
+import { utcDate } from '../utils/date';
 
 const MOODS = [
   { value: 'Great', emoji: '🚀', label: 'Great', desc: 'Productive Day' },
@@ -112,8 +113,7 @@ export const EODReportPage: React.FC = () => {
 
   const formatISTTime = (dateString?: string) => {
     if (!dateString) return '--:--';
-    const utcDate = new Date(dateString + 'Z');
-    return utcDate.toLocaleTimeString('en-IN', {
+    return utcDate(dateString).toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,

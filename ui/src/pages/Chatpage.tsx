@@ -62,7 +62,7 @@ import {
 
 // ─────────────────────────────────────────────────────────────────────────────
 const formatTime = (iso: string) =>
-  parseUtcDate(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  parseUtcDate(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 
 const formatDate = (iso: string) => {
   const d = parseUtcDate(iso);

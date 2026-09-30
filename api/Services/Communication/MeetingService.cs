@@ -1,4 +1,5 @@
 ﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Communication;
 using Microsoft.EntityFrameworkCore;
@@ -80,7 +81,7 @@ namespace DailyTrackerAPI.Services.Communication
                 Agenda = dto.Agenda?.Trim(),
                 Location = dto.Location?.Trim(),
                 MeetingType = dto.MeetingType,
-                ScheduledAt = dto.ScheduledAt.ToUniversalTime(),
+                ScheduledAt = AppClock.FromClient(dto.ScheduledAt),   // a time without a zone is India time
                 DurationMinutes = dto.DurationMinutes,
                 IsRecurring = dto.IsRecurring,
                 RecurrencePattern = dto.RecurrencePattern,
@@ -130,7 +131,7 @@ namespace DailyTrackerAPI.Services.Communication
             if (dto.Notes != null) meeting.Notes = dto.Notes.Trim();
             if (dto.Location != null) meeting.Location = dto.Location.Trim();
             if (dto.MeetingType != null) meeting.MeetingType = dto.MeetingType;
-            if (dto.ScheduledAt.HasValue) meeting.ScheduledAt = dto.ScheduledAt.Value.ToUniversalTime();
+            if (dto.ScheduledAt.HasValue) meeting.ScheduledAt = AppClock.FromClient(dto.ScheduledAt.Value);
             if (dto.DurationMinutes.HasValue) meeting.DurationMinutes = dto.DurationMinutes.Value;
             if (dto.Status != null) meeting.Status = dto.Status;
             if (dto.RecurrencePattern != null) meeting.RecurrencePattern = dto.RecurrencePattern;
@@ -188,7 +189,7 @@ namespace DailyTrackerAPI.Services.Communication
                 MeetingId = meetingId,
                 Description = dto.Description.Trim(),
                 AssignedToUserId = dto.AssignedToUserId,
-                DueDate = dto.DueDate?.ToUniversalTime(),
+                DueDate = dto.DueDate,
                 Status = "Open",
             };
 
@@ -223,7 +224,7 @@ namespace DailyTrackerAPI.Services.Communication
             if (dto.Description != null) item.Description = dto.Description.Trim();
             if (dto.AssignedToUserId != null) item.AssignedToUserId = dto.AssignedToUserId;
             if (dto.Status != null) item.Status = dto.Status;
-            if (dto.DueDate.HasValue) item.DueDate = dto.DueDate.Value.ToUniversalTime();
+            if (dto.DueDate.HasValue) item.DueDate = dto.DueDate.Value;
 
             await _db.SaveChangesAsync();
 

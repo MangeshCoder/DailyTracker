@@ -50,9 +50,9 @@ namespace DailyTrackerAPI.Services.AI
             return new
             {
                 isCheckedIn = dailyLog?.CheckInTime != null,
-                checkInTime = dailyLog?.CheckInTime?.ToString("hh:mm tt"),
+                checkInTime = dailyLog?.CheckInTime?.ToIstTime().ToString("hh:mm tt"),
                 isCheckedOut = dailyLog?.CheckOutTime != null,
-                checkOutTime = dailyLog?.CheckOutTime?.ToString("hh:mm tt"),
+                checkOutTime = dailyLog?.CheckOutTime?.ToIstTime().ToString("hh:mm tt"),
                 totalWorkMinutes = dailyLog?.TotalWorkMinutes ?? 0,
                 tasksCount = dailyLog?.TaskLogs.Count ?? 0,
                 completedTasksCount = dailyLog?.TaskLogs.Count(t => t.Status == "Completed") ?? 0,
@@ -91,7 +91,7 @@ namespace DailyTrackerAPI.Services.AI
 
             // Build Accomplishments
             var accomplishedSb = new StringBuilder();
-            accomplishedSb.AppendLine($"• Total Work Hours: {hours}h {mins}m (Checked in at {dailyLog.CheckInTime.Value:hh:mm tt})");
+            accomplishedSb.AppendLine($"• Total Work Hours: {hours}h {mins}m (Checked in at {dailyLog.CheckInTime.Value.ToIstTime():hh:mm tt})");
             if (completedTasks.Any())
             {
                 foreach (var t in completedTasks)
@@ -492,10 +492,10 @@ namespace DailyTrackerAPI.Services.AI
                 var hours = netMinutes / 60;
                 var mins = netMinutes % 60;
 
-                var reply = $"You checked in at **{todayLog.CheckInTime.Value:hh:mm tt}** and have worked **{hours}h {mins}m** so far today (net of breaks).";
+                var reply = $"You checked in at **{todayLog.CheckInTime.Value.ToIstTime():hh:mm tt}** and have worked **{hours}h {mins}m** so far today (net of breaks).";
                 if (activeBreak != null)
                 {
-                    reply += $"\n\n☕ You are currently on an active **{activeBreak.BreakType}** break since {activeBreak.StartTime:hh:mm tt}.";
+                    reply += $"\n\n☕ You are currently on an active **{activeBreak.BreakType}** break since {activeBreak.StartTime.ToIstTime():hh:mm tt}.";
                 }
                 return reply;
             }
@@ -531,7 +531,7 @@ namespace DailyTrackerAPI.Services.AI
                 var mins = netMinutes % 60;
 
                 var sb = new StringBuilder("📝 **Today's EOD Report Draft**:\n\n");
-                sb.AppendLine($"• **Check-In Time:** {todayLog.CheckInTime:hh:mm tt}");
+                sb.AppendLine($"• **Check-In Time:** {todayLog.CheckInTime?.ToIstTime():hh:mm tt}");
                 sb.AppendLine($"• **Total Net Work Time:** {hours}h {mins}m");
                 sb.AppendLine($"• **Tasks Completed ({todayLog.TaskLogs.Count(t => t.Status == "Completed")}):**");
                 foreach (var t in todayLog.TaskLogs.Where(t => t.Status == "Completed"))
@@ -566,7 +566,7 @@ namespace DailyTrackerAPI.Services.AI
                 var sb = new StringBuilder($"You have **{meetings.Count}** meeting(s) scheduled today:\n\n");
                 foreach (var m in meetings)
                 {
-                    sb.AppendLine($"📅 **{m.Title}** at {m.ScheduledAt:hh:mm tt} ({m.DurationMinutes}m) — Location: {m.Location ?? "Online"}");
+                    sb.AppendLine($"📅 **{m.Title}** at {m.ScheduledAt.ToIstTime():hh:mm tt} ({m.DurationMinutes}m) — Location: {m.Location ?? "Online"}");
                 }
                 return sb.ToString();
             }
@@ -600,14 +600,14 @@ namespace DailyTrackerAPI.Services.AI
 
             if (dailyLog != null)
             {
-                var checkIn = dailyLog.CheckInTime.HasValue ? dailyLog.CheckInTime.Value.ToString("hh:mm tt") : "Not Checked In";
-                var checkOut = dailyLog.CheckOutTime.HasValue ? dailyLog.CheckOutTime.Value.ToString("hh:mm tt") : "Not Checked Out";
+                var checkIn = dailyLog.CheckInTime.HasValue ? dailyLog.CheckInTime.Value.ToIstTime().ToString("hh:mm tt") : "Not Checked In";
+                var checkOut = dailyLog.CheckOutTime.HasValue ? dailyLog.CheckOutTime.Value.ToIstTime().ToString("hh:mm tt") : "Not Checked Out";
                 sb.AppendLine($"TODAY'S ATTENDANCE: CheckIn: {checkIn} | CheckOut: {checkOut} | WorkMinutes: {dailyLog.TotalWorkMinutes} min | Status: {dailyLog.DayStatus}");
 
                 var activeBreak = dailyLog.BreakLogs.FirstOrDefault(b => b.IsActive || b.EndTime == null);
                 if (activeBreak != null)
                 {
-                    sb.AppendLine($"CURRENT BREAK: Active ({activeBreak.BreakType}) since {activeBreak.StartTime:hh:mm tt}");
+                    sb.AppendLine($"CURRENT BREAK: Active ({activeBreak.BreakType}) since {activeBreak.StartTime.ToIstTime():hh:mm tt}");
                 }
 
                 if (dailyLog.TaskLogs.Any())

@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Inbox,
 } from 'lucide-react';
+import { utcDate } from '../utils/date';
 
 interface Props {
   logs: SupportLog[];
@@ -54,9 +55,7 @@ const COLUMN_META: Record<SupportType, { label: string; icon: React.ElementType;
 
 const formatISTTime = (dateString?: string) => {
   if (!dateString) return '--:--';
-  // Force treat backend time as UTC
-  const utcDate = new Date(dateString + 'Z');
-  return utcDate.toLocaleTimeString('en-IN', {
+  return utcDate(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,

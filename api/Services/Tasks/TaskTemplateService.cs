@@ -107,7 +107,7 @@ namespace DailyTrackerAPI.Services.Tasks
 
         public async Task<List<TaskTemplateDto>> GetTodaysRecurringAsync(int userId)
         {
-            var todayName = DateTime.UtcNow.DayOfWeek.ToString()[..3]; // "Mon", "Tue" etc.
+            var todayName = DailyTrackerAPI.Helpers.AppClock.TodayIst.DayOfWeek.ToString()[..3]; // "Mon", "Tue" etc. (India day)
 
             return await _db.TaskTemplates
                 .Where(t => t.UserId == userId && t.IsActive && t.IsRecurring &&

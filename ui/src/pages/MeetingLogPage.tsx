@@ -30,6 +30,7 @@ import {
   ChevronRight,
   CheckCircle2} from 'lucide-react';
 import { Select } from '../components/ui/Select';
+import { utcDate } from '../utils/date';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Uploaded files live on the API server: the same address when hosted, localhost:7096 on your PC
@@ -153,7 +154,7 @@ const Avatar: React.FC<{
 };
 
 const formatDateTime = (iso: string) => {
-  const d = new Date(iso);
+  const d = utcDate(iso);
   return d.toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -759,7 +760,8 @@ const CreateMeetingModal: React.FC<{
       toast.error('Title and Date & Time are required');
       return;
     }
-    createMut.mutate({ ...form, attendeeIds: selectedAttendees });
+    // the picked time is India time, whatever zone this device is set to
+    createMut.mutate({ ...form, scheduledAt: `${form.scheduledAt.slice(0, 16)}:00+05:30`, attendeeIds: selectedAttendees });
   };
 
   return (
@@ -1153,7 +1155,7 @@ export const MeetingLogPage: React.FC = () => {
       ),
       upcoming: meetings.filter(
         (m) =>
-          m.status === 'Scheduled' && new Date(m.scheduledAt) >= new Date()
+          m.status === 'Scheduled' && utcDate(m.scheduledAt) >= new Date()
       ).length,
     }),
     [meetings]
