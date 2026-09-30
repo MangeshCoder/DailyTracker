@@ -22,10 +22,11 @@ test('opening a chat shows the latest messages, one page only; scrolling up load
   // no "load the whole history" cascade just from opening the chat
   expect(fake.historyRequestsFor(10).filter(r => r.before !== null)).toHaveLength(0);
 
-  // scroll to the top → the previous page is added and the reader stays where they were
+  // scroll to the top ONCE → the previous page is added and the reader stays where they were.
+  // (Two scrolls to the top would rightly load two pages: on a slow machine the first
+  // load can finish before the second scroll, so the test scrolls just once.)
   const firstVisible = bubbles(page).first();
   const firstId = await firstVisible.getAttribute('id');
-  await page.locator('main [id^="msg-"]').first().scrollIntoViewIfNeeded();
   await page.evaluate(() => {
     const list = document.querySelector('main [id^="msg-"]')?.closest('[class*="overflow-y"]');
     if (list) list.scrollTop = 0;
