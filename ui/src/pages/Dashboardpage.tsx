@@ -155,8 +155,8 @@ export const DashboardPage = () => {
 
   // Swal colours follow the current theme
   const swalTheme = isDark
-    ? { background: 'rgb(11, 23, 57)', color: '#ffffff' }
-    : { background: '#ffffff', color: 'rgb(11, 23, 57)' };
+    ? { background: 'rgb(var(--c-slate-900))', color: '#ffffff' }
+    : { background: '#ffffff', color: 'rgb(var(--c-slate-900))' };
 
   const load = useCallback(async () => {
     try {
@@ -248,10 +248,10 @@ export const DashboardPage = () => {
         text:  'Are you sure you want to check out for today?',
         icon:  'question',
         ...swalTheme,
-        iconColor: '#D0800C',
+        iconColor: 'rgb(var(--c-blue-500))',
         showCancelButton:   true,
-        confirmButtonColor: '#D0800C',
-        cancelButtonColor:  '#96A3D0',
+        confirmButtonColor: 'rgb(var(--c-blue-500))',
+        cancelButtonColor:  'rgb(var(--c-slate-400))',
         confirmButtonText:  'Yes, check out',
         cancelButtonText:   'Cancel',
         customClass: { popup: 'font-sans rounded-2xl' },

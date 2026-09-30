@@ -53,3 +53,28 @@ test('menu search lists matching pages from every section and opens them', async
   await page.locator('aside nav').getByRole('link', { name: /Payroll/ }).click();
   await expect(page).toHaveURL(/\/payroll$/);
 });
+
+test('each person can switch between the three colour designs and it is remembered', async ({ page }) => {
+  const fake = new FakeBackend(page);
+  await fake.install();
+  await fake.login();
+  const primary = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-blue-600').trim());
+  const html = page.locator('html');
+
+  await expect(html).toHaveAttribute('data-design', 'montcrest');          // default
+  expect(await primary()).toBe('179 95 0');                                // Montcrest amber button shade
+
+  await page.getByTitle('Account & Documentation Menu').click();
+  await page.getByRole('button', { name: 'Dashdark Purple', exact: true }).click();
+  await expect(html).toHaveAttribute('data-design', 'purple');
+  expect(await primary()).toBe('154 27 214');
+
+  await page.getByRole('button', { name: 'Original Blue', exact: true }).click();
+  await expect(html).toHaveAttribute('data-design', 'blue');
+  expect(await primary()).toBe('37 99 235');                               // Tailwind blue-600
+  await expect(page.getByRole('button', { name: 'Original Blue', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(html).toHaveAttribute('data-design', 'blue');               // still blue after a reload
+  expect(await primary()).toBe('37 99 235');
+});

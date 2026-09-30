@@ -39,8 +39,8 @@ import {
 
 const GRADE_META: Record<string, { text: string; stroke: string; label: string }> = {
   A: { text: 'text-emerald-600 dark:text-emerald-400', stroke: '#10b981', label: 'Excellent' },
-  B: { text: 'text-blue-600 dark:text-blue-400',       stroke: '#D0800C', label: 'Good' },
-  C: { text: 'text-amber-600 dark:text-amber-400',     stroke: '#EAB308', label: 'Fair' },
+  B: { text: 'text-blue-600 dark:text-blue-400',       stroke: 'rgb(var(--c-blue-500))', label: 'Good' },
+  C: { text: 'text-amber-600 dark:text-amber-400',     stroke: 'rgb(var(--c-amber-500))', label: 'Fair' },
   D: { text: 'text-rose-600 dark:text-rose-400',       stroke: '#f43f5e', label: 'Needs focus' },
 };
 
@@ -191,7 +191,7 @@ export const GoalsWidget = () => {
                 <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" className="stroke-slate-200 dark:stroke-slate-800" />
                 <circle
                   cx="60" cy="60" r={r} fill="none"
-                  stroke={grade.stroke}
+                  style={{ stroke: grade.stroke }}
                   strokeWidth="10"
                   strokeLinecap="round"
                   strokeDasharray={c}

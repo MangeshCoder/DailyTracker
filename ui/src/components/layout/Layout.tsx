@@ -7,7 +7,7 @@
 
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/Authcontext';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme, DESIGNS } from '../../context/ThemeContext';
 import { NotificationBell } from '../NotificationBell';
 import { Suspense, useState, useRef, useEffect, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
@@ -37,7 +37,7 @@ interface NavSection { title: string; icon: Icon; items: NavItem[]; manager?: bo
 
 const LayoutShell = () => {
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme, design, setDesign } = useTheme();
   const navigate = useNavigate();
   // the chat page fills the screen itself (its message box sits at the bottom)
   const fullHeightPage = useLocation().pathname.startsWith('/chat');
@@ -521,6 +521,28 @@ const LayoutShell = () => {
                   {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   <span>{isDark ? 'Light Theme' : 'Dark Theme'}</span>
                 </button>
+                <div className="px-2.5 pt-1.5 pb-1" role="group" aria-label="Design">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Design</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {DESIGNS.map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setDesign(d.id)}
+                        aria-pressed={design === d.id}
+                        title={`${d.label} — ${d.hint}`}
+                        className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 text-[10px] font-medium leading-tight transition ${
+                          design === d.id
+                            ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="w-6 h-6 rounded-full ring-1 ring-black/10" style={{ background: `linear-gradient(135deg, ${d.swatch[0]} 50%, ${d.swatch[1]} 50%)` }} />
+                        <span className="text-center">{d.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <button type="button" onClick={() => { logout(); setProfileOpen(false); }}
                   className={`${menuBtn} font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10`}>
                   <LogOut className="w-4 h-4" /><span>Sign Out</span>

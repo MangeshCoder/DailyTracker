@@ -22,17 +22,17 @@ const isDarkMode = () =>
 
 const themeBase = () =>
   isDarkMode()
-    ? { background: 'rgb(11, 23, 57)', color: '#ECEFFA' }   // slate-900 / slate-100
-    : { background: '#ffffff',         color: '#0B1739' };  // white / slate-900
+    ? { background: 'rgb(var(--c-slate-900))', color: 'rgb(var(--c-slate-100))' }   // slate-900 / slate-100
+    : { background: '#ffffff',         color: 'rgb(var(--c-slate-900))' };  // white / slate-900
 
 const POPUP_CLASS = 'font-sans !rounded-2xl';
 
 const ICON_COLORS: Record<SweetAlertIcon, string> = {
   success:  '#10b981',
   error:    '#f43f5e',
-  warning:  '#EAB308',
-  info:     '#D0800C',
-  question: '#D0800C',
+  warning:  'rgb(var(--c-amber-500))',
+  info:     'rgb(var(--c-blue-500))',
+  question: 'rgb(var(--c-blue-500))',
 };
 
 export function useConfirm() {
@@ -61,8 +61,8 @@ export function useConfirm() {
       showCancelButton:   true,
       reverseButtons:     true,
       focusCancel:        isDanger,
-      confirmButtonColor: isDanger ? '#e11d48' : '#B35F00',
-      cancelButtonColor:  isDarkMode() ? '#4E5A80' : '#96A3D0',
+      confirmButtonColor: isDanger ? '#e11d48' : 'rgb(var(--c-blue-600))',
+      cancelButtonColor:  isDarkMode() ? 'rgb(var(--c-slate-600))' : 'rgb(var(--c-slate-400))',
       confirmButtonText:  options?.confirmText ?? 'Yes, continue',
       cancelButtonText:   options?.cancelText  ?? 'Cancel',
     });
@@ -91,7 +91,7 @@ export function useConfirm() {
       reverseButtons:     true,
       focusCancel:        false,
       confirmButtonColor: '#e11d48',
-      cancelButtonColor:  isDarkMode() ? '#4E5A80' : '#96A3D0',
+      cancelButtonColor:  isDarkMode() ? 'rgb(var(--c-slate-600))' : 'rgb(var(--c-slate-400))',
       confirmButtonText:  options?.confirmText ?? 'Yes, continue',
       cancelButtonText:   'Cancel',
       preConfirm: (value: string) => {
@@ -118,7 +118,7 @@ export function useConfirm() {
       text:               message,
       icon,
       iconColor:          ICON_COLORS[icon],
-      confirmButtonColor: '#B35F00',
+      confirmButtonColor: 'rgb(var(--c-blue-600))',
       confirmButtonText:  'OK',
     });
   };
