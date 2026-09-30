@@ -635,7 +635,7 @@ export const GiveKudosForm = ({ users, onClose }: KudosFormProps) => {
           <button
             onClick={() => give.mutate()}
             disabled={!toUserId || !message.trim() || give.isPending}
-            className="w-full inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold py-2.5 rounded-xl shadow-md shadow-amber-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full inline-flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold py-2.5 rounded-xl shadow-md shadow-amber-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {give.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
             {give.isPending ? 'Sending…' : 'Send Kudos'}

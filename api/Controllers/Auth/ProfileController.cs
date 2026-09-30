@@ -115,7 +115,7 @@ namespace DailyTrackerAPI.Controllers.Auth
         {
             var query = _db.Users
                 .Include(u => u.Manager)
-                .Where(u => u.IsActive)
+                .Where(u => u.IsActive && u.Role != "Pending")   // not-yet-approved sign-ups aren't in the directory
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))

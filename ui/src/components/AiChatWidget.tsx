@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef, type KeyboardEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/Authcontext";
 import {
   Mic,
   MicOff,
@@ -450,7 +451,7 @@ const ActionCard = ({
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white shadow transition active:scale-95 flex items-center gap-1.5"
           >
             {loading ? <Spin /> : <Coffee size={13} />}
             {loading ? "Starting..." : `Start ${breakType} Break`}
@@ -763,6 +764,8 @@ export const AiChatWidget = () => {
   const { toast } = useToast();
   // On the full chat page the pill would cover the message box / send button
   const onChatPage = useLocation().pathname.startsWith("/chat");
+  // signed out (login, register …) there's no bottom bar to sit above
+  const signedIn = !!useAuth().user;
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -1201,7 +1204,7 @@ export const AiChatWidget = () => {
       {!isOpen && !chatDockOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className={`fixed right-4 md:right-6 z-50 ${onChatPage ? "hidden md:flex md:bottom-28" : "bottom-20 md:bottom-6"} pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2`}
+          className={`fixed right-4 md:right-6 z-50 ${onChatPage ? "hidden md:flex md:bottom-28" : signedIn ? "bottom-20 md:bottom-6" : "bottom-4 md:bottom-6"} pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2`}
           aria-label="Open AI Assistant"
         >
           <Sparkles size={18} />
@@ -1324,7 +1327,7 @@ export const AiChatWidget = () => {
                     payload: { dayStatus: "Present" },
                   })
                 }
-                className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-500 hover:bg-amber-400 text-white px-2.5 py-1.5 rounded-lg transition shrink-0 shadow active:scale-95"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded-lg transition shrink-0 shadow active:scale-95"
               >
                 <LogIn size={12} /> Check In
               </button>

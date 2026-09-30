@@ -676,7 +676,7 @@ function DocumentCard({ doc, canManage, onEdit, onDelete, onDownload }: DocCardP
       </CardContent>
 
       {/* Action Footer */}
-      <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-850/50 flex items-center gap-2">
+      <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/40 flex items-center gap-2">
         <button
           onClick={() => onDownload(doc)}
           className="flex-1 py-1.5 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-medium transition flex items-center justify-center gap-1.5 border border-blue-200 dark:border-blue-800/40"
@@ -1029,7 +1029,7 @@ export function DocumentManagementPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Document</th>
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Owner</th>

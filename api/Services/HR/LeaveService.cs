@@ -332,7 +332,7 @@ namespace DailyTrackerAPI.Services.HR
             else
             {
                 users = await _db.Users
-                    .Where(u => u.IsActive)
+                    .Where(u => u.IsActive && u.Role != "Pending")   // not-yet-approved sign-ups aren't team members
                     .OrderBy(u => u.FullName)
                     .ToListAsync();
             }

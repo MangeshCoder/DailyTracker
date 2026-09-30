@@ -3,7 +3,7 @@
 //  Sidebar System & Docs, User Profile Dropdown, Documentation Hub & Mobile Nav
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/Authcontext';
 import { useTheme } from '../../context/ThemeContext';
 import { NotificationBell } from '../NotificationBell';
@@ -20,6 +20,8 @@ const LayoutShell = () => {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  // the chat page fills the screen itself (its message box sits at the bottom)
+  const fullHeightPage = useLocation().pathname.startsWith('/chat');
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -685,7 +687,8 @@ const LayoutShell = () => {
         </header>
 
         {/* ── Main Content Area ─────────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        {/* bottom room so the last item can scroll clear of the bottom bar and the chat / AI Help buttons */}
+        <main className={`flex-1 overflow-y-auto ${fullHeightPage ? 'pb-16 md:pb-0' : 'pb-40 md:pb-24'}`}>
           <ErrorBoundary>
             <Suspense fallback={<SkeletonDashboard />}>
               <Outlet />

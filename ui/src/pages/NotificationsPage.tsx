@@ -325,10 +325,10 @@ export function NotificationsPage() {
       />
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard title="Loaded" value={allItems.length} icon={Layers}    color="blue"    loading={isLoading} />
-        <StatCard title="Unread" value={unreadCount}     icon={Bell}      color="rose"    loading={isLoading} />
-        <StatCard title="Read"   value={readCount}       icon={MailOpen}  color="emerald" loading={isLoading} />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <StatCard compact title="Loaded" value={allItems.length} icon={Layers}    color="blue"    loading={isLoading} />
+        <StatCard compact title="Unread" value={unreadCount}     icon={Bell}      color="rose"    loading={isLoading} />
+        <StatCard compact title="Read"   value={readCount}       icon={MailOpen}  color="emerald" loading={isLoading} />
       </div>
 
       {/* ── Filters ── */}

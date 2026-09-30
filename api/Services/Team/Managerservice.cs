@@ -78,6 +78,8 @@ namespace DailyTrackerAPI.Services.Team
 
             int workingDays = CountWorkingDays(from, to);
             int present = logs.Count(l => l.DayStatus == "Present");
+            var publicHolidays = await PublicHolidaysAsync(from, to);
+            var leaveDays = await ApprovedLeaveDaysAsync(userId, from, to);
             int wfh = logs.Count(l => l.DayStatus == "WFH");
             int halfDay = logs.Count(l => l.DayStatus == "HalfDay");
             int weekend = logs.Count(l => l.DayStatus == "Weekend");  // ← FIX
@@ -85,8 +87,20 @@ namespace DailyTrackerAPI.Services.Team
 
             // totalLogged = regular working days only (for attendance % calculation)
             int totalLogged = present + wfh + halfDay;
-            // absent = working days not covered by any regular attendance
-            int absent = Math.Max(0, workingDays - totalLogged);
+            // absent = working days from joining up to yesterday not covered by attendance,
+            // approved leave or a public holiday (same rule as payroll)
+            var (countFrom, countTo) = AttendanceDays.CountableRange(user, from, to,
+                logs.Any(l => l.LogDate.Date == AppClock.TodayIst));
+            var covered = logs.Where(l => l.DayStatus is "Present" or "WFH" or "HalfDay")
+                .Select(l => l.LogDate.Date).Concat(leaveDays).ToHashSet();
+            int expected = 0, absent = 0;
+            for (var d = countFrom; d <= countTo; d = d.AddDays(1))
+            {
+                if (!AttendanceDays.IsWorkingDay(d, publicHolidays)) continue;
+                if (leaveDays.Contains(d) && !logs.Any(l => l.LogDate.Date == d)) continue;   // on leave: not expected
+                expected++;
+                if (!covered.Contains(d)) absent++;
+            }
 
             int totalWork = logs.Sum(l => l.TotalWorkMinutes);
             int totalTasks = logs.SelectMany(l => l.TaskLogs).Count(t => t.Status == "Completed");
@@ -104,8 +118,9 @@ namespace DailyTrackerAPI.Services.Team
                 DaysAbsent = absent,
                 DaysWeekend = weekend,  // ← FIX
                 DaysHoliday = holiday,  // ← FIX
-                AttendancePercentage = workingDays > 0
-                    ? Math.Round((double)totalLogged / workingDays * 100, 1) : 0,
+                // share of the days they could have worked (joined → today) that they did work
+                AttendancePercentage = expected > 0
+                    ? Math.Min(100, Math.Round((double)totalLogged / expected * 100, 1)) : 0,
                 TotalWorkMinutes = totalWork,
                 TotalWorkHours = FormatMinutes(totalWork),
                 AverageDailyHours = totalLogged > 0
@@ -155,6 +170,16 @@ namespace DailyTrackerAPI.Services.Team
 
             int workingDays = CountWorkingDays(from.Date, to.Date);
             int daysPresent = logs.Count(l => l.DayStatus is "Present" or "WFH" or "HalfDay");
+            // attendance % over the days they could have worked: joined → today, minus holidays and leave
+            var publicHolidays = await PublicHolidaysAsync(from.Date, to.Date);
+            var leaveDays = await ApprovedLeaveDaysAsync(userId, from.Date, to.Date);
+            var (countFrom, countTo) = AttendanceDays.CountableRange(user, from, to,
+                logs.Any(l => l.LogDate.Date == AppClock.TodayIst));
+            int expected = 0;
+            for (var d = countFrom; d <= countTo; d = d.AddDays(1))
+                if (AttendanceDays.IsWorkingDay(d, publicHolidays)
+                    && !(leaveDays.Contains(d) && !logs.Any(l => l.LogDate.Date == d)))
+                    expected++;
             int totalWork = logs.Sum(l => l.TotalWorkMinutes);
             int totalTasks = logs.SelectMany(l => l.TaskLogs).Count(t => t.Status == "Completed");
             int totalLogged = logs.SelectMany(l => l.TaskLogs).Count();
@@ -186,8 +211,8 @@ namespace DailyTrackerAPI.Services.Team
                 ToDate = to.Date,
                 TotalWorkingDays = workingDays,
                 DaysPresent = daysPresent,
-                AttendancePercentage = workingDays > 0
-                    ? Math.Round((double)daysPresent / workingDays * 100, 1) : 0,
+                AttendancePercentage = expected > 0
+                    ? Math.Min(100, Math.Round((double)daysPresent / expected * 100, 1)) : 0,
                 TotalWorkMinutes = totalWork,
                 TotalWorkHours = FormatMinutes(totalWork),
                 AverageDailyHours = daysPresent > 0
@@ -210,6 +235,10 @@ namespace DailyTrackerAPI.Services.Team
         {
             var from = new DateTime(year, month, 1);
             var to = from.AddMonths(1).AddDays(-1);
+            var user = await _db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException("User not found");
+            var joined = AttendanceDays.JoinedOn(user);
+            var leaveDays = await ApprovedLeaveDaysAsync(userId, from, to);
 
             // Load all logs for the month into a fast dictionary
             var logs = await _db.DailyLogs
@@ -260,11 +289,14 @@ namespace DailyTrackerAPI.Services.Team
                 }
                 else
                 {
-                    // Normal working day, no log
+                    // Normal working day, no log: before joining / not over yet / on leave / absent
                     result.Add(new AttendanceDayDto
                     {
                         Date = day,
-                        Status = day.Date > AppClock.TodayIst ? "Future" : "Absent"
+                        Status = day.Date < joined ? "NotJoined"
+                            : day.Date >= AppClock.TodayIst ? "Future"
+                            : leaveDays.Contains(day.Date) ? "Leave"
+                            : "Absent"
                     });
                 }
             }
@@ -297,7 +329,7 @@ namespace DailyTrackerAPI.Services.Team
         public async Task<List<UserDto>> GetAllUsersForManagerAsync(HashSet<int>? onlyUserIds = null)
         {
             return await _db.Users
-                .Where(u => onlyUserIds == null || onlyUserIds.Contains(u.Id))
+                .Where(u => u.Role != "Pending" && (onlyUserIds == null || onlyUserIds.Contains(u.Id)))   // sign-ups waiting for a role aren't team members
                 .Select(u => new UserDto
                 {
                     Id = u.Id,
@@ -380,6 +412,23 @@ namespace DailyTrackerAPI.Services.Team
                     }).ToList()
                 }).ToList()
             };
+        }
+
+        private async Task<HashSet<DateTime>> PublicHolidaysAsync(DateTime from, DateTime to) =>
+            (await _db.Holidays.Where(h => h.Type == "Public" && h.Date >= from && h.Date <= to)
+                .Select(h => h.Date).ToListAsync()).Select(d => d.Date).ToHashSet();
+
+        /// <summary>Every date in [from, to] covered by this person's approved leave</summary>
+        private async Task<HashSet<DateTime>> ApprovedLeaveDaysAsync(int userId, DateTime from, DateTime to)
+        {
+            var leaves = await _db.LeaveRequests
+                .Where(l => l.UserId == userId && l.Status == "Approved" && l.FromDate <= to && l.ToDate >= from)
+                .Select(l => new { l.FromDate, l.ToDate }).ToListAsync();
+            var days = new HashSet<DateTime>();
+            foreach (var l in leaves)
+                for (var d = l.FromDate.Date < from ? from : l.FromDate.Date; d <= l.ToDate.Date && d <= to; d = d.AddDays(1))
+                    days.Add(d);
+            return days;
         }
 
         private static int CountWorkingDays(DateTime from, DateTime to)

@@ -100,7 +100,7 @@ const LeaveTypeCard = ({ item }: { item: LeaveTypeBalanceItem }) => {
             {cfg.icon}
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:white leading-tight">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
               {item.leaveType}
             </h4>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]">

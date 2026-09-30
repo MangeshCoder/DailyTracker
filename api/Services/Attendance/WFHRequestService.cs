@@ -471,6 +471,9 @@ namespace DailyTrackerAPI.Services.Attendance
                 .Where(l => teamUserIds.Contains(l.UserId) && l.Status == "Approved"
                     && l.FromDate <= monthEnd && l.ToDate >= from)
                 .ToListAsync();
+            var publicHolidays = (await _db.Holidays
+                .Where(h => h.Type == "Public" && h.Date >= from && h.Date <= monthEnd)
+                .Select(h => h.Date).ToListAsync()).Select(d => d.Date).ToHashSet();
 
             return teamUsers.Select(user =>
             {
@@ -490,8 +493,25 @@ namespace DailyTrackerAPI.Services.Attendance
                 int daysWorked = daysPresent + daysWFH + daysHalfDay;
                 int daysOnLeave = approvedLeaves.Where(l => l.UserId == user.Id).Sum(l =>
                     CountWorkingDays(l.FromDate < from ? from : l.FromDate, l.ToDate > monthEnd ? monthEnd : l.ToDate));
-                // Weekend/Holiday are bonus days — don't reduce the absent count; approved leave isn't absence
-                int daysAbsent = Math.Max(0, workingDays - daysWorked - daysOnLeave);
+
+                // Absent = working days from joining up to yesterday (today once checked in) that
+                // have no attendance, approved leave or public holiday — same rule as payroll
+                var leaveDates = new HashSet<DateTime>();
+                foreach (var l in approvedLeaves.Where(l => l.UserId == user.Id))
+                    for (var d = l.FromDate.Date < from ? from : l.FromDate.Date; d <= l.ToDate.Date && d <= monthEnd; d = d.AddDays(1))
+                        leaveDates.Add(d);
+                var workedDates = userLogs.Where(l => l.DayStatus is "Present" or "WFH" or "HalfDay").Select(l => l.LogDate.Date)
+                    .Concat(userWFH.Select(r => r.RequestDate.Date)).ToHashSet();
+                var (countFrom, countTo) = AttendanceDays.CountableRange(user, from, monthEnd,
+                    userLogs.Any(l => l.LogDate.Date == AppClock.TodayIst));
+                int expected = 0, daysAbsent = 0;
+                for (var d = countFrom; d <= countTo; d = d.AddDays(1))
+                {
+                    if (!AttendanceDays.IsWorkingDay(d, publicHolidays)) continue;
+                    if (leaveDates.Contains(d) && !workedDates.Contains(d)) continue;   // on leave
+                    expected++;
+                    if (!workedDates.Contains(d)) daysAbsent++;
+                }
 
                 var totalWorkMinutes = userLogs.Sum(l =>
                     l.CheckInTime.HasValue && l.CheckOutTime.HasValue
@@ -513,8 +533,8 @@ namespace DailyTrackerAPI.Services.Attendance
                     DaysOnLeave = daysOnLeave,
                     DaysWeekend = daysWeekend,  // ← NEW
                     DaysHoliday = daysHoliday,  // ← NEW
-                    AttendancePercentage = workingDays > 0
-                        ? Math.Round(daysWorked / (double)workingDays * 100, 1) : 0,
+                    AttendancePercentage = expected > 0
+                        ? Math.Min(100, Math.Round(daysWorked / (double)expected * 100, 1)) : 0,
                     TotalWorkMinutes = totalWorkMinutes,
                     TotalWorkHours = FormatHours(totalWorkMinutes),
                     AverageDailyHours = daysWorked > 0

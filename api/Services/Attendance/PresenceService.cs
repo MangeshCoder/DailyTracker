@@ -53,7 +53,7 @@ namespace DailyTrackerAPI.Services.Attendance
         public async Task<List<UserPresenceDto>> GetTeamPresenceAsync()
         {
             var today = AppClock.TodayIst;
-            var users = await _db.Users.Where(u => u.IsActive).ToListAsync();
+            var users = await _db.Users.Where(u => u.IsActive && u.Role != "Pending").ToListAsync();
 
             var presences = await _db.UserPresences.ToDictionaryAsync(p => p.UserId);
             var todayLogs = await _db.DailyLogs

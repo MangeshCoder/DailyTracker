@@ -72,6 +72,8 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
     Holiday:       'bg-violet-500/20 text-violet-600 dark:text-violet-300',
     HolidayWorked: 'bg-violet-600 text-white',
     Future:        'bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-700',
+    Leave:         'bg-sky-500/20 text-sky-700 dark:text-sky-300',
+    NotJoined:     'bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-700',
   };
 
   return (
@@ -112,6 +114,7 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
           { c: 'bg-blue-500',      l: 'WFH'              },
           { c: 'bg-amber-500',     l: 'Half Day'         },
           { c: 'bg-rose-500/40',   l: 'Absent'           },
+          { c: 'bg-sky-500/40',    l: 'On leave'         },
           { c: 'bg-slate-300 dark:bg-slate-700', l: 'Weekend' },
           { c: 'bg-orange-500',    l: 'Weekend (worked)' },
           { c: 'bg-violet-500/40', l: 'Holiday'          },

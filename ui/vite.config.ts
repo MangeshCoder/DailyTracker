@@ -67,7 +67,10 @@ export default defineConfig({
         globIgnores: ['**/face-api-*.js'],
         // Hosted, the API shares this address: links to it (downloads, health
         // checks …) must reach the server, not get the app's index.html
-        navigateFallbackDenylist: [/^\/api\//, /^\/hubs\//, /^\/uploads\//, /^\/models\//, /^\/health/, /^\/swagger/],
+        // Real files (the PDF guides, images …) too: the guide viewer loads the PDF in a frame,
+        // and without this the frame showed the app itself instead of the document
+        navigateFallbackDenylist: [/^\/api\//, /^\/hubs\//, /^\/uploads\//, /^\/models\//, /^\/health/, /^\/swagger/,
+          /^[^?]*\.[a-z0-9]{2,5}(\?.*)?$/i],
 
         runtimeCaching: [
           // ── face-api.js chunk + ML models — CacheFirst (hashed / static files)

@@ -249,7 +249,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ userId, onClose }) => {
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 flex items-center gap-3">
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center gap-3">
               <a
                 href={`mailto:${profile.email}`}
                 className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition text-center shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
@@ -352,7 +352,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ user, onClick }) => {
       </CardContent>
 
       {/* Card Action Footer */}
-      <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-850/50 flex items-center justify-between text-xs text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">
+      <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">
         <span>View full profile</span>
         <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
       </div>
@@ -604,7 +604,7 @@ export const DirectoryPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
                   <th className="py-3 px-4">Employee</th>
                   <th className="py-3 px-4">Role</th>
                   <th className="py-3 px-4">Designation</th>

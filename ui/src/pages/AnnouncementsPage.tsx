@@ -451,10 +451,10 @@ export const AnnouncementsPage = () => {
       />
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard title="Total"  value={allItems.length}           icon={Layers} color="slate" loading={isLoading} />
-        <StatCard title="Unread" value={unread}                    icon={Bell}   color="blue"  loading={isLoading} />
-        <StatCard title="Pinned" value={data?.pinned.length ?? 0}  icon={Pin}    color="amber" loading={isLoading} />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <StatCard compact title="Total"  value={allItems.length}           icon={Layers} color="slate" loading={isLoading} />
+        <StatCard compact title="Unread" value={unread}                    icon={Bell}   color="blue"  loading={isLoading} />
+        <StatCard compact title="Pinned" value={data?.pinned.length ?? 0}  icon={Pin}    color="amber" loading={isLoading} />
       </div>
 
       {/* ── Category filter ── */}

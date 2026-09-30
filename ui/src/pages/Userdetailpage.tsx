@@ -83,8 +83,12 @@ const AttendanceCalendar = ({
     HalfDay: { bg: 'bg-amber-500/10 border-amber-500/30',     text: 'text-amber-700 dark:text-amber-400',     dot: 'bg-amber-500' },
     Absent:  { bg: 'bg-rose-500/10 border-rose-500/25',       text: 'text-rose-700 dark:text-rose-400',       dot: 'bg-rose-500' },
     Weekend: { bg: 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/40', text: 'text-slate-400 dark:text-slate-600', dot: 'bg-slate-300 dark:bg-slate-600' },
+    Leave:   { bg: 'bg-sky-500/10 border-sky-500/30',         text: 'text-sky-700 dark:text-sky-400',         dot: 'bg-sky-500' },
+    Holiday: { bg: 'bg-violet-500/10 border-violet-500/30',   text: 'text-violet-700 dark:text-violet-400',   dot: 'bg-violet-500' },
     Future:  { bg: 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/40',  text: 'text-slate-300 dark:text-slate-700', dot: 'bg-slate-200 dark:bg-slate-700' },
   };
+  // days before the person joined look like days still to come
+  statusStyle.NotJoined = statusStyle.Future;
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -117,7 +121,7 @@ const AttendanceCalendar = ({
                 <span className={`text-xs font-bold ${s.text}`}>{d.getDate()}</span>
                 <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
               </div>
-              {day.status !== 'Weekend' && day.status !== 'Future' && day.status !== 'Absent' && (
+              {day.workHours && day.status !== 'Weekend' && (   /* only days with a check-in carry hours */
                 <p className="hidden sm:block text-[10px] text-slate-500 dark:text-slate-400 mt-1 truncate">{day.workHours}</p>
               )}
             </div>
@@ -127,7 +131,7 @@ const AttendanceCalendar = ({
 
       {/* Legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-5">
-        {Object.entries(statusStyle).filter(([k]) => k !== 'Future').map(([status, style]) => (
+        {Object.entries(statusStyle).filter(([k]) => k !== 'Future' && k !== 'NotJoined').map(([status, style]) => (
           <div key={status} className="flex items-center gap-1.5">
             <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
             <span className="text-xs text-slate-600 dark:text-slate-400">{status}</span>

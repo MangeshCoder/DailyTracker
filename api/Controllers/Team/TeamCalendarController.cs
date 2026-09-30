@@ -47,7 +47,7 @@ namespace DailyTrackerAPI.Controllers.Team
 
             // ── 1. Active users ───────────────────────────────────────────────
             var users = await _db.Users
-                .Where(u => u.IsActive)
+                .Where(u => u.IsActive && u.Role != "Pending")   // not-yet-approved sign-ups aren't on the roster
                 .Select(u => new { u.Id, u.FullName, u.Role, u.ProfilePhotoUrl })
                 .OrderBy(u => u.FullName)
                 .ToListAsync();

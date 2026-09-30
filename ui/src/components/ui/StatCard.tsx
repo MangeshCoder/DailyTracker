@@ -15,6 +15,8 @@ export interface StatCardProps {
   loading?: boolean;
   onClick?: () => void;
   className?: string;
+  /** For 3-across rows: hide the icon on phones so the title has room */
+  compact?: boolean;
 }
 
 const COLOR_MAP: Record<string, { bg: string; iconBg: string; text: string; glow: string }> = {
@@ -72,13 +74,14 @@ export const StatCard: React.FC<StatCardProps> = ({
   loading = false,
   onClick,
   className = '',
+  compact = false,
 }) => {
   const scheme = COLOR_MAP[color] || COLOR_MAP.blue;
 
   return (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 shadow-xs transition-all duration-200 ${
+      className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 sm:p-5 shadow-xs transition-all duration-200 ${
         onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
       } ${scheme.bg} ${className}`}
     >
@@ -86,22 +89,22 @@ export const StatCard: React.FC<StatCardProps> = ({
         className={`absolute -top-12 -right-12 w-28 h-28 bg-gradient-to-br ${scheme.glow} rounded-full blur-xl pointer-events-none opacity-50`}
       />
 
-      <div className="relative z-10 flex items-start justify-between gap-3">
+      <div className="relative z-10 flex items-start justify-between gap-2 sm:gap-3">
         <div className="space-y-1.5 flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide sm:tracking-wider leading-snug text-slate-500 dark:text-slate-400 break-words sm:truncate">
             {title}
           </p>
 
           {loading ? (
             <div className="h-8 w-20 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg mt-1" />
           ) : (
-            <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+            <h3 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white break-words">
               {value}
             </h3>
           )}
 
           {subtitle && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 sm:line-clamp-1">
               {subtitle}
             </p>
           )}
@@ -130,7 +133,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
 
           {Icon && (
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform ${scheme.iconBg}`}>
+            <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${compact ? 'hidden sm:flex' : 'flex'} items-center justify-center flex-shrink-0 transition-transform ${scheme.iconBg}`}>
               {React.isValidElement(Icon) ? (
                 Icon
               ) : typeof Icon === 'string' ? (

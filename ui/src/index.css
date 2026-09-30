@@ -112,3 +112,9 @@ input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus {
   background-color: #3b82f6;  /* blue-500 highlight on focused segment */
   border-radius: 2px;
 }
+/* ── Light mode readability ──────────────────────────────────────────────────
+   Grey helper text (slate-400) and amber labels (amber-600) are too faint on white
+   in light mode — use one shade darker. :where() keeps this at the same strength
+   as the utility itself, so hover/focus colours and dark mode are unaffected. */
+:where(html:not(.dark)) .text-slate-400 { color: rgb(100 116 139); } /* slate-500 */
+:where(html:not(.dark)) .text-amber-600 { color: rgb(180 83 9); }    /* amber-700 */

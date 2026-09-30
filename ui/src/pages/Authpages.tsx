@@ -655,7 +655,8 @@ export const LoginPage = () => {
               </div>
             </div>
 
-            <div className={`mt-5 text-center flex items-center justify-center gap-1.5 text-xs ${AUTH.subtle}`}>
+            {/* room below on phones for the AI Help button */}
+            <div className={`mt-5 mb-16 md:mb-0 text-center flex items-center justify-center gap-1.5 text-xs ${AUTH.subtle}`}>
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
               <span>Protected by 2FA, email OTP & trusted devices</span>
             </div>

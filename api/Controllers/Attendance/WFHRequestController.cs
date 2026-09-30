@@ -189,7 +189,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
             [FromQuery] int month = 0,
             [FromQuery] int year = 0)
         {
-            var now = DateTime.UtcNow;
+            var now = AppClock.TodayIst;   // India's month, not the server's
             month = month > 0 ? month : now.Month;
             year = year > 0 ? year : now.Year;
 

@@ -213,7 +213,7 @@ export const KudosPage = () => {
         actions={
           <button
             onClick={() => setActiveTab('give')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-white shadow-md shadow-amber-500/25 transition"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/25 transition"
           >
             <Gift className="w-4 h-4" /> Give Kudos
           </button>
