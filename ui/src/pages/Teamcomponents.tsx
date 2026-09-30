@@ -32,7 +32,6 @@ import {
   HandHelping,
   Circle,
   Trophy,
-  ChevronDown,
   MessageSquare,
 } from 'lucide-react';
 import { Select } from '../components/ui/Select';

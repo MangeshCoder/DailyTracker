@@ -11,7 +11,7 @@ import { wfhApi } from '../services/api';
 import type { TeamMonthlyAttendance } from '../types';
 import { useState } from 'react';
 import { Card } from './ui/Card';
-import { ChevronDown, CalendarRange, Inbox } from 'lucide-react';
+import { CalendarRange, Inbox } from 'lucide-react';
 import { Select } from './ui/Select';
 
 const SELECT_CLS =

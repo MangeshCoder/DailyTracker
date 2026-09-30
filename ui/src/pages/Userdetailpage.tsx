@@ -26,7 +26,6 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
-  ChevronDown,
   RefreshCw,
   CalendarRange,
   UserCheck,

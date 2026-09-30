@@ -36,7 +36,6 @@ import {
   Lock,
   Clock,
   Coffee,
-  ChevronDown,
   Inbox,
   Zap,
 } from 'lucide-react';

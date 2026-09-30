@@ -40,7 +40,6 @@ import {
   RefreshCw,
   Lock,
   Info,
-  ChevronDown,
   ArrowRight,
   AlertCircle,
   Paperclip,

@@ -52,7 +52,6 @@ import {
   Ban,
   RefreshCw,
   PauseOctagon,
-  ChevronDown,
   Eye,
   Search,
   Percent,

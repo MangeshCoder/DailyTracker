@@ -11,7 +11,7 @@ import { wfhApi } from '../services/api';
 import { StatusPill } from './StatusPill';
 import { useState } from 'react';
 import type { WFHRequest } from '../types';
-import { ChevronDown, Home, SunMoon, CalendarDays, UserCheck, Inbox } from 'lucide-react';
+import { Home, SunMoon, CalendarDays, UserCheck, Inbox } from 'lucide-react';
 import { Select as StyledSelect } from './ui/Select';
 
 const SELECT_CLS =
