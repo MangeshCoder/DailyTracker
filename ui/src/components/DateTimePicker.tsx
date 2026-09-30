@@ -6,9 +6,10 @@
 //  tabs, 5-minute steps, Today / Clear, Confirm → 'YYYY-MM-DDTHH:mm'.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarClock, CalendarDays, Clock, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { placePopup, CALENDAR_WIDTH } from './popupPosition';
 
 interface DateTimePickerProps {
   value:        string;
@@ -92,19 +93,15 @@ export function DateTimePicker({
     }, 50);
   }, [tab, open]);
 
+  // Fixed-size popup next to the field, always fully on screen
   const calcPosition = useCallback(() => {
     if (!triggerRef.current) return;
-    const rect    = triggerRef.current.getBoundingClientRect();
-    const popupH  = 380;
-    const showAbove = (window.innerHeight - rect.bottom) < popupH && rect.top > (window.innerHeight - rect.bottom);
-    setPopupStyle({
-      position: 'fixed',
-      left:     rect.left,
-      width:    Math.max(rect.width, 288),
-      zIndex:   9999,
-      ...(showAbove ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
-    });
+    const height = popupRef.current?.offsetHeight ?? 380;
+    setPopupStyle(placePopup(triggerRef.current.getBoundingClientRect(), height, CALENDAR_WIDTH));
   }, []);
+
+  // once drawn, place it again using its real height
+  useLayoutEffect(() => { if (open) calcPosition(); }, [open, tab, calcPosition]);
 
   const openPicker = () => { if (disabled) return; calcPosition(); setOpen(o => !o); };
 
@@ -217,7 +214,7 @@ export function DateTimePicker({
               const isSel=ymd===selDate, isToday=ymd===today;
               const isWknd=[0,6].includes(new Date(viewYear,viewMonth,day).getDay());
               return <button key={day} type="button" onClick={()=>pickDay(day)}
-                className={`aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition ${
+                className={`h-8 flex items-center justify-center rounded-lg text-xs font-medium transition ${
                   isSel ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
                   : isToday ? `ring-1 ring-blue-500 text-blue-600 dark:text-blue-400 font-bold ${HOVER_CELL}`
                   : isWknd ? `text-slate-400 dark:text-slate-500 ${HOVER_CELL}`

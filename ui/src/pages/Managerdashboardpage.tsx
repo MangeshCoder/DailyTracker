@@ -62,6 +62,7 @@ import {
   CalendarRange,
 } from 'lucide-react';
 import { localDate } from '../utils/date';
+import { Select } from '../components/ui/Select';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,20 +167,18 @@ const MonthYearPicker = ({
 }) => (
   <div className="flex items-center gap-2">
     <div className="relative">
-      <select value={month} onChange={e => onMonth(+e.target.value)} className={SELECT_CLS}>
+      <Select value={month} onChange={e => onMonth(+e.target.value)} className={SELECT_CLS}>
         {Array.from({ length: 12 }, (_, i) => (
           <option key={i + 1} value={i + 1}>
             {new Date(2024, i, 1).toLocaleString('default', { month: 'long' })}
           </option>
         ))}
-      </select>
-      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </Select>
     </div>
     <div className="relative">
-      <select value={year} onChange={e => onYear(+e.target.value)} className={SELECT_CLS}>
+      <Select value={year} onChange={e => onYear(+e.target.value)} className={SELECT_CLS}>
         {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-      </select>
-      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </Select>
     </div>
   </div>
 );

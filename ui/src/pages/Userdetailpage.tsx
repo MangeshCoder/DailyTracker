@@ -44,6 +44,7 @@ import {
   Inbox,
 } from 'lucide-react';
 import { localDate } from '../utils/date';
+import { Select } from '../components/ui/Select';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -330,16 +331,14 @@ export const UserDetailPage = () => {
               </label>
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <select value={month} onChange={e => setMonth(parseInt(e.target.value))} className={SELECT_CLS}>
+                  <Select value={month} onChange={e => setMonth(parseInt(e.target.value))} className={SELECT_CLS}>
                     {fullMonths.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </Select>
                 </div>
                 <div className="relative">
-                  <select value={year} onChange={e => setYear(parseInt(e.target.value))} className={SELECT_CLS}>
+                  <Select value={year} onChange={e => setYear(parseInt(e.target.value))} className={SELECT_CLS}>
                     {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </Select>
                 </div>
                 <button
                   onClick={loadData}

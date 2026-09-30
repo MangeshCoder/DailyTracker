@@ -33,6 +33,7 @@ import {
   FileText,
   AlertCircle,
   Layers} from 'lucide-react';
+import { Select } from '../components/ui/Select';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Uploaded files live on the API server: the same address when hosted, localhost:7096 on your PC
@@ -831,7 +832,7 @@ const CreateCycleModal: React.FC<{
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1.5">
                 Appraisal Cadence
               </label>
-              <select
+              <Select
                 value={form.cycleType}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -846,7 +847,7 @@ const CreateCycleModal: React.FC<{
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1.5">

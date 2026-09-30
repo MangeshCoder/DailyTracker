@@ -25,6 +25,7 @@ import {
   FilterBar,
   type ViewMode
 } from '../components/ui';
+import { Select } from '../components/ui/Select';
 
 const defaultForm: CreateTaskDto = {
   taskTitle: '',
@@ -314,7 +315,7 @@ export const TasksPage: React.FC = () => {
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                     Status
                   </label>
-                  <select
+                  <Select
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
@@ -323,14 +324,14 @@ export const TasksPage: React.FC = () => {
                     <option value="Completed">Completed</option>
                     <option value="Blocked">Blocked</option>
                     <option value="OnHold">On Hold</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
                     Priority
                   </label>
-                  <select
+                  <Select
                     value={form.priority}
                     onChange={e => setForm({ ...form, priority: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
@@ -338,7 +339,7 @@ export const TasksPage: React.FC = () => {
                     <option value="Low">Low</option>
                     <option value="Medium">Medium</option>
                     <option value="High">High</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

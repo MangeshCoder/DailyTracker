@@ -16,6 +16,7 @@ import type {
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { DatePicker } from '../components/DatePicker';
 import {
   GraduationCap,
   Award,
@@ -34,6 +35,7 @@ import {
   Users,
   User,
   Paperclip} from 'lucide-react';
+import { Select } from '../components/ui/Select';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TRAINING_TYPES = [
@@ -223,7 +225,7 @@ function AddTrainingModal({ edit, onClose }: AddTrainingModalProps) {
             </div>
             <div>
               <label className={labelCls}>Learning Format</label>
-              <select
+              <Select
                 value={form.trainingType}
                 onChange={(e) => set('trainingType', e.target.value)}
                 className={inputCls}
@@ -233,7 +235,7 @@ function AddTrainingModal({ edit, onClose }: AddTrainingModalProps) {
                     {TYPE_ICONS[t]} {t}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -253,20 +255,16 @@ function AddTrainingModal({ edit, onClose }: AddTrainingModalProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className={labelCls}>Commencement Date *</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.startDate}
-                onChange={(e) => set('startDate', e.target.value)}
-                className={inputCls}
+                onChange={(v: string) => set('startDate', v)}
               />
             </div>
             <div>
               <label className={labelCls}>Completion Date</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.endDate ?? ''}
-                onChange={(e) => set('endDate', e.target.value)}
-                className={inputCls}
+                onChange={(v: string) => set('endDate', v)}
               />
             </div>
           </div>
@@ -288,7 +286,7 @@ function AddTrainingModal({ edit, onClose }: AddTrainingModalProps) {
             </div>
             <div>
               <label className={labelCls}>Current Progress Status</label>
-              <select
+              <Select
                 value={form.status}
                 onChange={(e) => set('status', e.target.value)}
                 className={inputCls}
@@ -298,7 +296,7 @@ function AddTrainingModal({ edit, onClose }: AddTrainingModalProps) {
                     {s}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -514,20 +512,16 @@ function AddCertModal({ edit, onClose }: AddCertModalProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className={labelCls}>Issue Date *</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.issueDate}
-                onChange={(e) => set('issueDate', e.target.value)}
-                className={inputCls}
+                onChange={(v: string) => set('issueDate', v)}
               />
             </div>
             <div>
               <label className={labelCls}>Expiry Date (if applicable)</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.expiryDate ?? ''}
-                onChange={(e) => set('expiryDate', e.target.value)}
-                className={inputCls}
+                onChange={(v: string) => set('expiryDate', v)}
               />
               <p className="text-slate-400 text-[11px] mt-1">
                 Leave blank if credential is lifetime or non-expiring.
@@ -1222,7 +1216,7 @@ export function TrainingCertificationPage() {
           ))}
 
           {mainTab === 'trainings' && (
-            <select
+            <Select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl px-2.5 py-1 text-slate-700 dark:text-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 ml-1"
@@ -1233,7 +1227,7 @@ export function TrainingCertificationPage() {
                   {TYPE_ICONS[t]} {t}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
 

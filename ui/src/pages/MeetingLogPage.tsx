@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2} from 'lucide-react';
+import { Select } from '../components/ui/Select';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Uploaded files live on the API server: the same address when hosted, localhost:7096 on your PC
@@ -666,7 +667,7 @@ const MeetingModal: React.FC<{
                   className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <select
+                  <Select
                     value={newActionAssignee}
                     onChange={(e) =>
                       setNewActionAssignee(
@@ -681,7 +682,7 @@ const MeetingModal: React.FC<{
                         {a.fullName}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <DatePicker
                     value={newActionDue}
                     onChange={setNewActionDue}
@@ -808,7 +809,7 @@ const CreateMeetingModal: React.FC<{
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1.5">
                 Session Type
               </label>
-              <select
+              <Select
                 value={form.meetingType}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -823,7 +824,7 @@ const CreateMeetingModal: React.FC<{
                     {t.icon} {t.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block mb-1.5">
@@ -1285,7 +1286,7 @@ export const MeetingLogPage: React.FC = () => {
       {/* ── Filters Bar ── */}
       <div className="flex flex-wrap gap-2.5 items-center justify-between">
         <div className="flex flex-wrap gap-2 items-center">
-          <select
+          <Select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as MeetingType | '')}
             className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
@@ -1296,9 +1297,9 @@ export const MeetingLogPage: React.FC = () => {
                 {t.icon} {t.label}
               </option>
             ))}
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={filterStatus}
             onChange={(e) =>
               setFilterStatus(e.target.value as MeetingStatus | '')
@@ -1313,7 +1314,7 @@ export const MeetingLogPage: React.FC = () => {
                 </option>
               )
             )}
-          </select>
+          </Select>
         </div>
 
         {(filterType || filterStatus) && (

@@ -33,6 +33,7 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
+import { Select } from '../components/ui/Select';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -352,7 +353,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ user, onClick }) => {
       </CardContent>
 
       {/* Card Action Footer */}
-      <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between text-xs text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">
+      <div className="px-5 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-blue-50/60 dark:bg-slate-800/60 flex items-center justify-between text-xs font-semibold text-blue-700 dark:text-blue-300 group-hover:bg-blue-100/70 dark:group-hover:bg-slate-800 transition-colors">
         <span>View full profile</span>
         <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
       </div>
@@ -488,7 +489,7 @@ export const DirectoryPage: React.FC = () => {
           </div>
 
           {/* Role Filter */}
-          <select
+          <Select
             value={filterRole}
             onChange={(e) => setFilterRole(e.target.value)}
             className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 min-w-[130px]"
@@ -499,10 +500,10 @@ export const DirectoryPage: React.FC = () => {
                 {r}
               </option>
             ))}
-          </select>
+          </Select>
 
           {/* Department Filter */}
-          <select
+          <Select
             value={filterDept}
             onChange={(e) => setFilterDept(e.target.value)}
             className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 min-w-[150px]"
@@ -513,7 +514,7 @@ export const DirectoryPage: React.FC = () => {
                 {d}
               </option>
             ))}
-          </select>
+          </Select>
 
           {/* View mode toggle */}
           <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/80 shrink-0">

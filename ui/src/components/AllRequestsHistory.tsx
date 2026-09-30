@@ -12,6 +12,7 @@ import { StatusPill } from './StatusPill';
 import { useState } from 'react';
 import type { WFHRequest } from '../types';
 import { ChevronDown, Home, SunMoon, CalendarDays, UserCheck, Inbox } from 'lucide-react';
+import { Select as StyledSelect } from './ui/Select';
 
 const SELECT_CLS =
   'appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ' +
@@ -23,8 +24,7 @@ const YEARS = Array.from({ length: new Date().getFullYear() - START_YEAR + 1 }, 
 
 const Select = ({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <div className="relative">
-    <select {...props} className={SELECT_CLS}>{children}</select>
-    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+    <StyledSelect {...props} className={SELECT_CLS}>{children}</StyledSelect>
   </div>
 );
 

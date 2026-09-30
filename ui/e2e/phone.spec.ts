@@ -92,3 +92,16 @@ test('on the phone login page the AI Help button does not cover the footer', asy
     && Math.min(f.x + f.width, a.x + a.width) - Math.max(f.x, a.x) > 0;
   expect(overlap).toBe(false);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`"View full profile" in the directory is easy to read (${theme})`, async ({ page }) => {
+    const fake = await signIn(page, theme);
+    const people = [{ id: 7, fullName: 'Gatlu Ghule', email: 'g@test.dev', role: 'Developer', isActive: true, managerName: 'Mangesh Ghule' }];
+    const previous = fake.answer;
+    fake.answer = (path, method) => (path === '/profile/directory' ? people : previous?.(path, method));
+    await fake.navigate('/team/directory');
+    const link = page.getByText('View full profile').first();
+    await expect(link).toBeVisible();
+    expect(await contrast(link)).toBeGreaterThan(4.5);   // was faint grey (≈ 3, and unreadable in dark mode)
+  });
+}

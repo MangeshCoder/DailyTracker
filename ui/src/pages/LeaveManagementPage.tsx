@@ -28,6 +28,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { Select } from '../components/ui/Select';
 
 // ─── Leave type visual configuration ─────────────────────────────────────────
 interface LeaveTypeConfig {
@@ -771,7 +772,7 @@ export const LeaveManagementPage: React.FC = () => {
                     <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
                       Holiday Type
                     </label>
-                    <select
+                    <Select
                       value={holidayForm.type}
                       onChange={(e) =>
                         setHolidayForm((p) => ({ ...p, type: e.target.value }))
@@ -781,7 +782,7 @@ export const LeaveManagementPage: React.FC = () => {
                       <option value="Public">Public (Mandatory)</option>
                       <option value="Optional">Optional (Floating)</option>
                       <option value="Company">Company Special</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
                 <div className="flex justify-end">

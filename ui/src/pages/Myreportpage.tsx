@@ -41,6 +41,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { localDate } from '../utils/date';
+import { Select } from '../components/ui/Select';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -391,20 +392,18 @@ export const MyReportPage = () => {
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   <div className="relative">
-                    <select value={month} onChange={e => setMonth(+e.target.value)} className={SELECT_CLS}>
+                    <Select value={month} onChange={e => setMonth(+e.target.value)} className={SELECT_CLS}>
                       {Array.from({ length: 12 }, (_, i) => (
                         <option key={i + 1} value={i + 1}>
                           {new Date(2024, i, 1).toLocaleString('default', { month: 'short' })}
                         </option>
                       ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </Select>
                   </div>
                   <div className="relative">
-                    <select value={year} onChange={e => setYear(+e.target.value)} className={SELECT_CLS}>
+                    <Select value={year} onChange={e => setYear(+e.target.value)} className={SELECT_CLS}>
                       {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </Select>
                   </div>
                 </div>
               </div>

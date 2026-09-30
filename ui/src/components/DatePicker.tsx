@@ -10,9 +10,10 @@
 //  ✅ value / onChange use 'YYYY-MM-DD'
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { placePopup, CALENDAR_WIDTH } from './popupPosition';
 
 interface DatePickerProps {
   value:        string;
@@ -70,25 +71,16 @@ export function DatePicker({
     if (d) { setViewYear(d.getFullYear()); setViewMonth(d.getMonth()); }
   }, [value]);
 
-  // Position popup relative to trigger; flip above if not enough room below
+  // Fixed-size popup next to the field (it used to be as wide as the field, so on a
+  // wide form the square day cells made it taller than the screen)
   const calcPosition = useCallback(() => {
     if (!triggerRef.current) return;
-    const rect       = triggerRef.current.getBoundingClientRect();
-    const popupH     = 320; // approximate popup height in px
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    const showAbove  = spaceBelow < popupH && spaceAbove > spaceBelow;
-
-    setPopupStyle({
-      position: 'fixed',
-      left:     rect.left,
-      width:    Math.max(rect.width, 288), // min 288px (w-72)
-      zIndex:   9999,
-      ...(showAbove
-        ? { bottom: window.innerHeight - rect.top + 8 }
-        : { top: rect.bottom + 8 }),
-    });
+    const height = popupRef.current?.offsetHeight ?? 330;
+    setPopupStyle(placePopup(triggerRef.current.getBoundingClientRect(), height, CALENDAR_WIDTH));
   }, []);
+
+  // once drawn, place it again using its real height
+  useLayoutEffect(() => { if (open) calcPosition(); }, [open, showYearGrid, viewMonth, calcPosition]);
 
   const openPicker = () => {
     if (disabled) return;
@@ -155,7 +147,7 @@ export function DatePicker({
     <div
       ref={popupRef}
       style={popupStyle}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/10 dark:shadow-black/50 p-4 select-none"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/10 dark:shadow-black/50 p-3 select-none"
     >
       {showYearGrid ? (
         <>
@@ -209,7 +201,7 @@ export function DatePicker({
               const isWknd  = [0,6].includes(new Date(viewYear, viewMonth, day).getDay());
               return (
                 <button key={day} type="button" disabled={!!dis} onClick={() => selectDay(day)}
-                  className={`aspect-square flex items-center justify-center rounded-lg text-xs font-medium transition disabled:cursor-not-allowed ${
+                  className={`h-8 flex items-center justify-center rounded-lg text-xs font-medium transition disabled:cursor-not-allowed ${
                     isSel     ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
                     : isToday ? `ring-1 ring-blue-500 text-blue-600 dark:text-blue-400 font-bold ${HOVER_CELL}`
                     : dis     ? 'text-slate-300 dark:text-slate-700'

@@ -37,6 +37,7 @@ import {
   Info,
   Save,
 } from 'lucide-react';
+import { Select as StyledSelect } from '../components/ui/Select';
 
 // ─── Shared input styles ──────────────────────────────────────────────────────
 
@@ -49,10 +50,9 @@ const LABEL_CLS = 'block text-xs font-semibold text-slate-600 dark:text-slate-40
 
 const Select = ({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <div className="relative">
-    <select {...props} className={`${INPUT_CLS} appearance-none pr-10 cursor-pointer`}>
+    <StyledSelect {...props} className={`${INPUT_CLS} appearance-none pr-10 cursor-pointer`}>
       {children}
-    </select>
-    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+    </StyledSelect>
   </div>
 );
 

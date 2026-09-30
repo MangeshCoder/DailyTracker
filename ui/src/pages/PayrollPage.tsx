@@ -30,6 +30,7 @@ import {
   X,
   Coins
 } from 'lucide-react';
+import { Select } from '../components/ui/Select';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -154,7 +155,7 @@ const SetSalaryModal: React.FC<{
               Monthly Gross Base Salary *
             </label>
             <div className="flex gap-2">
-              <select
+              <Select
                 value={form.currency}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, currency: e.target.value }))
@@ -166,7 +167,7 @@ const SetSalaryModal: React.FC<{
                     {c} ({sym(c)})
                   </option>
                 ))}
-              </select>
+              </Select>
               <input
                 type="number"
                 min={0}

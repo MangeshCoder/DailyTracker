@@ -12,6 +12,7 @@ import type { TeamMonthlyAttendance } from '../types';
 import { useState } from 'react';
 import { Card } from './ui/Card';
 import { ChevronDown, CalendarRange, Inbox } from 'lucide-react';
+import { Select } from './ui/Select';
 
 const SELECT_CLS =
   'appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white ' +
@@ -58,16 +59,14 @@ export const TeamMonthlyAttendances = () => {
           <CalendarRange className="w-4 h-4 text-blue-500" /> Period
         </span>
         <div className="relative">
-          <select value={month} onChange={e => setMonth(+e.target.value)} className={SELECT_CLS}>
+          <Select value={month} onChange={e => setMonth(+e.target.value)} className={SELECT_CLS}>
             {monthOptions.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </Select>
         </div>
         <div className="relative">
-          <select value={year} onChange={e => setYear(+e.target.value)} className={SELECT_CLS}>
+          <Select value={year} onChange={e => setYear(+e.target.value)} className={SELECT_CLS}>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </Select>
         </div>
       </div>
 

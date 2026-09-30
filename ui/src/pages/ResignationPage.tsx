@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   ClipboardList} from 'lucide-react';
 import { localDate } from '../utils/date';
+import { DatePicker } from '../components/DatePicker';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso?: string) {
@@ -147,12 +148,10 @@ function SubmitResignationForm({ onSuccess }: { onSuccess: () => void }) {
           <label className="block text-slate-700 dark:text-slate-300 text-xs mb-1.5 font-bold uppercase tracking-wider">
             Proposed Final Working Day *
           </label>
-          <input
-            type="date"
+          <DatePicker
             value={lastDay}
-            onChange={(e) => setLastDay(e.target.value)}
+            onChange={(v: string) => setLastDay(v)}
             min={localDate(new Date(Date.now() + 86400000))}
-            className={inputCls}
           />
           <p className="text-[11px] text-slate-400 mt-1">
             Subject to contractual notice period validation with HR and team lead.
@@ -486,11 +485,9 @@ function ReviewModal({
               <label className="block text-slate-700 dark:text-slate-300 text-xs mb-1.5 font-bold uppercase tracking-wider">
                 Official Last Working Day *
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={officialDate}
-                onChange={(e) => setOfficialDate(e.target.value)}
-                className={inputCls}
+                onChange={(v: string) => setOfficialDate(v)}
               />
               <p className="text-slate-400 text-[11px] mt-1">
                 Requested date: {fmtDate(r.requestedLastDay)}
@@ -618,11 +615,9 @@ function CompleteExitModal({
             <label className="block text-slate-700 dark:text-slate-300 text-xs mb-1.5 font-bold uppercase tracking-wider">
               Official Exit Date *
             </label>
-            <input
-              type="date"
+            <DatePicker
               value={exitDate}
-              onChange={(e) => setExitDate(e.target.value)}
-              className={inputCls}
+              onChange={(v: string) => setExitDate(v)}
             />
           </div>
 

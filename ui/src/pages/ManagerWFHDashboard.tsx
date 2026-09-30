@@ -6,6 +6,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { TeamDailyStatusDashboard } from '../components/TeamDailyStatusDashboard';
 import { PendingRequestsPanel } from '../components/PendingRequestsPanel';
+import { PendingLeavePanel, usePendingLeave } from '../components/PendingLeavePanel';
+import { useAuth } from '../context/Authcontext';
 import { TeamMonthlyAttendances } from '../components/TeamMonthlyAttendance';
 import { AllRequestsHistory } from '../components/AllRequestsHistory';
 import {
@@ -36,7 +38,10 @@ export const ManagerWFHDashboard: React.FC = () => {
     refetchInterval: 60000,
   });
 
-  const pendingCount = pendingRequests.length;
+  // leave applications wait here too, so one place covers every request
+  const canReviewLeave = useAuth().user?.role === 'Manager';
+  const { data: pendingLeave = [] } = usePendingLeave(canReviewLeave);
+  const pendingCount = pendingRequests.length + pendingLeave.filter(l => l.canReview !== false).length;
 
   interface DashboardTab {
     key: 'today' | 'pending' | 'monthly' | 'history';
@@ -73,8 +78,8 @@ export const ManagerWFHDashboard: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* ── Page Header ── */}
       <PageHeader
-        title="Manager Attendance & WFH Hub"
-        description="Monitor real-time team attendance, audit remote work patterns, and resolve pending WFH or half-day applications."
+        title="Manager Attendance & Requests Hub"
+        description="Monitor real-time team attendance and approve or reject leave, WFH and half-day requests in one place."
         breadcrumbs={[
           { label: 'Workspace', href: '/' },
           { label: 'Management' },
@@ -98,7 +103,7 @@ export const ManagerWFHDashboard: React.FC = () => {
         <StatCard
           title="Pending Approval"
           value={pendingCount}
-          subtitle="Requests awaiting action"
+          subtitle="Leave + WFH awaiting action"
           icon={Clock}
           color="amber"
         />
@@ -159,7 +164,15 @@ export const ManagerWFHDashboard: React.FC = () => {
       {/* ── Tab Content ── */}
       <div className="animate-in fade-in duration-200">
         {tab === 'today' && <TeamDailyStatusDashboard />}
-        {tab === 'pending' && <PendingRequestsPanel />}
+        {tab === 'pending' && (
+          <div className="space-y-8">
+            {canReviewLeave && <PendingLeavePanel />}
+            <section aria-label="WFH and half-day requests" className="space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">WFH &amp; half-day requests</h3>
+              <PendingRequestsPanel />
+            </section>
+          </div>
+        )}
         {tab === 'monthly' && <TeamMonthlyAttendances />}
         {tab === 'history' && <AllRequestsHistory />}
       </div>

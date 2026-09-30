@@ -50,6 +50,8 @@ import { FaceVerifyModal } from "./FaceVerifyModal";
 import { useGeolocation } from "../context/useGeolocation";
 import type { FaceVerifyResult } from "../hooks/useFaceRecognition";
 import { localDate } from "../utils/date";
+import { DatePicker } from './DatePicker';
+import { Select } from './ui/Select';
 
 interface ContextSummary {
   isCheckedIn: boolean;
@@ -329,7 +331,7 @@ const ActionCard = ({
             </div>
             <div>
               <label className={LABEL_CLS}>Priority</label>
-              <select
+              <Select
                 value={taskPriority}
                 onChange={(e) => setTaskPriority(e.target.value)}
                 className={`${FIELD_CLS} focus:border-blue-500`}
@@ -337,7 +339,7 @@ const ActionCard = ({
                 <option value="Low">Low</option>
                 <option value="Medium">Medium</option>
                 <option value="High">High</option>
-              </select>
+              </Select>
             </div>
           </div>
         </div>
@@ -482,27 +484,23 @@ const ActionCard = ({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
             <label className={LABEL_CLS}>From Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={fromDate}
-              onChange={(e) => {
-                const val = e.target.value;
+              onChange={(v: string) => {
+                const val = v;
                 setFromDate(val);
                 if (toDate < val) {
                   setToDate(val);
                 }
               }}
-              className={`${FIELD_CLS} focus:border-emerald-500`}
             />
           </div>
           <div>
             <label className={LABEL_CLS}>To Date</label>
-            <input
-              type="date"
+            <DatePicker
               min={fromDate}
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className={`${FIELD_CLS} focus:border-emerald-500`}
+              onChange={(v: string) => setToDate(v)}
             />
           </div>
         </div>
@@ -510,7 +508,7 @@ const ActionCard = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
           <div>
             <label className={LABEL_CLS}>Leave Type</label>
-            <select
+            <Select
               value={leaveType}
               onChange={(e) => setLeaveType(e.target.value)}
               className={`${FIELD_CLS} focus:border-emerald-500`}
@@ -520,7 +518,7 @@ const ActionCard = ({
               <option value="Earned">Earned Leave (15d/yr)</option>
               <option value="CompOff">Comp Off</option>
               <option value="Unpaid">Unpaid Leave</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className={LABEL_CLS}>Reason</label>
@@ -570,23 +568,21 @@ const ActionCard = ({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
             <label className={LABEL_CLS}>Type</label>
-            <select
+            <Select
               value={wfhRequestType}
               onChange={(e) => setWfhRequestType(e.target.value)}
               className={`${FIELD_CLS} focus:border-violet-500`}
             >
               <option value="WFH">Full Day WFH</option>
               <option value="HalfDay">Half Day WFH</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className={LABEL_CLS}>Request Date</label>
-            <input
-              type="date"
+            <DatePicker
               min={todayStr}
               value={wfhDate}
-              onChange={(e) => setWfhDate(e.target.value)}
-              className={`${FIELD_CLS} focus:border-violet-500`}
+              onChange={(v: string) => setWfhDate(v)}
             />
           </div>
         </div>
