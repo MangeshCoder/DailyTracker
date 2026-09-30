@@ -720,6 +720,10 @@ namespace DailyTrackerAPI.DTOs
         public int Month { get; set; }
         public int Year { get; set; }
         public int WorkingDaysInMonth { get; set; }
+        /// <summary>Working days they were expected in: from joining (or first check-in) to today, minus holidays and leave</summary>
+        public int DaysExpected { get; set; }
+        /// <summary>Of those, the days they came in (office, WFH or half day) — AttendancePercentage = DaysAttended / DaysExpected</summary>
+        public int DaysAttended { get; set; }
         public int DaysPresent { get; set; }
         public int DaysWFH { get; set; }
         public int DaysHalfDay { get; set; }

@@ -642,9 +642,10 @@ export const ManagerDashboardPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-center font-semibold text-emerald-600 dark:text-emerald-400">
-                          {member.daysPresent + member.daysWFH + member.daysHalfDay}
-                          <span className="text-slate-400 dark:text-slate-600 font-normal">/{member.workingDaysInMonth}</span>
+                        <td className="px-4 py-3.5 text-center font-semibold text-emerald-600 dark:text-emerald-400"
+                          title="Days came in (office, WFH or half day) out of the working days expected since joining, up to today">
+                          {member.daysAttended ?? member.daysPresent + member.daysWFH + member.daysHalfDay}
+                          <span className="text-slate-400 dark:text-slate-600 font-normal">/{member.daysExpected ?? member.workingDaysInMonth}</span>
                         </td>
                         <td className="px-4 py-3.5 text-center font-medium text-blue-600 dark:text-blue-400">{member.daysWFH}</td>
                         <td className="px-4 py-3.5 text-center font-medium text-rose-600 dark:text-rose-400">{member.daysAbsent}</td>

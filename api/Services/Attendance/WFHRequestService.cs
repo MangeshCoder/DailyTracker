@@ -503,7 +503,8 @@ namespace DailyTrackerAPI.Services.Attendance
                 var workedDates = userLogs.Where(l => l.DayStatus is "Present" or "WFH" or "HalfDay").Select(l => l.LogDate.Date)
                     .Concat(userWFH.Select(r => r.RequestDate.Date)).ToHashSet();
                 var (countFrom, countTo) = AttendanceDays.CountableRange(user, from, monthEnd,
-                    userLogs.Any(l => l.LogDate.Date == AppClock.TodayIst));
+                    userLogs.Any(l => l.LogDate.Date == AppClock.TodayIst),
+                    userLogs.Select(l => (DateTime?)l.LogDate.Date).Min());
                 int expected = 0, daysAbsent = 0;
                 for (var d = countFrom; d <= countTo; d = d.AddDays(1))
                 {
@@ -533,8 +534,9 @@ namespace DailyTrackerAPI.Services.Attendance
                     DaysOnLeave = daysOnLeave,
                     DaysWeekend = daysWeekend,  // ← NEW
                     DaysHoliday = daysHoliday,  // ← NEW
+                    // days they came in out of the days they were expected (same rule as Team Dashboard)
                     AttendancePercentage = expected > 0
-                        ? Math.Min(100, Math.Round(daysWorked / (double)expected * 100, 1)) : 0,
+                        ? Math.Round((expected - daysAbsent) / (double)expected * 100, 1) : 0,
                     TotalWorkMinutes = totalWorkMinutes,
                     TotalWorkHours = FormatHours(totalWorkMinutes),
                     AverageDailyHours = daysWorked > 0

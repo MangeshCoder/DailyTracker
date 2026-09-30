@@ -20,6 +20,16 @@ namespace DailyTrackerAPI.Helpers
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Ist).Date;
         }
 
+        /// <summary>
+        /// The day counting starts: the joining date, or the first day they actually worked if
+        /// that was earlier (someone who checked in had clearly joined, whatever the record says)
+        /// </summary>
+        public static DateTime StartedOn(User user, DateTime? firstWorked)
+        {
+            var joined = JoinedOn(user);
+            return firstWorked.HasValue && firstWorked.Value.Date < joined ? firstWorked.Value.Date : joined;
+        }
+
         /// <summary>Last day that can count as absent: yesterday, or today once there's a log for it</summary>
         public static DateTime LastCountable(bool loggedToday) =>
             loggedToday ? AppClock.TodayIst : AppClock.TodayIst.AddDays(-1);
@@ -37,9 +47,10 @@ namespace DailyTrackerAPI.Helpers
         }
 
         /// <summary>The part of [from, to] this person could have been absent in (may be empty: From &gt; To)</summary>
-        public static (DateTime From, DateTime To) CountableRange(User user, DateTime from, DateTime to, bool loggedToday)
+        public static (DateTime From, DateTime To) CountableRange(User user, DateTime from, DateTime to, bool loggedToday,
+            DateTime? firstWorked = null)
         {
-            var joined = JoinedOn(user);
+            var joined = StartedOn(user, firstWorked);
             var last = LastCountable(loggedToday);
             return (joined > from.Date ? joined : from.Date, last < to.Date ? last : to.Date);
         }
