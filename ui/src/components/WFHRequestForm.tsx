@@ -139,7 +139,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       type === 'HalfDay'
-                        ? 'bg-amber-500 text-white'
+                        ? 'bg-amber-700 text-white'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
@@ -203,7 +203,7 @@ export const WFHRequestForm: React.FC<WFHRequestFormProps> = ({ onSuccess }) => 
                       : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400'
                   }`}
                 >
-                  <Moon className="w-4 h-4 text-indigo-400" />
+                  <Moon className="w-4 h-4 text-purple-400" />
                   <span>Afternoon Shift (Post 1:30 PM)</span>
                 </button>
               </div>

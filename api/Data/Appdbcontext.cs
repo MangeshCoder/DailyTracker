@@ -46,6 +46,7 @@ namespace DailyTrackerAPI.Data
         public DbSet<OnboardingTask> OnboardingTasks { get; set; }
         public DbSet<ExpenseClaim> ExpenseClaims { get; set; }
         public DbSet<ApprovalDelegation> ApprovalDelegations { get; set; }
+        public DbSet<MissedCheckInRequest> MissedCheckInRequests { get; set; }
         public DbSet<PushSubscription> PushSubscriptions { get; set; }
         public DbSet<AppSecret> AppSecrets { get; set; }
 
@@ -299,6 +300,18 @@ namespace DailyTrackerAPI.Data
                 e.Property(d => d.Note).HasMaxLength(300);
                 e.HasOne(d => d.From).WithMany().HasForeignKey(d => d.FromUserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(d => d.To).WithMany().HasForeignKey(d => d.ToUserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── Missed check-in: a forgotten day added after approval
+            mb.Entity<MissedCheckInRequest>(e => {
+                e.HasIndex(r => new { r.UserId, r.Date });
+                e.HasIndex(r => r.Status);
+                e.Property(r => r.WorkMode).HasMaxLength(10);
+                e.Property(r => r.Reason).HasMaxLength(300);
+                e.Property(r => r.Status).HasMaxLength(12);
+                e.Property(r => r.ReviewNote).HasMaxLength(300);
+                e.HasOne(r => r.User).WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.ReviewedBy).WithMany().HasForeignKey(r => r.ReviewedById).OnDelete(DeleteBehavior.SetNull);
             });
 
             // ── Push notifications: one row per phone / browser

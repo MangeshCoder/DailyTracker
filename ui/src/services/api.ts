@@ -498,6 +498,21 @@ export const wfhApi = {
     }).then(r => r.data),     
 };
 
+// ── Missed check-in: "I worked that day but forgot to check in" ──────────────
+export interface MissedCheckIn {
+  id: number; userId: number; userName: string; date: string; checkIn: string; checkOut: string;
+  workMode: 'Office' | 'WFH'; reason: string; status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+  reviewedBy?: string | null; reviewNote?: string | null; reviewedAt?: string | null; createdAt: string; isOwn: boolean;
+}
+export const missedCheckInApi = {
+  request: (d: { date: string; checkIn: string; checkOut: string; workMode: 'Office' | 'WFH'; reason: string }) =>
+    api.post<MissedCheckIn>('/missed-checkin', d),
+  mine:    () => api.get<MissedCheckIn[]>('/missed-checkin/mine'),
+  cancel:  (id: number) => api.delete(`/missed-checkin/${id}`),
+  pending: () => api.get<MissedCheckIn[]>('/missed-checkin/pending'),
+  review:  (id: number, d: { status: 'Approved' | 'Rejected'; note?: string }) => api.put<MissedCheckIn>(`/missed-checkin/${id}/review`, d),
+};
+
 // ── Phone / browser push notifications (utils/push.ts does the browser side) ──
 export interface PushDevice { id: number; device?: string; createdAt: string; lastSentAt?: string }
 export const pushApi = {

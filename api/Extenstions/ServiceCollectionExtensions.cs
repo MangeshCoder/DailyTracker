@@ -73,6 +73,7 @@ namespace DailyTrackerAPI.Extensions
             services.AddScoped<IOnboardingService, OnboardingService>();   // new joiners' checklist
             services.AddScoped<IExpenseService, ExpenseService>();         // expense claims (paid with the salary)
             services.AddScoped<IDelegationService, DelegationService>();   // approvals handed over while away
+            services.AddScoped<IMissedCheckInService, MissedCheckInService>(); // forgot to check in → added after approval
             services.AddScoped<IHolidayService, HolidayService>();
             services.AddScoped<IResignationService, ResignationService>();
 

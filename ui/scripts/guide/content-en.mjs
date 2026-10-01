@@ -36,6 +36,7 @@ export const sections = [
     body: `
     <table>
       <tr><th>Feature</th><th>What it does</th><th>Where</th></tr>
+      <tr><td>Missed check-in</td><td>Forgot to check in? Ask to add the day with your times; once approved it counts as present.</td><td>Work Management → My Report</td></tr>
       <tr><td>Phone notifications</td><td>Approvals, reminders and chat messages arrive on your phone or computer even when the app is closed.</td><td>Notifications → Phone notifications</td></tr>
       <tr><td>New look &amp; three designs</td><td>Montcrest logo and a fresh look; pick <b>Montcrest</b>, <b>Dashdark Purple</b> or <b>Original Blue</b> — your choice follows your account.</td><td>Account menu → Design</td></tr>
       <tr><td>Menu search</td><td>Type in the sidebar's <b>Search for…</b> box to jump to any page.</td><td>Sidebar</td></tr>
@@ -122,7 +123,16 @@ export const sections = [
           (last task, support log, break or chat message) — or after a normal 8-hour day if that is later. Late work keeps its overtime.</li>
       <li>Next morning the dashboard asks you: press <span class="ui">That's right</span>, or
           <span class="ui">I finished at a different time</span> and send the real time with a reason. Your team lead or manager approves it and your hours are updated.</li>
-    </ul>`,
+    </ul>
+    <h3>If you forgot to check in</h3>
+    <ol>
+      <li>Open <span class="ui">Work Management → My Report</span>. Absent days are red in the calendar — tap the day you worked.</li>
+      <li>In <b>Forgot to check in?</b> enter your check-in and check-out times (India time), choose <b>At the office</b> or <b>Work from home</b>, and give a short reason.</li>
+      <li>Press <span class="ui">Send for approval</span>. Your team lead or manager decides on Employee Requests.</li>
+    </ol>
+    <p>Once approved, the day counts as present (or WFH) in your attendance, absences and payroll. Any working day from the last
+    30 days can be added — not weekends or holidays (that work earns comp-off), days on approved leave, or days you already checked in.
+    You can cancel a request while it is still pending.</p>`,
   },
   {
     title: 'Tasks, goals and support',

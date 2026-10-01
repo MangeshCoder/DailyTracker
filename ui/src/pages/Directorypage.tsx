@@ -215,7 +215,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({ userId, onClose }) => {
                   {joinedStr && (
                     <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-2 text-slate-400 mb-1">
-                        <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                        <Calendar className="w-3.5 h-3.5 text-purple-500" />
                         <span>Date Joined</span>
                       </div>
                       <p className="font-medium text-slate-900 dark:text-white">{joinedStr}</p>
@@ -345,7 +345,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({ user, onClick }) => {
 
           {user.managerName && (
             <div className="flex items-center gap-2 truncate text-[11px] text-slate-400">
-              <UserCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <UserCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
               <span className="truncate">Reports to {user.managerName}</span>
             </div>
           )}

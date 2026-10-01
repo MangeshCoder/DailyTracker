@@ -9,6 +9,7 @@ import { PendingRequestsPanel } from '../components/PendingRequestsPanel';
 import { PendingLeavePanel, TeamLeaveHistory, usePendingLeave } from '../components/PendingLeavePanel';
 import { useAuth } from '../context/Authcontext';
 import { PendingCorrectionsPanel, usePendingCorrections } from '../components/PendingCorrectionsPanel';
+import { PendingMissedCheckInsPanel, usePendingMissedCheckIns } from '../components/MissedCheckIn';
 import { PendingCompOffPanel, usePendingCompOff } from '../components/CompOffPanel';
 import { PendingExpensesPanel, usePendingExpenses } from '../components/ExpensePanels';
 import { DelegationPanel, useMyDelegations } from '../components/DelegationPanel';
@@ -49,10 +50,11 @@ export const ManagerWFHDashboard: React.FC = () => {
     || !!delegations?.actingFor?.some(d => d.fromRole === 'Manager');
   const { data: pendingLeave = [] } = usePendingLeave(canReviewLeave);
   const { data: pendingCorrections = [] } = usePendingCorrections();
+  const { data: pendingMissed = [] } = usePendingMissedCheckIns();
   const { data: pendingCompOff = [] } = usePendingCompOff();
   const { data: pendingExpenses = [] } = usePendingExpenses();
   const pendingCount = pendingRequests.length + pendingLeave.filter(l => l.canReview !== false).length
-    + pendingCorrections.length + pendingCompOff.length + pendingExpenses.length;
+    + pendingCorrections.length + pendingMissed.length + pendingCompOff.length + pendingExpenses.length;
 
   interface DashboardTab {
     key: 'today' | 'pending' | 'monthly' | 'history';
@@ -90,7 +92,7 @@ export const ManagerWFHDashboard: React.FC = () => {
       {/* ── Page Header ── */}
       <PageHeader
         title="Manager Attendance & Requests Hub"
-        description="Monitor real-time team attendance and approve leave, WFH, half-days, comp-off, expenses and check-out corrections in one place."
+        description="Monitor real-time team attendance and approve leave, WFH, half-days, comp-off, expenses, missed check-ins and check-out corrections in one place."
         breadcrumbs={[
           { label: 'Workspace', href: '/' },
           { label: 'Management' },
@@ -181,6 +183,7 @@ export const ManagerWFHDashboard: React.FC = () => {
         {tab === 'pending' && (
           <div className="space-y-8">
             {canReviewLeave && <PendingLeavePanel />}
+            <PendingMissedCheckInsPanel />
             <PendingCorrectionsPanel />
             <PendingCompOffPanel />
             <PendingExpensesPanel />

@@ -70,7 +70,7 @@ const SHOWCASE_FEATURES = [
 const HIGHLIGHTS = [
   { icon: ShieldCheck,    tone: 'text-emerald-500', title: 'Secure sign-in', text: '2FA, email OTP & trusted devices' },
   { icon: MessagesSquare, tone: 'text-blue-500',    title: 'Real-time',      text: 'Team chat & instant notifications' },
-  { icon: Bot,            tone: 'text-indigo-500',  title: 'AI Copilot',     text: 'Ask about hours, tasks & leave' },
+  { icon: Bot,            tone: 'text-purple-500',  title: 'AI Copilot',     text: 'Ask about hours, tasks & leave' },
 ];
 
 export const LoginPage = () => {

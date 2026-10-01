@@ -87,7 +87,7 @@ export const ChatDock = () => {
           onTouchStart={preloadChat}
           className="fixed z-50 right-4 bottom-36 md:right-6 md:bottom-[5.5rem] w-14 h-14 rounded-full
                      bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 text-white
-                     shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200
+                     shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all duration-200
                      flex items-center justify-center"
           aria-label={totalUnread > 0 ? `Open chat, ${totalUnread} unread` : 'Open chat'}
           title="Messages"

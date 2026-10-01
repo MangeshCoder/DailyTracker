@@ -44,7 +44,7 @@ const CATEGORIES: { value: string; label: string; icon: string; color: string; b
   { value: 'Contract',    label: 'Contract',      icon: '📝', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30' },
   { value: 'Payslip',     label: 'Payslip',       icon: '💰', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
   { value: 'IDProof',     label: 'ID Proof',      icon: '🪪', color: 'text-amber-700 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-900/30' },
-  { value: 'Certificate', label: 'Certificate',   icon: '🏆', color: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/30' },
+  { value: 'Certificate', label: 'Certificate',   icon: '🏆', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/30' },
   { value: 'Policy',      label: 'Policy',        icon: '📋', color: 'text-cyan-700 dark:text-cyan-400',     bg: 'bg-cyan-50 dark:bg-cyan-900/30' },
   { value: 'Appraisal',   label: 'Appraisal',     icon: '⭐', color: 'text-pink-700 dark:text-pink-400',     bg: 'bg-pink-50 dark:bg-pink-900/30' },
   { value: 'Warning',     label: 'Warning',       icon: '⚠️', color: 'text-rose-700 dark:text-rose-400',     bg: 'bg-rose-50 dark:bg-rose-900/30' },

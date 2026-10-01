@@ -265,16 +265,16 @@ const ActionCard = ({
     };
 
     return (
-      <div className={`${CARD_CLS} border-indigo-500/40`}>
+      <div className={`${CARD_CLS} border-purple-500/40`}>
         <CardHead
           icon={FileText}
-          tone="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+          tone="bg-purple-500/10 text-purple-600 dark:text-purple-400"
           title={action.title}
           subtitle="Prefills draft into official form"
           right={
             <button
               onClick={handleNavClick}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition active:scale-95 flex items-center gap-1 shrink-0"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow transition active:scale-95 flex items-center gap-1 shrink-0"
             >
               Review & Submit <ChevronRight size={13} />
             </button>
@@ -1200,7 +1200,7 @@ export const AiChatWidget = () => {
       {!isOpen && !chatDockOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className={`fixed right-4 md:right-6 z-50 ${onChatPage ? "hidden md:flex md:bottom-28" : signedIn ? "bottom-20 md:bottom-6" : "bottom-4 md:bottom-6"} pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2`}
+          className={`fixed right-4 md:right-6 z-50 ${onChatPage ? "hidden md:flex md:bottom-28" : signedIn ? "bottom-20 md:bottom-6" : "bottom-4 md:bottom-6"} pl-3.5 pr-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:brightness-110 text-white rounded-full shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2`}
           aria-label="Open AI Assistant"
         >
           <Sparkles size={18} />

@@ -327,12 +327,12 @@ const MemberCard = ({ member, onExpand }: {
 
 const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
   const calColors: Record<string, string> = {
-    Present:       'bg-emerald-500 text-white',
-    WFH:           'bg-blue-500 text-white',
-    HalfDay:       'bg-amber-500 text-white',
+    Present:       'bg-emerald-700 text-white',
+    WFH:           'bg-blue-600 text-white',
+    HalfDay:       'bg-amber-700 text-white',
     Absent:        'bg-rose-500/20 text-rose-600 dark:text-rose-300',
     Weekend:       'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600',
-    WeekendWorked: 'bg-orange-500 text-white',
+    WeekendWorked: 'bg-orange-700 text-white',
     Holiday:       'bg-violet-500/20 text-violet-600 dark:text-violet-300',
     HolidayWorked: 'bg-violet-600 text-white',
     Future:        'bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-700',
@@ -370,12 +370,12 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
       {/* Legend */}
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-4">
         {[
-          { c: 'bg-emerald-500',   l: 'Present'          },
-          { c: 'bg-blue-500',      l: 'WFH'              },
-          { c: 'bg-amber-500',     l: 'Half Day'         },
+          { c: 'bg-emerald-700',   l: 'Present'          },
+          { c: 'bg-blue-600',      l: 'WFH'              },
+          { c: 'bg-amber-700',     l: 'Half Day'         },
           { c: 'bg-rose-500/40',   l: 'Absent'           },
           { c: 'bg-slate-300 dark:bg-slate-700', l: 'Weekend' },
-          { c: 'bg-orange-500',    l: 'Weekend (worked)' },
+          { c: 'bg-orange-700',    l: 'Weekend (worked)' },
           { c: 'bg-violet-500/40', l: 'Holiday'          },
           { c: 'bg-violet-600',    l: 'Holiday (worked)' },
         ].map(item => (
@@ -574,7 +574,7 @@ export const ManagerDashboardPage = () => {
           <Card>
             <CardContent className="!py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                   <BarChart3 className="w-4 h-4" />
                 </div>
                 <div>
@@ -853,7 +853,7 @@ export const ManagerDashboardPage = () => {
                           : user.role === 'Admin'
                             ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                             : user.role === 'TeamLead'
-                              ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                              ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
                               : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
                       }`}>
                         <Shield className="w-3 h-3" /> {user.role}

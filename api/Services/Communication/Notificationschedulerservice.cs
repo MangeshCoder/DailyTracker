@@ -261,11 +261,15 @@ namespace DailyTrackerAPI.Services.Communication
             var pendingWfh = await db.WFHRequests
                 .CountAsync(w => w.Status == "Pending" && w.RequestedAt <= twoDaysAgo, ct);
 
-            if (pendingLeave == 0 && pendingWfh == 0) return;
+            var pendingMissed = await db.MissedCheckInRequests
+                .CountAsync(r => r.Status == "Pending" && r.CreatedAt <= twoDaysAgo, ct);
+
+            if (pendingLeave == 0 && pendingWfh == 0 && pendingMissed == 0) return;
 
             var parts = new List<string>();
             if (pendingLeave > 0) parts.Add($"{pendingLeave} leave request{(pendingLeave > 1 ? "s" : "")}");
             if (pendingWfh > 0) parts.Add($"{pendingWfh} WFH request{(pendingWfh > 1 ? "s" : "")}");
+            if (pendingMissed > 0) parts.Add($"{pendingMissed} missed check-in{(pendingMissed > 1 ? "s" : "")}");
             var message = $"{string.Join(" and ", parts)} pending for over 2 days without action.";
 
             var managerIds = await db.Users

@@ -208,7 +208,7 @@ export const EODReportPage: React.FC = () => {
                 <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
                   Report Submitted for Today
                 </h4>
-                <p className="text-xs text-emerald-600/90 dark:text-emerald-400/80 mt-0.5 leading-relaxed">
+                <p className="text-xs text-emerald-800 dark:text-emerald-300 mt-0.5 leading-relaxed">
                   You can modify and update your answers at any point until your manager completes the formal review.
                 </p>
               </div>

@@ -178,7 +178,7 @@ export function FaceSetupPage() {
                 <div className="flex items-center gap-2">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition ${
                     done
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-emerald-700 text-white'
                       : active
                         ? 'bg-blue-600 text-white ring-4 ring-blue-500/20'
                         : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'

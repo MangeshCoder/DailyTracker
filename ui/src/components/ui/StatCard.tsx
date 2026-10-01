@@ -51,10 +51,10 @@ const COLOR_MAP: Record<string, { bg: string; iconBg: string; text: string; glow
     glow: 'from-rose-500/10 to-transparent',
   },
   indigo: {
-    bg: 'hover:border-indigo-500/40',
-    iconBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
-    text: 'text-indigo-600 dark:text-indigo-400',
-    glow: 'from-indigo-500/10 to-transparent',
+    bg: 'hover:border-purple-500/40',
+    iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+    text: 'text-purple-600 dark:text-purple-400',
+    glow: 'from-purple-500/10 to-transparent',
   },
   slate: {
     bg: 'hover:border-slate-400/40',

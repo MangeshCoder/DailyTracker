@@ -291,7 +291,7 @@ export const PendingRequestsPanel: React.FC = () => {
                             {req.employeeName}
                           </h4>
                           {req.isOwn && (
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-300">
                               Your request
                             </span>
                           )}

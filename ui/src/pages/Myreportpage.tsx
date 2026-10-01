@@ -42,6 +42,7 @@ import {
 import { localDate } from '../utils/date';
 import { Select } from '../components/ui/Select';
 import { ExcelButton } from '../components/ExcelButton';
+import { MissedCheckInCard } from '../components/MissedCheckIn';
 import { FileSpreadsheet } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,14 +64,14 @@ const YEARS = Array.from({ length: new Date().getFullYear() - START_YEAR + 1 }, 
 
 // ─── Attendance Calendar (reusable) ──────────────────────────────────────────
 
-const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
+const AttendanceCalendar = ({ days, onAbsentClick }: { days: AttendanceDay[]; onAbsentClick?: (date: string) => void }) => {
   const calColors: Record<string, string> = {
-    Present:       'bg-emerald-500 text-white',
-    WFH:           'bg-blue-500 text-white',
-    HalfDay:       'bg-amber-500 text-white',
+    Present:       'bg-emerald-700 text-white',
+    WFH:           'bg-blue-600 text-white',
+    HalfDay:       'bg-amber-700 text-white',
     Absent:        'bg-rose-500/20 text-rose-600 dark:text-rose-300',
     Weekend:       'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
-    WeekendWorked: 'bg-orange-500 text-white',
+    WeekendWorked: 'bg-orange-700 text-white',
     Holiday:       'bg-violet-500/20 text-violet-600 dark:text-violet-300',
     HolidayWorked: 'bg-violet-600 text-white',
     Future:        'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500',
@@ -99,12 +100,19 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
             ? `${new Date(day.date).toDateString()} — Holiday`
             : `${new Date(day.date).toDateString()} — ${day.status}${day.checkIn ? ` | In: ${day.checkIn}` : ''}`;
 
+          const cls = `aspect-square flex items-center justify-center rounded-lg text-xs font-semibold hover:scale-110 transition ${calColors[colorKey] ?? 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`;
+          // an absent day can be sent as "I forgot to check in"
+          if (day.status === 'Absent' && onAbsentClick)
+            return (
+              <button key={day.date} type="button" title={`${title} — tap to ask to add this day`}
+                aria-label={`${new Date(day.date).toDateString()} absent — ask to add this day`}
+                onClick={() => onAbsentClick(day.date.slice(0, 10))}
+                className={`${cls} cursor-pointer ring-1 ring-inset ring-rose-500/30 focus:outline-none focus:ring-2 focus:ring-blue-500`}>
+                {new Date(day.date).getDate()}
+              </button>
+            );
           return (
-            <div
-              key={day.date}
-              title={title}
-              className={`aspect-square flex items-center justify-center rounded-lg text-xs font-semibold cursor-default hover:scale-110 transition ${calColors[colorKey] ?? 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-            >
+            <div key={day.date} title={title} className={`${cls} cursor-default`}>
               {new Date(day.date).getDate()}
             </div>
           );
@@ -112,13 +120,13 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-4">
         {[
-          { c: 'bg-emerald-500',   l: 'Present'          },
-          { c: 'bg-blue-500',      l: 'WFH'              },
-          { c: 'bg-amber-500',     l: 'Half Day'         },
+          { c: 'bg-emerald-700',   l: 'Present'          },
+          { c: 'bg-blue-600',      l: 'WFH'              },
+          { c: 'bg-amber-700',     l: 'Half Day'         },
           { c: 'bg-rose-500/40',   l: 'Absent'           },
           { c: 'bg-sky-500/40',    l: 'On leave'         },
           { c: 'bg-slate-300 dark:bg-slate-700', l: 'Weekend' },
-          { c: 'bg-orange-500',    l: 'Weekend (worked)' },
+          { c: 'bg-orange-700',    l: 'Weekend (worked)' },
           { c: 'bg-violet-500/40', l: 'Holiday'          },
           { c: 'bg-violet-600',    l: 'Holiday (worked)' },
         ].map(i => (
@@ -145,6 +153,7 @@ export const MyReportPage = () => {
   const [to, setTo] = useState(localDate());
   const [report, setReport] = useState<UserFullReport | null>(null);
   const [calDays, setCalDays] = useState<AttendanceDay[]>([]);
+  const [pickedDay, setPickedDay] = useState<string>();   // red day tapped → "forgot to check in" form
   const [month, setMonth] = useState(currentMonth);
   const [year, setYear] = useState(currentYear);
   const [loading, setLoading] = useState(false);
@@ -289,7 +298,7 @@ export const MyReportPage = () => {
           {report && (
             <Card className="overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                <div className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
                   <ClipboardList className="w-4 h-4" />
                 </div>
                 <div>
@@ -415,7 +424,7 @@ export const MyReportPage = () => {
                   ))}
                 </div>
               ) : (
-                <AttendanceCalendar days={calDays} />
+                <AttendanceCalendar days={calDays} onAbsentClick={d => { setPickedDay(d); document.getElementById('missed-checkin')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} />
               )}
               {!calLoading && (
                 <ExcelButton className="w-full justify-center mt-4" label="Download month (Excel)"
@@ -424,6 +433,9 @@ export const MyReportPage = () => {
               )}
             </CardContent>
           </Card>
+          <div id="missed-checkin">
+            <MissedCheckInCard pickedDate={pickedDay} />
+          </div>
         </div>
       </div>
     </div>

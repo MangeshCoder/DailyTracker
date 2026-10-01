@@ -85,10 +85,10 @@ const RATING_COLORS = [
 const RATING_BG = [
   '',
   'bg-rose-500 text-white',
-  'bg-orange-500 text-white',
-  'bg-amber-500 text-white',
-  'bg-blue-500 text-white',
-  'bg-emerald-500 text-white',
+  'bg-orange-700 text-white',
+  'bg-amber-700 text-white',
+  'bg-blue-600 text-white',
+  'bg-emerald-700 text-white',
 ];
 
 const CYCLE_TYPES: { value: CycleType; label: string }[] = [
@@ -136,7 +136,7 @@ const Avatar: React.FC<{
   return (
     <div
       className={`${map[size]} rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600
-      flex items-center justify-center font-bold text-white flex-shrink-0 shadow-sm shadow-indigo-500/20`}
+      flex items-center justify-center font-bold text-white flex-shrink-0 shadow-sm shadow-purple-500/20`}
     >
       {initials || 'U'}
     </div>
