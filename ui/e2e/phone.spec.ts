@@ -77,20 +77,16 @@ test('the end of a page can be scrolled clear of the chat and AI Help buttons', 
   expect(lastBottom).toBeLessThanOrEqual(Math.min(aiTop, chatTop));
 });
 
-test('on the phone login page the AI Help button does not cover the footer', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('theme', 'light'));
+test('AI Help is not on the sign-in pages — only after signing in', async ({ page }) => {
   const fake = new FakeBackend(page);
   await fake.install();
-  await page.goto('/login');
-  const footer = page.getByText('Protected by 2FA, email OTP & trusted devices');
-  await footer.scrollIntoViewIfNeeded();
-  const f = (await footer.boundingBox())!;
-  const ai = page.getByRole('button', { name: 'Open AI Assistant' });
-  await expect(ai).toBeVisible();
-  const a = (await ai.boundingBox())!;
-  const overlap = Math.min(f.y + f.height, a.y + a.height) - Math.max(f.y, a.y) > 0
-    && Math.min(f.x + f.width, a.x + a.width) - Math.max(f.x, a.x) > 0;
-  expect(overlap).toBe(false);
+  for (const path of ['/login', '/register', '/forgot-password']) {
+    await page.goto(path);
+    await expect(page.locator('input[type=email]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open AI Assistant' })).toHaveCount(0);
+  }
+  await fake.login();
+  await expect(page.getByRole('button', { name: 'Open AI Assistant' })).toBeVisible();
 });
 
 for (const theme of ['light', 'dark'] as const) {

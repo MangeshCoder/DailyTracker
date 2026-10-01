@@ -225,7 +225,9 @@ const ManagerOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AppRoutes = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // AI Help only for signed-in, approved people — not on sign-in / register / password pages
+  const showAiHelp = isAuthenticated && user?.role !== 'Pending';
 
   return (
     <>
@@ -660,9 +662,11 @@ const AppRoutes = () => {
         {/* ── 404 Route ───────────────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <Suspense fallback={null}>
-        <AiChatWidget />
-      </Suspense>
+      {showAiHelp && (
+        <Suspense fallback={null}>
+          <AiChatWidget />
+        </Suspense>
+      )}
     </>
   );
 };
