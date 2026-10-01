@@ -36,6 +36,9 @@ export const sections = [
     body: `
     <table>
       <tr><th>Feature</th><th>What it does</th><th>Where</th></tr>
+      <tr><td>Phone notifications</td><td>Approvals, reminders and chat messages arrive on your phone or computer even when the app is closed.</td><td>Notifications → Phone notifications</td></tr>
+      <tr><td>New look &amp; three designs</td><td>Montcrest logo and a fresh look; pick <b>Montcrest</b>, <b>Dashdark Purple</b> or <b>Original Blue</b> — your choice follows your account.</td><td>Account menu → Design</td></tr>
+      <tr><td>Menu search</td><td>Type in the sidebar's <b>Search for…</b> box to jump to any page.</td><td>Sidebar</td></tr>
       <tr><td>Comp-off</td><td>Working 4+ hours on a weekend or public holiday earns a day off.</td><td>Leave page</td></tr>
       <tr><td>Expense claims</td><td>Send a bill; once approved it is paid with your salary.</td><td>HR &amp; Requests → Expenses</td></tr>
       <tr><td>Forgotten check-out</td><td>Reminder at 7 PM; the app closes the day for you and you confirm or correct it next morning.</td><td>Dashboard</td></tr>
@@ -66,6 +69,28 @@ export const sections = [
     <h3>Two-step sign-in (recommended)</h3>
     <p>Open <span class="ui">System &amp; Docs → Security &amp; 2FA</span>. Turn on an <b>authenticator app</b>
     (scan the QR code with Google or Microsoft Authenticator) or <b>email codes</b>. Keep your backup codes safe.</p>
+    <h3>Finding your way</h3>
+    <ul>
+      <li>The menu on the left is grouped into sections (General, Work Management, HR &amp; Requests, System &amp; Docs, and Manager for team leads and managers). Click a section name to open it.</li>
+      <li>Faster: type in <span class="ui">Search for…</span> at the top of the menu — e.g. “leave” or “payroll” — and click the page.</li>
+      <li>On a phone, open the menu with <b>☰</b> (top left); the bottom bar has Home, Tasks, Leave, Docs, Alerts and Profile.</li>
+    </ul>
+    <h3>Your look: design and light / dark</h3>
+    <p>Click your name at the bottom of the menu to open the account menu. <span class="ui">Light Theme / Dark Theme</span> switches
+    between light and dark, and under <b>Design</b> you can pick <b>Montcrest</b> (amber &amp; maroon, the default), <b>Dashdark Purple</b>
+    or <b>Original Blue</b>. The design is saved on your account, so it is the same on your phone and computer.</p>
+    <h3>Phone notifications</h3>
+    <ol>
+      <li>Open <span class="ui">General → Notifications</span>. At the top is the <b>Phone notifications</b> card.</li>
+      <li>Tap <span class="ui">Turn on</span> and allow notifications when the browser asks.</li>
+      <li>Tap <span class="ui">Send test</span> — a test notification should appear within a few seconds.</li>
+    </ol>
+    <p>You then get every bell notification (approvals, reminders, comp-off, expenses …) and chat messages while DailyTracker is closed.
+    Turn it on separately on each device you use; the card lists your devices. <span class="ui">Turn off</span> stops it on that device,
+    and signing out stops it too. Muted chats don't send notifications.</p>
+    <div class="tip"><b>iPhone / iPad:</b> notifications work only from the Home Screen app — in Safari tap <b>Share → Add to Home Screen</b>,
+    open DailyTracker from the new icon, then turn notifications on. <b>Blocked?</b> Allow notifications for the site in the browser's
+    settings (the lock icon next to the address) and try again.</div>
     <h3>Your first days — the getting-started checklist</h3>
     <p>New joiners see a <b>Getting started</b> card on the dashboard with a progress bar. Some steps tick themselves
     when you do them in the app (profile details, face check-in, two-step sign-in, uploading a document, your first check-in);
@@ -310,6 +335,7 @@ export const sections = [
       <li><b>I can't see a new feature.</b> Wait a minute or refresh (Ctrl + Shift + R). Many menu items are inside a section — click the section name to open it.</li>
       <li><b>Check-in says I'm too far from the office.</b> Turn on location / GPS and allow it for the site, then try again near the office.</li>
       <li><b>Face check-in fails.</b> Face the light, remove glasses or a mask, and hold still. Ask your manager to reset your face if it keeps failing.</li>
+      <li><b>I don't get phone notifications.</b> Check the card on the Notifications page says “On for this device” and press <b>Send test</b>. Make sure the phone isn't in Do Not Disturb / battery saver for the browser, and on iPhone use the Home Screen app.</li>
       <li><b>The app is slow to open the first time.</b> After a quiet period the server takes up to a minute to wake up.</li>
       <li><b>A time looks wrong.</b> All times are India time; tell your manager if something doesn't match.</li>
     </ul>`,

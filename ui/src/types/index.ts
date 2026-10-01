@@ -1,5 +1,5 @@
 // ─── Core Types (original) ────────────────────────────────────────────────────
-export interface User { id: number; fullName: string; email: string; role: string; isActive: boolean;department?:      string;
+export interface User { id: number; fullName: string; email: string; role: string; isActive: boolean; uiDesign?: string | null;department?:      string;
   designation?:     string;
   profilePhotoUrl?: string;
   phone?:           string;

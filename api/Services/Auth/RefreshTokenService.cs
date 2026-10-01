@@ -275,7 +275,7 @@ namespace DailyTrackerAPI.Services.Auth
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
                 AccessTokenExpiry = expiry,
-                User = new UserDto { Id = user.Id, FullName = user.FullName, Email = user.Email, Role = user.Role }
+                User = new UserDto { Id = user.Id, FullName = user.FullName, Email = user.Email, Role = user.Role, UiDesign = user.UiDesign }
             };
         }
 

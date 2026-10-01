@@ -15,13 +15,16 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(here, '..', '..', 'public');
+// Montcrest Software logo for the cover (embedded, so the PDF needs no files)
+const logo = `data:image/png;base64,${readFileSync(join(publicDir, 'brand', 'montcrest-logo.png')).toString('base64')}`;
 
 const css = `
   @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
   * { box-sizing: border-box; }
   body { font-family: 'Noto Sans', 'Noto Sans Devanagari', 'DejaVu Sans', sans-serif; color: #1e293b; font-size: 10.5pt; line-height: 1.55; margin: 0; }
   .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
-  .brand { font-size: 10pt; letter-spacing: .18em; text-transform: uppercase; color: #2563eb; font-weight: 700; }
+  .logo { height: 64px; width: auto; align-self: flex-start; margin-bottom: 26px; }
+  .brand { font-size: 10pt; letter-spacing: .18em; text-transform: uppercase; color: #B35F00; font-weight: 700; }
   .cover h1 { font-size: 30pt; line-height: 1.15; margin: 10px 0 6px; color: #0f172a; }
   .cover .subtitle { font-size: 13pt; color: #475569; margin: 0 0 22px; }
   .cover .updated { font-size: 9.5pt; color: #64748b; margin-top: 26px; }
@@ -31,19 +34,19 @@ const css = `
   .toc h2 { font-size: 20pt; margin: 0 0 16px; color: #0f172a; }
   .toc ol { list-style: none; padding: 0; margin: 0; }
   .toc li { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px dotted #cbd5e1; font-size: 11pt; }
-  .toc .n { color: #2563eb; font-weight: 700; width: 26px; }
+  .toc .n { color: #B35F00; font-weight: 700; width: 26px; }
   .toc .t { flex: 1; }
   .toc .p { color: #64748b; font-variant-numeric: tabular-nums; }
   section { page-break-before: always; }
   section:first-of-type { page-break-before: auto; }
-  .num { display: inline-block; background: #2563eb; color: #fff; font-weight: 700; border-radius: 6px; padding: 1px 8px; font-size: 11pt; margin-right: 8px; }
+  .num { display: inline-block; background: #B35F00; color: #fff; font-weight: 700; border-radius: 6px; padding: 1px 8px; font-size: 11pt; margin-right: 8px; }
   h2 { font-size: 18pt; margin: 0 0 2px; color: #0f172a; }
   .sub { color: #64748b; margin: 0 0 14px; font-size: 10.5pt; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-  h3 { font-size: 12pt; margin: 16px 0 4px; color: #1d4ed8; }
+  h3 { font-size: 12pt; margin: 16px 0 4px; color: #961B1F; }
   ul, ol { margin: 4px 0 8px; padding-left: 20px; }
   li { margin: 3px 0; }
   table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.8pt; page-break-inside: avoid; }
-  th { background: #eff6ff; color: #1e3a8a; text-align: left; }
+  th { background: #FFF8EB; color: #7A1619; text-align: left; }
   th, td { border: 1px solid #cbd5e1; padding: 5px 8px; vertical-align: top; }
   .ui { font-weight: 600; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0 4px; white-space: nowrap; }
   .tip { border-left: 4px solid #10b981; background: #ecfdf5; padding: 8px 12px; border-radius: 6px; margin: 12px 0; }
@@ -52,6 +55,7 @@ const css = `
 
 const html = (c, pages) => `<!doctype html><html lang="${c.meta.lang}"><head><meta charset="utf-8"><style>${css}</style></head><body>
   <div class="cover">
+    <img class="logo" src="${logo}" alt="Montcrest Software">
     <div class="brand">DailyTracker v2</div>
     <h1>${c.meta.title}</h1>
     <p class="subtitle">${c.meta.subtitle}</p>

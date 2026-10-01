@@ -40,6 +40,8 @@ namespace DailyTrackerAPI.Models.Auth
         // Face recognition fields  
         public string? FaceDescriptor { get; set; }
         public bool FaceRegistered { get; set; } = false;
+        /// <summary>Colour design picked in the account menu (montcrest | purple | blue); null = default</summary>
+        public string? UiDesign { get; set; }
         // Navigation
         public ICollection<DailyLog> DailyLogs { get; set; } = new List<DailyLog>();
         public ICollection<SupportLog> SupportGiven { get; set; } = new List<SupportLog>();

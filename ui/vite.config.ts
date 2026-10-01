@@ -63,6 +63,8 @@ export default defineConfig({
       workbox: {
         // Pre-cache all JS/CSS/HTML built by Vite
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // phone / browser push notifications: show them and open the page when tapped
+        importScripts: ['push-sw.js'],
         // face-api is only needed for face check-in — cache it on first use instead
         globIgnores: ['**/face-api-*.js'],
         // Hosted, the API shares this address: links to it (downloads, health

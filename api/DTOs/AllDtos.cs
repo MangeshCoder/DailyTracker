@@ -35,6 +35,8 @@ namespace DailyTrackerAPI.DTOs
         public string? Designation { get; set; }
         public string? ProfilePhotoUrl { get; set; }
         public bool FaceRegistered { get; set; }
+        /// <summary>Colour design picked in the account menu (sent on sign-in; null = default)</summary>
+        public string? UiDesign { get; set; }
     }
 
     // Includes all fields plus manager info (denormalized for convenience)

@@ -32,7 +32,14 @@ namespace DailyTrackerAPI.Extensions
             // ── Infrastructure ────────────────────────────────────────────────
             services.AddScoped<JwtHelper>();
             services.AddScoped<ITeamScope, TeamScope>();   // who may manage whom
-            services.AddScoped<INotificationSender, SignalRNotificationSender>();
+            // bell notifications go out over SignalR and are also pushed to phones (WebPush.cs)
+            services.AddScoped<SignalRNotificationSender>();
+            services.AddScoped<INotificationSender, PushingNotificationSender>();
+            services.AddSingleton<PushQueue>();
+            services.AddSingleton<IPushSender>(sp => sp.GetRequiredService<PushQueue>());
+            services.AddScoped<VapidKeys>();
+            services.AddScoped<PushDelivery>();
+            services.AddHttpClient(PushDelivery.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
             services.AddScoped<IMediaStorageService, MediaStorageService>();
 
             // ── Auth & Security ───────────────────────────────────────────────
@@ -93,6 +100,7 @@ namespace DailyTrackerAPI.Extensions
             // ── Background Jobs ───────────────────────────────────────────────
             services.AddHostedService<NotificationSchedulerService>();
             services.AddHostedService<MaintenanceService>();          // weekly backup, error log clean-up
+            services.AddHostedService<PushWorker>();                  // sends queued phone pushes
 
             // ── Monitoring (managers' System page) ────────────────────────────
             services.AddSingleton<ErrorLogWriter>();

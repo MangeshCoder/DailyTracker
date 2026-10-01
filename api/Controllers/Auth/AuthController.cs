@@ -406,7 +406,8 @@ namespace DailyTrackerAPI.Controllers.Auth
                     u.ProfilePhotoUrl,
                     u.Phone,
                     u.Bio,
-                    u.JoinDate
+                    u.JoinDate,
+                    u.UiDesign
                 })
                 .FirstOrDefaultAsync();
 

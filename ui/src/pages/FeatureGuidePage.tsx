@@ -42,12 +42,12 @@ const EDITIONS: GuideEdition[] = [
     nativeTitle: 'English Edition',
     filename: 'DailyTracker_v2_Feature_Guide.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide.pdf?v=${GUIDE_VERSION}`,
-    pages: 18,
-    size: '210 KB',
-    badge: '18 pages · updated 1 Oct 2026',
+    pages: 19,
+    size: '272 KB',
+    badge: '19 pages · updated 1 Oct 2026',
     summary: 'Every feature explained in plain words with exact steps — your working day, leave and comp-off, WFH, expenses, payroll, chat, AI Help — plus a section for team leads and managers.',
     features: [
-      "What's new: comp-off, expenses, Excel",
+      "What's new: phone notifications, new look, menu search",
       'Check-in, breaks & forgotten check-out',
       'Leave, comp-off & WFH requests',
       'Expense claims & your payslip',
@@ -61,12 +61,12 @@ const EDITIONS: GuideEdition[] = [
     nativeTitle: 'मराठी आवृत्ती (Marathi Edition)',
     filename: 'DailyTracker_v2_Feature_Guide_Marathi.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide_Marathi.pdf?v=${GUIDE_VERSION}`,
-    pages: 18,
-    size: '331 KB',
-    badge: '१८ पाने · १ ऑक्टोबर २०२६',
+    pages: 19,
+    size: '401 KB',
+    badge: '१९ पाने · १ ऑक्टोबर २०२६',
     summary: 'प्रत्येक सुविधा सोप्या शब्दांत, नेमक्या पायऱ्यांसह — कामाचा दिवस, रजा व कॉम्प-ऑफ, WFH, खर्च, पगार, चॅट, AI Help — आणि टीम लीड व मॅनेजरसाठी स्वतंत्र भाग.',
     features: [
-      'नवीन: कॉम्प-ऑफ, खर्च, Excel',
+      'नवीन: फोनवर सूचना, नवीन रूप, मेनूमध्ये शोध',
       'चेक-इन, ब्रेक आणि चेक-आउट विसरल्यास',
       'रजा, कॉम्प-ऑफ आणि WFH अर्ज',
       'खर्चाचे दावे आणि पे-स्लिप',
@@ -179,8 +179,8 @@ export const FeatureGuidePage: React.FC = () => {
       icon: MessageSquare,
       title: selectedEdition === 'marathi' ? 'चॅट व AI Help' : 'Chat & AI Help',
       desc: selectedEdition === 'marathi'
-        ? 'फाइल, पोल, @mention, पिन व शोधासह चॅट; प्रश्न विचारा किंवा AI कडून कामे करून घ्या'
-        : "Chat with files, polls, @mentions, pins and search; ask AI Help questions or let it do things for you",
+        ? 'फाइल, पोल, @mention, पिन व शोधासह चॅट; ॲप बंद असतानाही फोनवर सूचना; AI Help ला प्रश्न विचारा'
+        : "Chat with files, polls, @mentions, pins and search; phone notifications even when the app is closed; ask AI Help",
     },
     {
       icon: Sparkles,

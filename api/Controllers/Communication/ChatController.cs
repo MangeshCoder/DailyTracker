@@ -37,15 +37,55 @@ namespace DailyTrackerAPI.Controllers.Communication
         private readonly AppDbContext _db;
         private readonly IAppNotificationService _notifications;
         private readonly IFileStorage _files;
+        private readonly IPushSender _push;
 
         public ChatController(IChatService chatService, IHubContext<ChatHub> hub, AppDbContext db,
-            IAppNotificationService notifications, IFileStorage files)
+            IAppNotificationService notifications, IFileStorage files, IPushSender push)
         {
             _files = files;
+            _push = push;
             _chatService = chatService;
             _hub = hub;
             _db = db;
             _notifications = notifications;
+        }
+
+        /// <summary>
+        /// Phone push for a new message: to members who don't have the app open (not
+        /// connected to the chat hub), haven't muted the chat and weren't @mentioned
+        /// (mentions already get a bell notification, which is pushed too).
+        /// One tag per chat, so a burst of messages shows as one updated notification.
+        /// </summary>
+        private async Task PushToOfflineMembersAsync(ChatMessageDto message)
+        {
+            var conv = await _db.Conversations.AsNoTracking()
+                .Where(c => c.Id == message.ConversationId)
+                .Select(c => new
+                {
+                    c.Type, c.GroupName,
+                    Members = c.Members.Where(m => !m.HasLeft && !m.IsMuted).Select(m => m.UserId).ToList(),
+                })
+                .FirstOrDefaultAsync();
+            if (conv == null) return;
+
+            var to = conv.Members
+                .Where(id => id != message.SenderId && !message.MentionedUserIds.Contains(id) && !ChatHub.IsUserOnline(id))
+                .ToList();
+            if (to.Count == 0) return;
+
+            var text = message.MessageType switch
+            {
+                "Poll" => $"📊 Poll: {message.Poll?.Question ?? message.Content}",
+                "Image" => string.IsNullOrWhiteSpace(message.Content) ? "📷 Photo" : $"📷 {message.Content}",
+                "File" => $"📎 {message.AttachmentName ?? "File"}",
+                _ => message.Content,
+            };
+            var isGroup = conv.Type != "Direct";
+            _push.Enqueue(to, new PushMessage(
+                isGroup ? (conv.GroupName ?? "Group chat") : message.SenderName,
+                isGroup ? $"{message.SenderName}: {text}" : text,
+                $"/chat?c={message.ConversationId}",
+                $"chat-{message.ConversationId}"));
         }
 
         // ── CONVERSATIONS ─────────────────────────────────────────────────────
@@ -172,6 +212,7 @@ namespace DailyTrackerAPI.Controllers.Communication
                 // 🔴 BROADCAST: push to all clients in this conversation in real-time
                 await _hub.Clients.Group($"conv_{dto.ConversationId}")
                     .SendAsync("ReceiveMessage", message);
+                await PushToOfflineMembersAsync(message);
 
                 // 🔔 @mentions also land in the notification bell (with a link to the chat)
                 if (message.MentionedUserIds.Count > 0)
@@ -267,6 +308,7 @@ namespace DailyTrackerAPI.Controllers.Communication
 
                 await _hub.Clients.Group($"conv_{conversationId}")
                     .SendAsync("ReceiveMessage", message);
+                await PushToOfflineMembersAsync(message);
 
                 return Ok(message);
             }
@@ -350,6 +392,7 @@ namespace DailyTrackerAPI.Controllers.Communication
 
                 await _hub.Clients.Group($"conv_{conversationId}")
                     .SendAsync("ReceiveMessage", message);
+                await PushToOfflineMembersAsync(message);
 
                 return Ok(message);
             }

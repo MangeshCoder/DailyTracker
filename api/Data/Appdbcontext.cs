@@ -46,6 +46,8 @@ namespace DailyTrackerAPI.Data
         public DbSet<OnboardingTask> OnboardingTasks { get; set; }
         public DbSet<ExpenseClaim> ExpenseClaims { get; set; }
         public DbSet<ApprovalDelegation> ApprovalDelegations { get; set; }
+        public DbSet<PushSubscription> PushSubscriptions { get; set; }
+        public DbSet<AppSecret> AppSecrets { get; set; }
 
         // ─── Feature 10: Attendance Enhanced ─────────────────────────────────
         public DbSet<Holiday> Holidays { get; set; }
@@ -298,6 +300,25 @@ namespace DailyTrackerAPI.Data
                 e.HasOne(d => d.From).WithMany().HasForeignKey(d => d.FromUserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(d => d.To).WithMany().HasForeignKey(d => d.ToUserId).OnDelete(DeleteBehavior.Cascade);
             });
+
+            // ── Push notifications: one row per phone / browser
+            mb.Entity<PushSubscription>(e => {
+                e.HasIndex(p => p.Endpoint).IsUnique();
+                e.HasIndex(p => p.UserId);
+                e.Property(p => p.Endpoint).HasMaxLength(1000);
+                e.Property(p => p.P256dh).HasMaxLength(200);
+                e.Property(p => p.Auth).HasMaxLength(100);
+                e.Property(p => p.Device).HasMaxLength(100);
+                e.HasOne(p => p.User).WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── Server-made secrets (VAPID keys …)
+            mb.Entity<AppSecret>(e => {
+                e.HasKey(s => s.Key);
+                e.Property(s => s.Key).HasMaxLength(100);
+            });
+
+            mb.Entity<User>().Property(u => u.UiDesign).HasMaxLength(20);
 
             // ── LateArrivalReason
             mb.Entity<LateArrivalReason>(e => {

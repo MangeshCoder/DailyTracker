@@ -8,6 +8,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../services/api';
+import { forgetPushOnSignOut } from '../utils/push';
 
 interface AuthContextType {
   user:            User | null;
@@ -46,6 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    await forgetPushOnSignOut();   // this device stops getting this person's push notifications
     await authApi.logout();
     setUser(null);
     window.location.href = '/login';

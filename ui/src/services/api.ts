@@ -498,11 +498,22 @@ export const wfhApi = {
     }).then(r => r.data),     
 };
 
+// ── Phone / browser push notifications (utils/push.ts does the browser side) ──
+export interface PushDevice { id: number; device?: string; createdAt: string; lastSentAt?: string }
+export const pushApi = {
+  config:      () => api.get<{ publicKey: string }>('/push/config'),
+  devices:     () => api.get<PushDevice[]>('/push/devices'),
+  subscribe:   (d: { endpoint: string; keys: { p256dh: string; auth: string }; device?: string }) => api.post('/push/subscribe', d),
+  unsubscribe: (endpoint: string) => api.post('/push/unsubscribe', { endpoint }),
+  test:        () => api.post<{ sent: number; message: string }>('/push/test'),
+};
+
 export const profileApi = {
   // Own profile
   getMe:       ()              => api.get('/profile/me'),
   updateMe:    (d: object)     => api.put('/profile/me', d),        // PUT → UpdateProfileDto
   deletePhoto: ()              => api.delete('/profile/me/photo'),
+  setDesign:   (design: string) => api.put('/profile/me/design', { design }),   // colour design follows the account
 
   // Photo upload — multipart/form-data
   uploadPhoto: (file: File) => {

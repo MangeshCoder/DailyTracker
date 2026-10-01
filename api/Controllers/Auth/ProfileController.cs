@@ -12,6 +12,7 @@ namespace DailyTrackerAPI.Controllers.Auth
     // ─── Profile & Directory Controller ──────────────────────────────────────
     // GET    /api/profile/me              → current user's full profile
     // PUT    /api/profile/me              → edit own profile
+    // PUT    /api/profile/me/design       → colour design picked in the account menu
     // POST   /api/profile/me/photo        → upload/replace avatar (multipart)
     // DELETE /api/profile/me/photo        → remove avatar
     // GET    /api/profile/directory       → all active employees
@@ -61,6 +62,20 @@ namespace DailyTrackerAPI.Controllers.Auth
 
             await _db.SaveChangesAsync();
             return Ok(MapProfile(user));
+        }
+
+        public record DesignDto(string Design);
+        private static readonly string[] Designs = { "montcrest", "purple", "blue" };
+
+        /// <summary>Remember the colour design on the account, so it follows the person to every device</summary>
+        [HttpPut("me/design")]
+        public async Task<IActionResult> SetDesign([FromBody] DesignDto dto)
+        {
+            if (!Designs.Contains(dto.Design))
+                return BadRequest(new { message = "Unknown design." });
+            var userId = User.GetUserId();
+            await _db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.UiDesign, dto.Design));
+            return Ok(new { design = dto.Design });
         }
 
         [HttpPost("me/photo")]

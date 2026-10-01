@@ -22,6 +22,7 @@ import type { AppNotification } from '../types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
+import { PushSettingsCard } from '../components/PushSettingsCard';
 import {
   Bell,
   BellRing,
@@ -323,6 +324,9 @@ export function NotificationsPage() {
         }
         className="!mb-0"
       />
+
+      {/* ── Phone / browser push ── */}
+      <PushSettingsCard />
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">

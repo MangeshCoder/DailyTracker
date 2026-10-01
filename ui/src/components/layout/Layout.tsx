@@ -7,12 +7,13 @@
 
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/Authcontext';
-import { useTheme, DESIGNS } from '../../context/ThemeContext';
+import { useTheme, DESIGNS, type Design } from '../../context/ThemeContext';
+import { syncPushOwner } from '../../utils/push';
 import { NotificationBell } from '../NotificationBell';
 import { Suspense, useState, useRef, useEffect, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { SkeletonDashboard } from '../Skeleton';
-import { announcementsApi, notifApi } from '../../services/api';
+import { announcementsApi, notifApi, profileApi } from '../../services/api';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { ChatProvider } from '../../context/ChatContext';
@@ -36,8 +37,22 @@ interface NavItem {
 interface NavSection { title: string; icon: Icon; items: NavItem[]; manager?: boolean }
 
 const LayoutShell = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { isDark, toggleTheme, design, setDesign } = useTheme();
+
+  // the design follows the account: apply the saved one after sign-in, save a new pick
+  useEffect(() => {
+    const saved = DESIGNS.find(d => d.id === user?.uiDesign);
+    if (saved) setDesign(saved.id);
+  }, [user?.uiDesign, setDesign]);
+  const pickDesign = (d: Design) => {
+    setDesign(d);
+    updateUser({ uiDesign: d });
+    profileApi.setDesign(d).catch(() => { /* still applied on this device */ });
+  };
+
+  // this device's push notifications go to whoever is signed in now
+  useEffect(() => { if (user?.id) void syncPushOwner(); }, [user?.id]);
   const navigate = useNavigate();
   // the chat page fills the screen itself (its message box sits at the bottom)
   const fullHeightPage = useLocation().pathname.startsWith('/chat');
@@ -162,11 +177,11 @@ const LayoutShell = () => {
         { to: '/guide', label: 'Feature Manual & Hub', icon: BookOpen },
         {
           to: '/DailyTracker_v2_Feature_Guide.pdf', label: 'PDF Guide (English)', icon: Download,
-          isDownload: true, downloadName: 'DailyTracker_v2_Feature_Guide.pdf', badgeLabel: '18P',
+          isDownload: true, downloadName: 'DailyTracker_v2_Feature_Guide.pdf', badgeLabel: '19P',
         },
         {
           to: '/DailyTracker_v2_Feature_Guide_Marathi.pdf', label: 'मराठी मार्गदर्शिका (MR)', icon: Languages,
-          isDownload: true, downloadName: 'DailyTracker_v2_Feature_Guide_Marathi.pdf', badgeLabel: '१८P',
+          isDownload: true, downloadName: 'DailyTracker_v2_Feature_Guide_Marathi.pdf', badgeLabel: '१९P',
         },
         { to: '/security', label: 'Security & 2FA', icon: ShieldCheck },
       ],
@@ -501,13 +516,13 @@ const LayoutShell = () => {
                   target="_blank" rel="noopener noreferrer" onClick={() => setProfileOpen(false)}
                   className={`${menuBtn} hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400`}>
                   <Download className="w-4 h-4" /><span>PDF Guide (English)</span>
-                  <span className="ml-auto text-[10px] text-slate-500 dark:text-slate-400">18P</span>
+                  <span className="ml-auto text-[10px] text-slate-500 dark:text-slate-400">19P</span>
                 </a>
                 <a href={guideUrl('DailyTracker_v2_Feature_Guide_Marathi.pdf')} download="DailyTracker_v2_Feature_Guide_Marathi.pdf"
                   target="_blank" rel="noopener noreferrer" onClick={() => setProfileOpen(false)}
                   className={`${menuBtn} hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400`}>
                   <Languages className="w-4 h-4" /><span>मराठी मार्गदर्शिका (PDF)</span>
-                  <span className="ml-auto text-[10px] text-slate-500 dark:text-slate-400">१८P</span>
+                  <span className="ml-auto text-[10px] text-slate-500 dark:text-slate-400">१९P</span>
                 </a>
                 <button type="button" onClick={() => { navigate('/security'); setProfileOpen(false); closeMobile(); }}
                   className={`${menuBtn} hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300`}>
@@ -528,7 +543,7 @@ const LayoutShell = () => {
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() => setDesign(d.id)}
+                        onClick={() => pickDesign(d.id)}
                         aria-pressed={design === d.id}
                         title={`${d.label} — ${d.hint}`}
                         className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 text-[10px] font-medium leading-tight transition ${

@@ -14,9 +14,9 @@ test('the guide page offers both editions and the reader loads the current PDF',
   await fake.navigate('/guide');
 
   await expect(page.getByRole('heading', { name: 'DailyTracker v2 User Guides' })).toBeVisible();
-  await expect(page.getByText('18 pages · updated 1 Oct 2026')).toBeVisible();
+  await expect(page.getByText('19 pages · updated 1 Oct 2026')).toBeVisible();
   const src = await page.locator('iframe').getAttribute('src');
-  expect(src).toMatch(/^\/DailyTracker_v2_Feature_Guide\.pdf\?v=\d{4}-\d{2}-\d{2}#/);
+  expect(src).toMatch(/^\/DailyTracker_v2_Feature_Guide\.pdf\?v=\d{4}-\d{2}-\d{2}(\.\d+)?#/);
 
   for (const file of ['DailyTracker_v2_Feature_Guide.pdf', 'DailyTracker_v2_Feature_Guide_Marathi.pdf']) {
     const res = await request.get(`/${file}?v=2026-10-01&download=true`);

@@ -98,6 +98,7 @@ namespace DailyTrackerAPI.Services.Monitoring
             }
 
             _db.ChangeTracker.Clear();
+            DailyTrackerAPI.Services.Communication.VapidKeys.ResetCache();   // push keys come from the restored data now
             _logger.LogWarning("Database restored by user {User}: {Tables} tables, {Rows} rows from a backup made {Created:u} (safety backup {Safety})",
                 requestedBy, plan.Order.Count, rows, plan.CreatedAtUtc, safety.Id);
             return new RestoreResult(plan.Order.Count, rows, safety.Id, plan.CreatedAtUtc);
