@@ -393,12 +393,12 @@ export const MyReportPage = () => {
           {/* Attendance Calendar */}
           <Card>
             <CardContent>
-              <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                     <CalendarDays className="w-4 h-4" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">Attendance</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">Attendance</h3>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   <div className="relative">

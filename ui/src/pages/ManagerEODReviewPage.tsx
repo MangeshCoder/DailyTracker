@@ -303,9 +303,9 @@ export const ManagerEODReviewPage: React.FC = () => {
               {/* Header / Summary Bar */}
               <div
                 onClick={() => setExpandedId(isExpanded ? null : report.id)}
-                className="p-4 sm:p-5 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition flex items-center justify-between gap-4"
+                className="p-4 sm:p-5 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition flex items-center justify-between gap-2 sm:gap-4"
               >
-                <div className="flex items-center gap-3.5 min-w-0">
+                <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-sm shadow-blue-500/20 flex-shrink-0">
                     {report.userName.charAt(0).toUpperCase()}
                   </div>
@@ -321,8 +321,8 @@ export const ManagerEODReviewPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
-                      <span className="flex items-center gap-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                      <span className="flex items-center gap-1 whitespace-nowrap">
                         <Calendar className="w-3 h-3 text-slate-400" />
                         {new Date(report.reportDate).toLocaleDateString('en-IN', {
                           weekday: 'short',
@@ -331,14 +331,14 @@ export const ManagerEODReviewPage: React.FC = () => {
                           year: 'numeric',
                         })}
                       </span>
-                      <span>·</span>
-                      <span>Submitted: {formatISTDate(report.submittedAt)}</span>
+                      <span className="hidden sm:inline">·</span>
+                      <span className="whitespace-nowrap">Submitted {formatISTDate(report.submittedAt)}</span>
                     </p>
                   </div>
                 </div>
 
                 {/* Right badges & toggle */}
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                   {/* Mood Badge */}
                   <div
                     className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border ${mood.bg} ${mood.text}`}

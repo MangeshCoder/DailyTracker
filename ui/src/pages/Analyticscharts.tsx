@@ -23,6 +23,11 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
         ? analyticsApi.getUserAnalytics(userId, 365).then((r) => r.data.heatmap)
         : analyticsApi.getHeatmap(365).then((r) => r.data),
   });
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;   // show the most recent weeks first
+  }, [heatmap]);
 
   if (isLoading) {
     return <div className="animate-pulse h-36 bg-slate-100 dark:bg-slate-800 rounded-2xl" />;
@@ -61,7 +66,8 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
   let lastMonth = -1;
   weeks.forEach((week, i) => {
     const month = week[0].date.getMonth();
-    if (month !== lastMonth) {
+    // skip a label that would run into the previous one (a month starting 1–2 weeks after it)
+    if (month !== lastMonth && (months.length === 0 || i - months[months.length - 1].col >= 3)) {
       months.push({
         label: week[0].date.toLocaleString('default', { month: 'short' }),
         col: i,
@@ -72,8 +78,11 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
 
   return (
     <div className="space-y-3">
+      {/* Labels and grid scroll together; opens on the latest weeks (phones can't show a whole year) */}
+      <div ref={scrollRef} className="overflow-x-auto pb-2 scrollbar-thin">
+      <div className="w-max space-y-1">
       {/* Month labels */}
-      <div className="relative h-4 text-[10px] text-slate-500 font-semibold overflow-hidden">
+      <div className="relative h-4 text-[10px] text-slate-500 font-semibold">
         {months.map((m) => (
           <span
             key={`${m.label}-${m.col}`}
@@ -86,7 +95,7 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
       </div>
 
       {/* Grid */}
-      <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-thin">
+      <div className="flex gap-1">
         {weeks.map((week, wi) => (
           <div key={wi} className="flex flex-col gap-1 flex-shrink-0">
             {week.map((cell, di) => {
@@ -114,6 +123,8 @@ export const HeatmapCalendar: React.FC<{ userId?: number }> = ({ userId }) => {
             })}
           </div>
         ))}
+      </div>
+      </div>
       </div>
 
       {/* Legend */}

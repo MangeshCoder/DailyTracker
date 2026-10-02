@@ -89,6 +89,32 @@ test('AI Help is not on the sign-in pages — only after signing in', async ({ p
   await expect(page.getByRole('button', { name: 'Open AI Assistant' })).toBeVisible();
 });
 
+test('team calendar: today and the day counts fit inside the day box on a phone', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-16T11:00:00+05:30'));
+  const fake = await signIn(page, 'light');
+  const member = (userId: number, fullName: string, status: string) => ({ userId, fullName, role: 'Developer', status, profilePhotoUrl: null, leaveType: null });
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(2026, 8, i + 1), wd = d.getDay();
+    return { date: `2026-09-${String(i + 1).padStart(2, '0')}`, weekday: '', isWeekend: wd === 0 || wd === 6, isHoliday: false, holidayName: null,
+      isToday: i + 1 === 16, members: i + 1 === 16 ? [member(1, 'A', 'Present'), member(2, 'B', 'Present'), member(3, 'C', 'WFH'), member(4, 'D', 'Leave')] : [] };
+  });
+  const previous = fake.answer;
+  fake.answer = (path, method) => (path === '/team-calendar' ? { month: 9, year: 2026, label: 'September 2026', days } : previous?.(path, method));
+  await fake.navigate('/team/calendar');
+  const today = page.getByTestId('calendar-today');
+  await expect(today).toBeVisible();
+  // nothing inside the box (date, counts) sticks out of it — "TODAY" used to hang over the next day
+  const spill = await today.evaluate(cell => {
+    const b = cell.getBoundingClientRect();
+    return [...cell.querySelectorAll('*')].filter(e => e.getBoundingClientRect().width > 0)
+      .map(e => e.getBoundingClientRect()).filter(r => r.left < b.left - 1 || r.right > b.right + 1).length;
+  });
+  expect(spill).toBe(0);
+  // on phones the count is shown with its colour; the word is hidden (it didn't fit)
+  await expect(today.getByTitle('2 In Office')).toBeVisible();
+  await expect(today.getByText('In Office')).toBeHidden();
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`"View full profile" in the directory is easy to read (${theme})`, async ({ page }) => {
     const fake = await signIn(page, theme);

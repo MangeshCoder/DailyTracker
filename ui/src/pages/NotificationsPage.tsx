@@ -92,10 +92,31 @@ function NotifRow({
     if (n.actionUrl) onNavigate(n.actionUrl);
   }
 
+  const actions = (
+    <div className="flex items-center gap-1">
+      {!n.isRead && (
+        <button
+          onClick={e => { e.stopPropagation(); onMarkRead(n.id); }}
+          title="Mark as read"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+        >
+          <MailOpen className="w-4 h-4" />
+        </button>
+      )}
+      <button
+        onClick={e => { e.stopPropagation(); onDelete(n.id); }}
+        title="Delete notification"
+        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div
       onClick={handleClick}
-      className={`group relative flex items-start gap-4 px-5 py-4 cursor-pointer transition-colors ${
+      className={`group relative flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-4 cursor-pointer transition-colors ${
         n.isRead
           ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
           : 'bg-blue-50/60 dark:bg-blue-500/5 hover:bg-blue-50 dark:hover:bg-blue-500/10'
@@ -105,8 +126,8 @@ function NotifRow({
       {!n.isRead && <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-blue-500" />}
 
       {/* Type icon */}
-      <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center border ${meta.iconBox}`}>
-        <Icon className="w-5 h-5" />
+      <div className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border ${meta.iconBox}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
 
       {/* Content */}
@@ -133,32 +154,17 @@ function NotifRow({
             {meta.label}
           </span>
           {n.actionUrl && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 whitespace-nowrap">
               View details <ArrowRight className="w-3 h-3" />
             </span>
           )}
+          {/* phones: the buttons sit on this row so the message gets the full width */}
+          <div className="sm:hidden ml-auto">{actions}</div>
         </div>
       </div>
 
-      {/* Actions — always visible on mobile, on hover for larger screens */}
-      <div className="shrink-0 flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        {!n.isRead && (
-          <button
-            onClick={e => { e.stopPropagation(); onMarkRead(n.id); }}
-            title="Mark as read"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-          >
-            <MailOpen className="w-4 h-4" />
-          </button>
-        )}
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(n.id); }}
-          title="Delete notification"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+      {/* Actions — on hover for larger screens */}
+      <div className="hidden sm:block shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">{actions}</div>
     </div>
   );
 }

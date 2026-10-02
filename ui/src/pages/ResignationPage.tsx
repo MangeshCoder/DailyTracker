@@ -942,13 +942,13 @@ function ManagerResignationView() {
       )}
 
       {/* Filter Tabs */}
-      <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-800 w-fit text-xs">
+      <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-800 w-fit max-w-full overflow-x-auto text-xs">
         {statuses.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setStatusFilter(s)}
-            className={`px-3.5 py-1.5 rounded-xl font-semibold transition cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
               statusFilter === s
                 ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'

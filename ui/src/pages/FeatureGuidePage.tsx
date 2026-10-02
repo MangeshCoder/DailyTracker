@@ -230,8 +230,8 @@ export const FeatureGuidePage: React.FC = () => {
               }`}
             >
               <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
+                <div className="flex flex-wrap-reverse items-start justify-between gap-2 sm:gap-3">
+                  <div className="space-y-1 min-w-0">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
                       isDark
                         ? 'bg-blue-950/60 text-blue-400 border-blue-800'

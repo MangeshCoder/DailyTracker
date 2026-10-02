@@ -89,16 +89,29 @@ export const StatCard: React.FC<StatCardProps> = ({
         className={`absolute -top-12 -right-12 w-28 h-28 bg-gradient-to-br ${scheme.glow} rounded-full blur-xl pointer-events-none opacity-50`}
       />
 
-      <div className="relative z-10 flex items-start justify-between gap-2 sm:gap-3">
-        <div className="space-y-1.5 flex-1 min-w-0">
-          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide sm:tracking-wider leading-snug text-slate-500 dark:text-slate-400 break-words sm:truncate">
+      <div className="relative z-10 sm:flex sm:items-start sm:justify-between sm:gap-3">
+        {Icon && (
+          // phones: the icon floats top-right and the words flow around it, so long labels
+          // ("PRODUCTIVITY", "ASSESSMENTS") are never split in the middle of a word
+          <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl ${compact ? 'hidden sm:flex' : 'flex'} float-right ml-2 mb-1 sm:float-none sm:ml-0 sm:mb-0 sm:order-last items-center justify-center flex-shrink-0 transition-transform ${scheme.iconBg}`}>
+            {React.isValidElement(Icon) ? (
+              Icon
+            ) : typeof Icon === 'string' ? (
+              <span className="text-xl">{Icon}</span>
+            ) : (
+              React.createElement(Icon as React.ComponentType<{ className?: string }>, { className: 'w-4 h-4 sm:w-5 sm:h-5' })
+            )}
+          </div>
+        )}
+        <div className="space-y-1.5 sm:flex-1 sm:min-w-0">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide sm:tracking-wider leading-snug text-slate-500 dark:text-slate-400 hyphens-auto sm:truncate">
             {title}
           </p>
 
           {loading ? (
             <div className="h-8 w-20 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg mt-1" />
           ) : (
-            <h3 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white break-words">
+            <h3 className="text-xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               {value}
             </h3>
           )}
@@ -133,18 +146,6 @@ export const StatCard: React.FC<StatCardProps> = ({
             </div>
           )}
         </div>
-
-          {Icon && (
-            <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${compact ? 'hidden sm:flex' : 'flex'} items-center justify-center flex-shrink-0 transition-transform ${scheme.iconBg}`}>
-              {React.isValidElement(Icon) ? (
-                Icon
-              ) : typeof Icon === 'string' ? (
-                <span className="text-xl">{Icon}</span>
-              ) : (
-                React.createElement(Icon as React.ComponentType<{ className?: string }>, { className: 'w-5 h-5' })
-              )}
-            </div>
-          )}
       </div>
     </div>
   );

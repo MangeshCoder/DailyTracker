@@ -44,22 +44,26 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <div className={`relative mb-6 sm:mb-8 pb-5 border-b border-slate-200 dark:border-slate-800/80 ${className}`}>
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium">
-          {breadcrumbs.map((item, idx) => (
-            <React.Fragment key={idx}>
-              {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-600 flex-shrink-0" />}
-              {item.href ? (
-                <Link
-                  to={item.href}
-                  className="hover:text-blue-600 dark:hover:text-blue-400 transition"
-                >
-                  {item.label}
-                </Link>
-              ) : (
-                <span className="text-slate-800 dark:text-slate-200 font-semibold">{item.label}</span>
-              )}
-            </React.Fragment>
-          ))}
+        <nav className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-2 font-medium min-w-0">
+          {breadcrumbs.map((item, idx) => {
+            // phones show only the last two steps, each on one line
+            const phoneHidden = idx < breadcrumbs.length - 2 ? 'hidden sm:contents' : 'contents';
+            return (
+              <span key={idx} className={phoneHidden}>
+                {idx > 0 && <ChevronRight className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-600 flex-shrink-0 ${idx === breadcrumbs.length - 2 ? 'hidden sm:block' : ''}`} />}
+                {item.href ? (
+                  <Link
+                    to={item.href}
+                    className="hover:text-blue-600 dark:hover:text-blue-400 transition whitespace-nowrap truncate"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span className={`text-slate-800 dark:text-slate-200 font-semibold whitespace-nowrap truncate ${idx === breadcrumbs.length - 1 ? 'min-w-0' : ''}`}>{item.label}</span>
+                )}
+              </span>
+            );
+          })}
         </nav>
       )}
 

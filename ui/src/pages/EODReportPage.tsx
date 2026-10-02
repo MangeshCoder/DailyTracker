@@ -237,7 +237,7 @@ export const EODReportPage: React.FC = () => {
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                       What did you accomplish today? <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-xs text-slate-400">{form.whatWasDone.length} / 500</span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap shrink-0">{form.whatWasDone.length} / 500</span>
                   </div>
                   <textarea
                     rows={4}

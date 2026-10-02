@@ -328,13 +328,13 @@ export const UserDetailPage = () => {
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
                 <CalendarDays className="w-3.5 h-3.5" /> Calendar Month
               </label>
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[8rem] sm:flex-none">
                   <Select value={month} onChange={e => setMonth(parseInt(e.target.value))} className={SELECT_CLS}>
                     {fullMonths.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                   </Select>
                 </div>
-                <div className="relative">
+                <div className="relative flex-1 min-w-[6rem] sm:flex-none">
                   <Select value={year} onChange={e => setYear(parseInt(e.target.value))} className={SELECT_CLS}>
                     {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                   </Select>

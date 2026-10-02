@@ -174,6 +174,7 @@ const TodayPanel: React.FC<{ today: CalendarDay | undefined }> = ({ today }) => 
     'Weekend',
     'Holiday',
     'Absent',
+    'Unknown',   // nobody checked in yet — was left out, so the panel looked empty
   ];
 
   return (
@@ -213,7 +214,7 @@ const TodayPanel: React.FC<{ today: CalendarDay | undefined }> = ({ today }) => 
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                   <span className={`text-xs font-semibold ${cfg.text}`}>
-                    {cfg.label}
+                    {status === 'Unknown' ? 'Not checked in yet' : cfg.label}
                   </span>
                 </div>
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
@@ -418,7 +419,7 @@ const DayCell: React.FC<{
   // Weekend cell with no activity
   if (isWeekend && !hasCheckins) {
     return (
-      <div className="bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl p-2 sm:p-2.5 min-h-[92px] sm:min-h-[105px] border border-dashed border-slate-200/60 dark:border-slate-800/60 flex flex-col justify-between">
+      <div className="bg-slate-50/50 dark:bg-slate-950/30 rounded-xl sm:rounded-2xl p-1.5 sm:p-2.5 min-h-[92px] sm:min-h-[105px] border border-dashed border-slate-200/60 dark:border-slate-800/60 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold">
             {dateNum}
@@ -438,7 +439,8 @@ const DayCell: React.FC<{
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl p-2 sm:p-2.5 min-h-[92px] sm:min-h-[105px] flex flex-col cursor-pointer transition-all duration-150 border select-none group shadow-sm ${
+      data-testid={day.isToday ? 'calendar-today' : undefined}
+      className={`rounded-xl sm:rounded-2xl p-1.5 sm:p-2.5 min-h-[92px] sm:min-h-[105px] flex flex-col cursor-pointer transition-all duration-150 border select-none group shadow-sm ${
         day.isToday
           ? 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-500/50 ring-2 ring-blue-500/20 shadow-blue-500/5'
           : isWeekend
@@ -453,7 +455,8 @@ const DayCell: React.FC<{
         <span
           className={`text-xs font-bold ${
             day.isToday
-              ? 'text-blue-600 dark:text-blue-400'
+              // phones: today is a filled circle (no room for a "Today" label in a 7-column grid)
+              ? 'text-white bg-blue-600 dark:bg-blue-500 rounded-full w-5 h-5 inline-flex items-center justify-center sm:w-auto sm:h-auto sm:bg-transparent sm:dark:bg-transparent sm:text-blue-600 sm:dark:text-blue-400'
               : isWeekend
               ? 'text-orange-600 dark:text-orange-400'
               : 'text-slate-800 dark:text-slate-200'
@@ -463,7 +466,7 @@ const DayCell: React.FC<{
         </span>
 
         {day.isToday && (
-          <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md">
+          <span className="hidden sm:inline text-[9px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md">
             Today
           </span>
         )}
@@ -484,11 +487,13 @@ const DayCell: React.FC<{
           return (
             <div
               key={s}
-              className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 border ${cfg.bg} ${cfg.border} text-[10px] font-semibold ${cfg.text} truncate transition group-hover:scale-[1.02]`}
+              title={`${n} ${cfg.label}`}
+              className={`flex items-center gap-1 rounded-md px-1 sm:px-1.5 py-0.5 border ${cfg.bg} ${cfg.border} text-[10px] font-semibold ${cfg.text} truncate transition group-hover:scale-[1.02]`}
             >
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+              {/* phones: just the colour and the number — the colour key sits above the grid */}
               <span className="truncate">
-                {n} {cfg.label}
+                {n}<span className="hidden sm:inline"> {cfg.label}</span>
               </span>
             </div>
           );
@@ -787,7 +792,7 @@ export const TeamCalendarPage: React.FC = () => {
           </div>
 
           {/* Weekday Column Headers */}
-          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, idx) => (
               <div
                 key={d}
@@ -804,7 +809,7 @@ export const TeamCalendarPage: React.FC = () => {
 
           {/* Calendar Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {[...Array(35)].map((_, i) => (
                 <div
                   key={i}
@@ -813,7 +818,7 @@ export const TeamCalendarPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {[...Array(leadingBlanks)].map((_, i) => (
                 <div
                   key={`blank-${i}`}
