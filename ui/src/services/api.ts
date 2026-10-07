@@ -162,7 +162,7 @@ export const aiChatApi = {
       };
     }>('/aichat/context-summary'),
       getEodDraft: () =>
-      api.get<{ success: boolean; draft?: any; message?: string }>("/aichat/eod-draft"),
+      api.get<{ success: boolean; draft?: any; message?: string; /** "ai" = written by Gemini, "template" = filled from the day's records */ source?: "ai" | "template" }>("/aichat/eod-draft"),
     
 };
 

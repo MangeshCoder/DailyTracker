@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -203,11 +204,13 @@ public sealed class ApiFactory : WebApplicationFactory<AppDbContext>
     public string ContentRoot { get; }
 
     private readonly Action<IServiceCollection>? _configureServices;
+    private readonly IDictionary<string, string?>? _settings;
 
     public ApiFactory(string? jwtKey = null, Action<string>? prepareContentRoot = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null, IDictionary<string, string?>? settings = null)
     {
         _configureServices = configureServices;
+        _settings = settings;
         ContentRoot = Paths.NewTempDir("api-tests");
         File.Copy(Path.Combine(Paths.ApiProject, "appsettings.json"), Path.Combine(ContentRoot, "appsettings.json"));
         prepareContentRoot?.Invoke(ContentRoot);
@@ -221,6 +224,8 @@ public sealed class ApiFactory : WebApplicationFactory<AppDbContext>
     {
         builder.UseEnvironment("Testing");   // not Development: no user secrets, no static-web-assets manifest
         builder.UseContentRoot(ContentRoot);
+        // per-test settings (e.g. a Gemini key), added last so they win over appsettings and environment
+        if (_settings != null) builder.ConfigureAppConfiguration(c => c.AddInMemoryCollection(_settings));
         builder.ConfigureServices(services =>
         {
             foreach (var d in services.Where(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>)

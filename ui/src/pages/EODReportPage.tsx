@@ -145,7 +145,10 @@ export const EODReportPage: React.FC = () => {
           learnings: res.data.draft.learnings || prev.learnings,
           moodRating: res.data.draft.moodRating || prev.moodRating,
         }));
-        toast.success('✨ Form populated with today’s activities & tasks!');
+        // a draft is only a starting point — the person reads and edits it before submitting
+        toast.success(res.data.source === 'ai'
+          ? '✨ Drafted with AI from today’s tasks — read it and edit before submitting.'
+          : 'Filled in from today’s tasks — edit it before submitting.');
       } else {
         toast.error(res.data.message || 'Could not generate draft. Please ensure you are checked in.');
       }
