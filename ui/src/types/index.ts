@@ -1118,3 +1118,30 @@ export interface RestoreResultDto {
   safetyBackupId: number;
   backupCreatedAt: string;     // UTC
 }
+
+// ─── AI team summary (Manager Dashboard) ─────────────────────────────────────
+export interface TeamSummaryPerson {
+  userId: number;
+  name: string;
+  role: string;
+  daysWorked: number;
+  workMinutes: number;
+  tasksCompleted: number;
+  tasksBlocked: number;
+  eodsSubmitted: number;
+  eodsMissing: number;
+  lastMood: string | null;
+}
+
+export interface TeamSummary {
+  /** "ai" = text written by Gemini, "template" = put together from the numbers */
+  source: 'ai' | 'template';
+  from: string;
+  to: string;
+  days: number;
+  overview: string;
+  highlights: string[];
+  blockers: string[];
+  needsAttention: string[];
+  people: TeamSummaryPerson[];
+}

@@ -351,5 +351,23 @@ namespace DailyTrackerAPI.Controllers.Communication
                 return StatusCode(500, new { success = false, message = "Failed to generate EOD draft." });
             }
         }
+
+        /// <summary>
+        /// AI summary of the caller's team for the last <paramref name="days"/> days (Manager: everyone,
+        /// team lead: their own people). The numbers are counted from the database; Gemini writes the text.
+        /// </summary>
+        [Authorize]
+        [HttpGet("team-summary")]
+        public async Task<IActionResult> GetTeamSummary([FromQuery] int days = 7)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { success = false, message = "Invalid user token." });
+
+            var summary = await _aiService.GenerateTeamSummaryAsync(userId, days);
+            return summary == null
+                ? StatusCode(403, new { message = "The team summary is for managers and team leads." })
+                : Ok(summary);
+        }
     }
 }

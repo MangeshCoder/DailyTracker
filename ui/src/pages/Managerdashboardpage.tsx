@@ -30,6 +30,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardContent } from '../components/ui/Card';
+import { TeamAiSummary } from '../components/TeamAiSummary';
 import {
   ClipboardList,
   BarChart3,
@@ -59,6 +60,7 @@ import {
   Mail,
   Info,
   CalendarRange,
+  Sparkles,
 } from 'lucide-react';
 import { localDate } from '../utils/date';
 import { Select } from '../components/ui/Select';
@@ -390,7 +392,7 @@ const AttendanceCalendar = ({ days }: { days: AttendanceDay[] }) => {
 
 // ─── Main Manager Dashboard Page ──────────────────────────────────────────────
 
-type Tab = 'daily' | 'monthly' | 'attendance' | 'User';
+type Tab = 'daily' | 'monthly' | 'attendance' | 'summary' | 'User';
 
 export const ManagerDashboardPage = () => {
   const [tab, setTab]                       = useState<Tab>('daily');
@@ -480,6 +482,7 @@ export const ManagerDashboardPage = () => {
     { key: 'daily',      label: 'Daily Activity',  icon: ClipboardList },
     { key: 'monthly',    label: 'Monthly Stats',   icon: BarChart3 },
     { key: 'attendance', label: 'Attendance',      icon: CalendarDays },
+    { key: 'summary',    label: 'AI Summary',      icon: Sparkles },
     // activating / deactivating people: Managers only
     ...(user?.role === 'Manager' ? [{ key: 'User' as Tab, label: 'User Management', icon: UserCog }] : []),
   ];
@@ -522,6 +525,9 @@ export const ManagerDashboardPage = () => {
           })}
         </div>
       </div>
+
+      {/* ─── AI SUMMARY TAB ────────────────────────────────────────────────── */}
+      {tab === 'summary' && <TeamAiSummary />}
 
       {/* ─── DAILY TAB ─────────────────────────────────────────────────────── */}
       {tab === 'daily' && (

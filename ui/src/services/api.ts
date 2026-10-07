@@ -13,6 +13,7 @@ import type {
   SubmitResignationDto,
   AppNotification,
   MonitoringSummary, ErrorLogPage, DatabaseBackupDto, RestoreResultDto,
+  TeamSummary,
 } from '../types';
 import type { ChatApiResponse, MessageHistory } from '../types/chat';
 
@@ -163,6 +164,9 @@ export const aiChatApi = {
     }>('/aichat/context-summary'),
       getEodDraft: () =>
       api.get<{ success: boolean; draft?: any; message?: string; /** "ai" = written by Gemini, "template" = filled from the day's records */ source?: "ai" | "template" }>("/aichat/eod-draft"),
+      /** Manager / team lead: AI summary of the team's last `days` days (numbers counted by the server) */
+      getTeamSummary: (days: number) =>
+      api.get<TeamSummary>("/aichat/team-summary", { params: { days } }),
     
 };
 

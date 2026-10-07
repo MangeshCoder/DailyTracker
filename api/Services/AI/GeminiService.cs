@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DailyTrackerAPI.Helpers;
+using DailyTrackerAPI.Services.Auth;
 
 namespace DailyTrackerAPI.Services.AI
 {
@@ -16,14 +17,17 @@ namespace DailyTrackerAPI.Services.AI
         Task<ChatResponse> GetChatResponseAsync(string userMessage, List<MessageHistory> history, int userId);
         Task<object> GetUserContextSummaryAsync(int userId);
         Task<object> GenerateEodDraftAsync(int userId);
+        /// <summary>The team's last <paramref name="days"/> days for a manager / team lead; null when they manage nobody</summary>
+        Task<TeamSummaryResult?> GenerateTeamSummaryAsync(int actorId, int days);
     }
 
-    public class GeminiService : IAiService
+    public partial class GeminiService : IAiService
     {
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
         private readonly AppDbContext _db;
         private readonly ILogger<GeminiService> _logger;
+        private readonly ITeamScope _teamScope;
         private const string DefaultModel = "gemini-2.0-flash";
         private string Model => _configuration["Gemini:Model"] is { Length: > 0 } m ? m : DefaultModel;
 
@@ -31,8 +35,10 @@ namespace DailyTrackerAPI.Services.AI
             HttpClient httpClient,
             IConfiguration configuration,
             AppDbContext db,
-            ILogger<GeminiService> logger)
+            ILogger<GeminiService> logger,
+            ITeamScope teamScope)
         {
+            _teamScope = teamScope;
             _httpClient = httpClient;
             _configuration = configuration;
             _db = db;
@@ -205,9 +211,6 @@ namespace DailyTrackerAPI.Services.AI
         /// <summary>Asks Gemini for the four EOD fields as JSON. Null when there is no key or the answer can't be used.</summary>
         private async Task<EodDraftText?> TryWriteEodWithAiAsync(string facts)
         {
-            var apiKey = _configuration["Gemini:ApiKey"] ?? _configuration["GeminiApiKey"];
-            if (string.IsNullOrWhiteSpace(apiKey)) return null;
-
             const string instructions = """
                 You write a short End-of-Day work report for an employee of an Indian software company, in the first person ("I ...").
                 Use ONLY the facts between <records> and </records>. Never invent tasks, numbers, people or outcomes.
@@ -221,27 +224,50 @@ namespace DailyTrackerAPI.Services.AI
                 Keep it professional and simple, without filler.
                 """;
 
+            var schema = new
+            {
+                type = "OBJECT",
+                properties = new
+                {
+                    whatWasDone = new { type = "STRING" },
+                    blockers = new { type = "STRING" },
+                    planForTomorrow = new { type = "STRING" },
+                    learnings = new { type = "STRING" },
+                },
+                required = new[] { "whatWasDone", "blockers", "planForTomorrow", "learnings" },
+            };
+            if (await AskGeminiForJsonAsync("EOD draft", instructions, facts, schema, 1024) is not { } draft) return null;
+
+            string Field(string name) =>
+                draft.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()!.Trim() : "";
+            var whatWasDone = Field("whatWasDone");
+            if (whatWasDone.Length == 0) return null;   // the one field the report can't do without
+            return new EodDraftText(
+                Cap(whatWasDone, EodWhatWasDoneMax),
+                Cap(Field("blockers"), EodOtherFieldMax),
+                Cap(Field("planForTomorrow"), EodOtherFieldMax),
+                Cap(Field("learnings"), EodOtherFieldMax));
+        }
+
+        /// <summary>
+        /// One Gemini call that must answer with JSON matching <paramref name="schema"/>; <paramref name="records"/> is
+        /// wrapped in &lt;records&gt; tags. Null when there is no key, Gemini fails or is slow, or the answer isn't JSON.
+        /// </summary>
+        private async Task<JsonElement?> AskGeminiForJsonAsync(string purpose, string instructions, string records, object schema, int maxOutputTokens)
+        {
+            var apiKey = _configuration["Gemini:ApiKey"] ?? _configuration["GeminiApiKey"];
+            if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
             var body = new
             {
                 system_instruction = new { parts = new[] { new { text = instructions } } },
-                contents = new[] { new { role = "user", parts = new[] { new { text = $"<records>\n{facts}</records>" } } } },
+                contents = new[] { new { role = "user", parts = new[] { new { text = $"<records>\n{records}</records>" } } } },
                 generationConfig = new
                 {
                     temperature = 0.3,
-                    maxOutputTokens = 1024,
+                    maxOutputTokens,
                     responseMimeType = "application/json",
-                    responseSchema = new
-                    {
-                        type = "OBJECT",
-                        properties = new
-                        {
-                            whatWasDone = new { type = "STRING" },
-                            blockers = new { type = "STRING" },
-                            planForTomorrow = new { type = "STRING" },
-                            learnings = new { type = "STRING" },
-                        },
-                        required = new[] { "whatWasDone", "blockers", "planForTomorrow", "learnings" },
-                    },
+                    responseSchema = schema,
                 },
             };
 
@@ -259,28 +285,19 @@ namespace DailyTrackerAPI.Services.AI
                 var text = await response.Content.ReadAsStringAsync(timeout.Token);
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Gemini EOD draft failed ({StatusCode}); using the template", response.StatusCode);
+                    _logger.LogWarning("Gemini {Purpose} failed ({StatusCode}); using the template", purpose, response.StatusCode);
                     return null;
                 }
 
                 using var doc = JsonDocument.Parse(text);
                 var answer = doc.RootElement.GetProperty("candidates")[0].GetProperty("content")
                                 .GetProperty("parts")[0].GetProperty("text").GetString();
-                using var draft = JsonDocument.Parse(answer ?? "");
-                string Field(string name) =>
-                    draft.RootElement.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()!.Trim() : "";
-
-                var whatWasDone = Field("whatWasDone");
-                if (whatWasDone.Length == 0) return null;   // the one field the report can't do without
-                return new EodDraftText(
-                    Cap(whatWasDone, EodWhatWasDoneMax),
-                    Cap(Field("blockers"), EodOtherFieldMax),
-                    Cap(Field("planForTomorrow"), EodOtherFieldMax),
-                    Cap(Field("learnings"), EodOtherFieldMax));
+                using var json = JsonDocument.Parse(answer ?? "");
+                return json.RootElement.ValueKind == JsonValueKind.Object ? json.RootElement.Clone() : null;
             }
             catch (Exception ex)   // timeout, network, unexpected JSON
             {
-                _logger.LogWarning(ex, "Gemini EOD draft could not be used; using the template");
+                _logger.LogWarning(ex, "Gemini {Purpose} could not be used; using the template", purpose);
                 return null;
             }
         }
