@@ -103,8 +103,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Ubuntu's package mirror sometimes stalls with no output; give up on a stalled
+      # download fast and try again instead of hanging until the job is cancelled.
       - name: Install browser for chat tests
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+            | sudo tee /etc/apt/apt.conf.d/99ci-timeouts > /dev/null
+          npx playwright install chromium
+          for attempt in 1 2; do
+            timeout 240 npx playwright install-deps chromium && exit 0
+            echo "::warning::Installing browser system packages stalled or failed (attempt $attempt of 2)"
+            sleep 10
+          done
+          exit 1
 
       - name: Chat tests (real browser, fake backend)
         run: npx playwright test
