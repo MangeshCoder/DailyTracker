@@ -347,7 +347,8 @@ namespace DailyTrackerAPI.Services.Team
                     Email = u.Email,
                     Role = u.Role,
                     IsActive = u.IsActive,
-                    FaceRegistered = u.FaceRegistered
+                    FaceRegistered = u.FaceRegistered,
+                    ManagerId = u.ManagerId
                 })
                 .ToListAsync();
         }

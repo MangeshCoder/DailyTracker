@@ -35,6 +35,8 @@ namespace DailyTrackerAPI.DTOs
         public string? Designation { get; set; }
         public string? ProfilePhotoUrl { get; set; }
         public bool FaceRegistered { get; set; }
+        /// <summary>Who this person reports to (null = nobody / a Manager)</summary>
+        public int? ManagerId { get; set; }
         /// <summary>Colour design picked in the account menu (sent on sign-in; null = default)</summary>
         public string? UiDesign { get; set; }
     }
@@ -1137,6 +1139,9 @@ namespace DailyTrackerAPI.DTOs
         public string Role { get; set; } = string.Empty;
         public int? ManagerId { get; set; }
     }
+
+    /// <summary>Change who an approved person reports to (their Team Lead or Manager)</summary>
+    public class SetReportsToDto { public int ManagerId { get; set; } }
 
     public class EditMessageDto { public string Content { get; set; } = ""; }
     public class ReactDto { public string Emoji { get; set; } = ""; }

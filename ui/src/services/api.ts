@@ -134,7 +134,10 @@ export const authApi = {
     api.post('/auth/reset-password', data),
   me: () => api.get('/auth/me').then(r => r.data),
   getPendingUsers: () => api.get('/auth/pending-users'),
-  assignRole: (d: { userId: number; role: string }) => api.post('/auth/assign-role', d),
+  /** managerId = the Team Lead / Manager they report to (default: you) */
+  assignRole: (d: { userId: number; role: string; managerId?: number }) => api.post('/auth/assign-role', d),
+  setReportsTo: (userId: number, managerId: number) =>
+    api.put<{ userId: number; managerId: number; managerName: string }>(`/auth/users/${userId}/reports-to`, { managerId }),
 };
 
 // ─── AI Chat ──────────────────────────────────────────────────────────────────

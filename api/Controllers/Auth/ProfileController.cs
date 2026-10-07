@@ -166,7 +166,8 @@ namespace DailyTrackerAPI.Controllers.Auth
         // ── Uses UpdateEmployeeProfileDto (added to AllDtos in this feature) ──
         [HttpPut("{userId:int}/admin"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> AdminUpdateProfile(
-            int userId, [FromBody] UpdateEmployeeProfileDto dto)
+            int userId, [FromBody] UpdateEmployeeProfileDto dto,
+            [FromServices] DailyTrackerAPI.Services.Auth.ITeamScope teamScope)
         {
             var user = await _db.Users
                 .Include(u => u.Manager)
@@ -180,8 +181,8 @@ namespace DailyTrackerAPI.Controllers.Auth
 
             if (dto.ManagerId.HasValue)
             {
-                if (dto.ManagerId.Value == userId)
-                    return BadRequest(new { message = "A user cannot be their own manager." });
+                if (await teamScope.ReportsToProblemAsync(userId, dto.ManagerId.Value) is { } problem)
+                    return BadRequest(new { message = problem });
                 user.ManagerId = dto.ManagerId.Value;
             }
 

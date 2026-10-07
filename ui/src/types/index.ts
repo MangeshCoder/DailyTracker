@@ -21,6 +21,8 @@ export interface ManagerUserDto {
   email: string;
   role: string;
   isActive: boolean;
+  /** who they report to (their Team Lead or Manager) */
+  managerId?: number | null;
 }
 export interface Setup2FAResponse { manualEntryKey: string; qrCodeBase64: string; message: string; }
 export interface RegisterDto { fullName: string; email: string; password: string; role: string; }

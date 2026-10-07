@@ -12,7 +12,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useMemo } from 'react';
-import { managerApi, downloadBlob } from '../services/api';
+import { managerApi, authApi, downloadBlob } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import type {
   ManagerTeamDaily,
   TeamMonthlyStats,
@@ -420,6 +421,23 @@ export const ManagerDashboardPage = () => {
       const res = await managerApi.getTeamDaily(selectedDate);
       setTeamDaily(res.data);
     } finally { setLoading(false); }
+  };
+
+  const { toast } = useToast();
+  // people can report to an active Manager or Team Lead
+  const leaders = useMemo(
+    () => users.filter(u => u.isActive && (u.role === 'Manager' || u.role === 'TeamLead')).sort((a, b) => a.fullName.localeCompare(b.fullName)),
+    [users],
+  );
+  const handleReportsTo = async (userId: number, managerId: number) => {
+    try {
+      const res = await authApi.setReportsTo(userId, managerId);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, managerId } : u));
+      const who = users.find(u => u.id === userId)?.fullName ?? 'They';
+      toast.success(`${who} now reports to ${res.data.managerName}`);
+    } catch (err: any) {
+      await alert(err.response?.data?.message || 'Could not change who they report to', 'error');
+    }
   };
 
   const handleToggleUser = async (userId: number) => {
@@ -866,6 +884,23 @@ export const ManagerDashboardPage = () => {
                       </span>
                     </div>
                   </div>
+                  {/* who their leave, WFH and EOD reports go to (Managers don't report to anyone) */}
+                  {user.role !== 'Manager' && user.isActive && (
+                    <label className="block mt-3">
+                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Reports to</span>
+                      <Select
+                        aria-label={`${user.fullName} reports to`}
+                        value={user.managerId ?? ''}
+                        onChange={e => handleReportsTo(user.id, Number(e.target.value))}
+                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-3 py-2 text-sm"
+                      >
+                        {!user.managerId && <option value="">Nobody yet</option>}
+                        {leaders.filter(l => l.id !== user.id).map(l => (
+                          <option key={l.id} value={l.id}>{l.fullName} · {l.role === 'TeamLead' ? 'Team Lead' : l.role}</option>
+                        ))}
+                      </Select>
+                    </label>
+                  )}
 
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${

@@ -11,7 +11,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react';
-import { authApi } from '../services/api';
+import { authApi, managerApi } from '../services/api';
+import { useAuth } from '../context/Authcontext';
+import { Select } from '../components/ui/Select';
 import { useToast } from '../context/ToastContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
@@ -35,6 +37,9 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Types
 // ─────────────────────────────────────────────────────────────────────────────
+/** someone a new person can report to: an active Manager or Team Lead */
+interface Leader { id: number; fullName: string; role: string }
+
 interface PendingUser {
   id: number;
   fullName: string;
@@ -82,12 +87,18 @@ const ConfirmModal = ({
   loading,
   onConfirm,
   onCancel,
+  leaders,
+  reportsTo,
+  onReportsTo,
 }: {
   user: PendingUser;
   role: RoleOption;
   loading: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  leaders: Leader[];
+  reportsTo: number | null;
+  onReportsTo: (id: number) => void;
 }) => {
   const cfg = ROLE_CONFIG[role];
   const Icon = cfg.icon;
@@ -128,6 +139,26 @@ const ConfirmModal = ({
               {cfg.label}
             </span>
           </div>
+
+          {/* Developers and Team Leads report to someone: their leave, WFH and EOD go to that person */}
+          {role !== 'Manager' && leaders.length > 0 && (
+            <label className="block">
+              <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Reports to</span>
+              <Select
+                aria-label="Reports to"
+                value={reportsTo ?? ''}
+                onChange={(e) => onReportsTo(Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-3 py-2.5 text-sm"
+              >
+                {leaders.map((l) => (
+                  <option key={l.id} value={l.id}>{l.fullName} · {l.role === 'TeamLead' ? 'Team Lead' : l.role}</option>
+                ))}
+              </Select>
+              <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Their leave, WFH and EOD reports go to this person.
+              </span>
+            </label>
+          )}
 
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
             The user can sign in with this role right after you confirm.
@@ -185,6 +216,23 @@ export const AssignRole = () => {
 
   const [modal, setModal] = useState<{ user: PendingUser; role: RoleOption } | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
+  const { user: me } = useAuth();
+  const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [reportsTo, setReportsTo] = useState<number | null>(null);
+
+  // who new people can report to: active Managers and Team Leads (you first)
+  useEffect(() => {
+    managerApi.getAllUsers()
+      .then((res) => setLeaders((res.data as (Leader & { isActive: boolean })[])
+        .filter((u) => u.isActive && (u.role === 'Manager' || u.role === 'TeamLead'))
+        .sort((a, b) => (a.id === me?.id ? -1 : b.id === me?.id ? 1 : a.fullName.localeCompare(b.fullName)))))
+      .catch(() => setLeaders([]));   // the role can still be given; they report to you
+  }, [me?.id]);
+
+  const openModal = (user: PendingUser, role: RoleOption) => {
+    setReportsTo(me?.id ?? null);
+    setModal({ user, role });
+  };
 
   // ── Fetch pending users ────────────────────────────────────────────────────
   const loadUsers = async () => {
@@ -209,9 +257,11 @@ export const AssignRole = () => {
     if (!modal) return;
     setAssignLoading(true);
     try {
-      await authApi.assignRole({ userId: modal.user.id, role: modal.role });
+      const managerId = modal.role !== 'Manager' && reportsTo ? reportsTo : undefined;
+      await authApi.assignRole({ userId: modal.user.id, role: modal.role, managerId });
       setUsers((prev) => prev.filter((u) => u.id !== modal.user.id));
-      toast.success(`${ROLE_CONFIG[modal.role].label} role assigned to ${modal.user.fullName}`);
+      const lead = leaders.find((l) => l.id === managerId);
+      toast.success(`${ROLE_CONFIG[modal.role].label} role assigned to ${modal.user.fullName}` + (lead ? ` — reports to ${lead.fullName}` : ''));
       setModal(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to assign role. Try again.');
@@ -232,6 +282,9 @@ export const AssignRole = () => {
           loading={assignLoading}
           onConfirm={handleConfirm}
           onCancel={() => !assignLoading && setModal(null)}
+          leaders={leaders}
+          reportsTo={reportsTo}
+          onReportsTo={setReportsTo}
         />
       )}
 
@@ -364,7 +417,7 @@ export const AssignRole = () => {
                       return (
                         <button
                           key={role}
-                          onClick={() => setModal({ user, role })}
+                          onClick={() => openModal(user, role)}
                           className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition active:scale-95 ${cfg.chip}`}
                         >
                           <Icon className="w-3.5 h-3.5" />

@@ -418,7 +418,8 @@ namespace DailyTrackerAPI.Controllers.Auth
         [Authorize(Roles = "Manager")]
         [HttpPost("assign-role")]
         public async Task<IActionResult> AssignRole(AssignRoleDto dto,
-            [FromServices] DailyTrackerAPI.Services.HR.IOnboardingService onboarding)
+            [FromServices] DailyTrackerAPI.Services.HR.IOnboardingService onboarding,
+            [FromServices] DailyTrackerAPI.Services.Auth.ITeamScope teamScope)
         {
             var user = await _db.Users.FindAsync(dto.UserId);
             if (user == null)
@@ -433,6 +434,7 @@ namespace DailyTrackerAPI.Controllers.Auth
                 && !await _db.Users.AnyAsync(u => u.Role == "Manager" && u.IsActive && u.Id != user.Id))
                 return BadRequest(new { message = "This is the only manager — make someone else a manager first." });
 
+            var wasTeamLead = user.Role == "TeamLead";
             if (dto.Role == "Manager")
             {
                 user.Role = "Manager";
@@ -440,13 +442,22 @@ namespace DailyTrackerAPI.Controllers.Auth
             }
             else if (dto.Role == "Developer" || dto.Role == "TeamLead")
             {
+                // reports to the chosen Team Lead / Manager; the approving manager when none is picked
+                var reportsTo = dto.ManagerId ?? currentManagerId;
+                if (await teamScope.ReportsToProblemAsync(user.Id, reportsTo) is { } problem)
+                    return BadRequest(new { message = problem });
                 user.Role = dto.Role;
-                user.ManagerId = currentManagerId;
+                user.ManagerId = reportsTo;
             }
             else
             {
                 return BadRequest("Invalid role.");
             }
+
+            // a Team Lead who becomes a Developer no longer leads anyone: their people move up to the next lead
+            if (wasTeamLead && user.Role == "Developer")
+                foreach (var report in await _db.Users.Where(u => u.ManagerId == user.Id).ToListAsync())
+                    report.ManagerId = user.ManagerId;
 
             await _db.SaveChangesAsync();
 
@@ -454,6 +465,24 @@ namespace DailyTrackerAPI.Controllers.Auth
             if (isNewJoiner) await onboarding.StartForNewJoinerAsync(currentManagerId, user.Id);
 
             return Ok("Role assigned successfully");
+        }
+
+        /// <summary>Change who an approved person reports to — their Team Lead or a Manager (Managers only)</summary>
+        [Authorize(Roles = "Manager")]
+        [HttpPut("users/{userId:int}/reports-to")]
+        public async Task<IActionResult> SetReportsTo(int userId, [FromBody] SetReportsToDto dto,
+            [FromServices] DailyTrackerAPI.Services.Auth.ITeamScope teamScope)
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null || user.Role == "Pending") return NotFound(new { message = "User not found." });
+            if (user.Role == "Manager") return BadRequest(new { message = "Managers don't report to anyone here." });
+            if (await teamScope.ReportsToProblemAsync(userId, dto.ManagerId) is { } problem)
+                return BadRequest(new { message = problem });
+
+            user.ManagerId = dto.ManagerId;
+            await _db.SaveChangesAsync();
+            var name = await _db.Users.Where(u => u.Id == dto.ManagerId).Select(u => u.FullName).FirstAsync();
+            return Ok(new { userId, managerId = dto.ManagerId, managerName = name });
         }
 
         [Authorize(Roles = "Manager")]

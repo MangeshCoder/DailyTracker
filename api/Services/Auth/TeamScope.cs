@@ -38,6 +38,10 @@ namespace DailyTrackerAPI.Services.Auth
 
         /// <summary>Who decides for this person today, if they handed over (null = they're not away)</summary>
         Task<int?> DelegateOfAsync(int userId);
+
+        /// <summary>Why <paramref name="userId"/> can't report to <paramref name="managerId"/> (null = fine):
+        /// it must be an active Manager or Team Lead, not themselves, and not someone who already reports to them</summary>
+        Task<string?> ReportsToProblemAsync(int userId, int managerId);
     }
 
     public class TeamScope : ITeamScope
@@ -127,6 +131,23 @@ namespace DailyTrackerAPI.Services.Auth
 
         public async Task<bool> ActsForManagerAsync(int actorId) =>
             await ActiveToday().AnyAsync(d => d.ToUserId == actorId && d.From.Role == "Manager" && d.From.IsActive);
+
+        public async Task<string?> ReportsToProblemAsync(int userId, int managerId)
+        {
+            if (managerId == userId) return "Someone can't report to themselves.";
+            var boss = await _db.Users.AsNoTracking().Where(u => u.Id == managerId)
+                .Select(u => new { u.IsActive, u.Role, u.ManagerId }).FirstOrDefaultAsync();
+            if (boss == null || !boss.IsActive) return "That person isn't an active user.";
+            if (boss.Role != "Manager" && boss.Role != "TeamLead") return "People can only report to a Manager or a Team Lead.";
+            // no loops: walk up from the new boss; we must not reach the person themselves
+            var next = boss.ManagerId;
+            for (var hops = 0; next != null && hops < 50; hops++)
+            {
+                if (next == userId) return "That would make a loop — this person already manages them.";
+                next = await _db.Users.AsNoTracking().Where(u => u.Id == next).Select(u => u.ManagerId).FirstOrDefaultAsync();
+            }
+            return null;
+        }
 
         public async Task<int?> DelegateOfAsync(int userId) =>
             await ActiveToday().Where(d => d.FromUserId == userId).OrderBy(d => d.Id).Select(d => (int?)d.ToUserId).FirstOrDefaultAsync();
