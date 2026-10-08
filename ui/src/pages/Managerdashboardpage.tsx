@@ -32,6 +32,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardContent } from '../components/ui/Card';
 import { TeamAiSummary } from '../components/TeamAiSummary';
+import { TeamCheckup } from '../components/TeamCheckup';
 import {
   ClipboardList,
   BarChart3,
@@ -828,6 +829,8 @@ export const ManagerDashboardPage = () => {
             <StatCard title="Active"      value={activeUsers}                 icon={UserCheck} color="emerald" loading={loadingUsers} />
             <StatCard title="Inactive"    value={users.length - activeUsers}  icon={UserX}     color="rose"    loading={loadingUsers} />
           </div>
+
+          {!loadingUsers && users.length > 0 && <TeamCheckup users={users} leaders={leaders} onReportsTo={handleReportsTo} />}
 
           <Card>
             <CardContent className="!py-4">
