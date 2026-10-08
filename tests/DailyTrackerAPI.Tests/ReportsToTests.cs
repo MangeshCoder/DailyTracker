@@ -129,4 +129,32 @@ public class ReportsToTests : IDisposable
         Assert.Equal(1, ManagerOf(5));
         Assert.Equal(1, ManagerOf(2));
     }
+
+    private static DateTime NextWeekday(int daysAhead)
+    {
+        var d = AppClock.TodayIst.AddDays(daysAhead);
+        while (d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) d = d.AddDays(1);
+        return d;
+    }
+
+    [Fact]
+    public async Task The_manager_still_sees_people_who_report_to_a_team_lead_in_the_attendance_hub()
+    {
+        var day = NextWeekday(3).ToString("yyyy-MM-dd");
+        var r = await _ravi.PostAsJsonAsync("/api/wfh-requests", new { requestType = "WFH", requestDate = day, reason = "Plumber visit" });
+        Assert.True(r.IsSuccessStatusCode, await r.Content.ReadAsStringAsync());
+
+        // pending WFH: Ravi reports to Tina, yet the manager can decide it
+        var pending = JsonDocument.Parse(await _mangesh.GetStringAsync("/api/wfh-requests/pending")).RootElement;
+        Assert.Contains(pending.EnumerateArray(), x => x.GetProperty("userId").GetInt32() == 4);
+
+        static HashSet<int> Members(JsonElement e) =>
+            e.GetProperty("members").EnumerateArray().Select(m => m.GetProperty("userId").GetInt32()).ToHashSet();
+        // today's presence: the manager sees everyone (not sign-ups or nobody else), Tina sees her own people
+        var all = Members(JsonDocument.Parse(await _mangesh.GetStringAsync("/api/wfh-requests/team-status")).RootElement);
+        Assert.Subset(all, new HashSet<int> { 1, 2, 4, 5, 7 });
+        Assert.DoesNotContain(3, all);
+        var tinas = Members(JsonDocument.Parse(await _tina.GetStringAsync("/api/wfh-requests/team-status")).RootElement);
+        Assert.Equal(new HashSet<int> { 2, 4, 5 }, tinas);
+    }
 }
