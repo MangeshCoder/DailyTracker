@@ -329,8 +329,9 @@ namespace DailyTrackerAPI.Services.Attendance
             var targetDate = (date ?? AppClock.TodayIst).Date;
             var teamUserIds = await GetTeamUserIds(managerId);
 
+            // people who have left (switched off) aren't "not checked in"
             var teamUsers = await _db.Users
-                .Where(u => teamUserIds.Contains(u.Id))
+                .Where(u => teamUserIds.Contains(u.Id) && u.IsActive)
                 .ToListAsync();
 
             // Fetch all DailyLogs for this date
@@ -459,8 +460,10 @@ namespace DailyTrackerAPI.Services.Attendance
                     && r.Status == "Approved")
                 .ToListAsync();
 
+            // people who have left only appear in months they worked
+            var workedIds = dailyLogs.Select(d => d.UserId).Distinct().ToList();
             var teamUsers = await _db.Users
-                .Where(u => teamUserIds.Contains(u.Id))
+                .Where(u => teamUserIds.Contains(u.Id) && (u.IsActive || workedIds.Contains(u.Id)))
                 .ToListAsync();
 
             // Approved leave in this month (working days only) — not "absent"

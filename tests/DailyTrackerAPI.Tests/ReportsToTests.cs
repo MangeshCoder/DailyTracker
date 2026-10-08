@@ -152,9 +152,36 @@ public class ReportsToTests : IDisposable
             e.GetProperty("members").EnumerateArray().Select(m => m.GetProperty("userId").GetInt32()).ToHashSet();
         // today's presence: the manager sees everyone (not sign-ups or nobody else), Tina sees her own people
         var all = Members(JsonDocument.Parse(await _mangesh.GetStringAsync("/api/wfh-requests/team-status")).RootElement);
-        Assert.Subset(all, new HashSet<int> { 1, 2, 4, 5, 7 });
-        Assert.DoesNotContain(3, all);
+        Assert.Equal(new HashSet<int> { 1, 2, 4, 5, 7 }, all);    // not the sign-up (3) or Old, who has left (6)
         var tinas = Members(JsonDocument.Parse(await _tina.GetStringAsync("/api/wfh-requests/team-status")).RootElement);
         Assert.Equal(new HashSet<int> { 2, 4, 5 }, tinas);
+
+        // the monthly matrix: everyone still here; Old (left, no days this month) isn't listed
+        var month = AppClock.TodayIst;
+        var monthly = JsonDocument.Parse(await _mangesh.GetStringAsync($"/api/wfh-requests/team-monthly?month={month.Month}&year={month.Year}")).RootElement
+            .EnumerateArray().Select(m => m.GetProperty("userId").GetInt32()).ToHashSet();
+        Assert.Equal(new HashSet<int> { 1, 2, 4, 5, 7 }, monthly);
+    }
+
+    [Fact]
+    public async Task Someone_who_left_still_shows_in_the_months_they_worked()
+    {
+        var day = AppClock.TodayIst;
+        Db(db =>
+        {
+            db.DailyLogs.Add(new DailyTrackerAPI.Models.Tasks.DailyLog
+            {
+                UserId = 6, LogDate = day, DayStatus = "Present",
+                CheckInTime = day.AddHours(4), CheckOutTime = day.AddHours(12), TotalWorkMinutes = 420, CreatedAt = day.AddHours(4),
+            });
+            return db.SaveChanges();
+        });
+        var monthly = JsonDocument.Parse(await _mangesh.GetStringAsync($"/api/wfh-requests/team-monthly?month={day.Month}&year={day.Year}")).RootElement
+            .EnumerateArray().Select(m => m.GetProperty("userId").GetInt32()).ToHashSet();
+        Assert.Contains(6, monthly);
+        // …but not in today's presence: they can't check in any more
+        var today = JsonDocument.Parse(await _mangesh.GetStringAsync("/api/wfh-requests/team-status")).RootElement
+            .GetProperty("members").EnumerateArray().Select(m => m.GetProperty("userId").GetInt32());
+        Assert.DoesNotContain(6, today);
     }
 }
