@@ -284,9 +284,7 @@ namespace DailyTrackerAPI.Services.Attendance
         // ══════════════════════════════════════════════════════════════════════
         public async Task<List<WFHRequestDto>> GetPendingRequestsAsync(int managerId)
         {
-            var teamUserIds = await GetTeamUserIds(managerId);
-            foreach (var away in await _scope.ActingForAsync(managerId))   // covering for someone on leave
-                teamUserIds.AddRange((await GetTeamUserIds(away)).Where(id => id != away && id != managerId && !teamUserIds.Contains(id)));
+            var teamUserIds = await GetTeamUserIds(managerId);   // includes anyone covered for while they're away
 
             // Own requests only when nobody else can review them
             var manager = await _db.Users.FindAsync(managerId);
@@ -597,31 +595,25 @@ namespace DailyTrackerAPI.Services.Attendance
                 throw new UnauthorizedAccessException("You do not have permission to review this request.");
         }
 
+        /// <summary>
+        /// The people this manager / team lead sees here, plus themselves — the same team rule as every
+        /// other page (ITeamScope): a Manager sees everyone, a Team Lead their own people and anyone they
+        /// cover for while that person is away.
+        /// </summary>
         private async Task<List<int>> GetTeamUserIds(int managerId)
         {
             var managerUser = await _db.Users.FindAsync(managerId);
-            bool isManagerRole = managerUser?.Role is "Manager" or "TeamLead" or "Admin";
+            if (managerUser?.Role == "Admin")
+                return await _db.Users.Select(u => u.Id).ToListAsync();
+            if (managerUser?.Role is not ("Manager" or "TeamLead"))
+                return new List<int> { managerId };
 
-            if (isManagerRole)
-            {
-                // Get all direct reports
-                // Direct reports + self; Managers also cover people with no manager assigned
-                // (their requests are sent to every manager)
-                bool coversUnassigned = managerUser!.Role == "Manager";
-                var teamIds = await _db.Users
-                    .Where(u => u.ManagerId == managerId || u.Id == managerId
-                        || (coversUnassigned && u.ManagerId == null && u.Role != "Pending"))
-                    .Select(u => u.Id)
-                    .ToListAsync();
-
-                // If Admin, return all users
-                if (managerUser?.Role == "Admin")
-                    return await _db.Users.Select(u => u.Id).ToListAsync();
-
-                return teamIds;
-            }
-
-            return new List<int> { managerId };
+            var managed = await _scope.ManagedUserIdsAsync(managerId);
+            var teamIds = managed == null
+                ? await _db.Users.Where(u => u.Role != "Pending").Select(u => u.Id).ToListAsync()
+                : managed.ToList();
+            if (!teamIds.Contains(managerId)) teamIds.Add(managerId);
+            return teamIds;
         }
 
         private static string FormatHours(int minutes)
