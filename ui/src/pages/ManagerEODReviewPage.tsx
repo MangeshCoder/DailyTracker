@@ -77,7 +77,7 @@ export const ManagerEODReviewPage: React.FC = () => {
     mutationFn: (data: { reportId: number; comment: string }) =>
       eodApi.review(data.reportId, { managerComment: data.comment }),
     onSuccess: () => {
-      toast.success('EOD report successfully audited and feedback sent! 🎉');
+      toast.success('Feedback sent');
       setSelectedReport(null);
       setReviewComment('');
       qc.invalidateQueries({ queryKey: ['eodPending'] });
@@ -90,7 +90,7 @@ export const ManagerEODReviewPage: React.FC = () => {
   const handleReview = () => {
     if (!selectedReport) return;
     if (!reviewComment.trim()) {
-      toast.error('Please enter a feedback or review note');
+      toast.error('Please write your feedback first');
       return;
     }
     reviewMutation.mutate({
@@ -137,10 +137,10 @@ export const ManagerEODReviewPage: React.FC = () => {
               <ShieldAlert className="w-6 h-6" />
             </div>
             <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Supervisor Access Required
+              Managers only
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              This auditing interface is restricted to Department Managers and Team Leads to review team daily reports.
+              Only managers can review end-of-day reports.
             </p>
           </CardContent>
         </Card>
@@ -152,14 +152,13 @@ export const ManagerEODReviewPage: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* ── Page Header ── */}
       <PageHeader
-        title="Team EOD Report Review"
-        description="Audit daily employee submissions, evaluate achievements, unblock critical issues, and supply constructive feedback."
+        title="EOD Reviews"
+        description="Read your team's end-of-day reports, see who is stuck, and send feedback."
         breadcrumbs={[
           { label: 'Workspace', href: '/' },
           { label: 'Management' },
           { label: 'EOD Reviews' },
         ]}
-        badge={{ label: 'Supervisor Oversight Active', variant: 'purple' }}
         actions={
           <button
             type="button"
@@ -167,7 +166,7 @@ export const ManagerEODReviewPage: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-sm"
           >
             <Clock className="w-4 h-4 text-blue-500" />
-            <span>Refresh Queue</span>
+            <span>Refresh</span>
           </button>
         }
       />
@@ -177,28 +176,28 @@ export const ManagerEODReviewPage: React.FC = () => {
         <StatCard
           title="Total Reports"
           value={totalReports}
-          subtitle="Cumulative daily logs"
+          subtitle="Reports in the list"
           icon={ClipboardCheck}
           color="blue"
         />
         <StatCard
-          title="Awaiting Review"
+          title="Waiting for feedback"
           value={pendingCount}
-          subtitle="Requires supervisor sign-off"
+          subtitle="Not reviewed yet"
           icon={Clock}
           color="amber"
         />
         <StatCard
-          title="Audited Reports"
+          title="Reviewed"
           value={reviewedCount}
-          subtitle="Feedback provided"
+          subtitle="Feedback sent"
           icon={CheckCircle2}
           color="emerald"
         />
         <StatCard
-          title="Blockers Flagged"
+          title="With blockers"
           value={blockersCount}
-          subtitle="Submissions needing assistance"
+          subtitle="Someone is stuck"
           icon={AlertTriangle}
           color="rose"
         />
@@ -272,12 +271,12 @@ export const ManagerEODReviewPage: React.FC = () => {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {reports.length === 0 ? 'All Caught Up!' : 'No Matching Reports Found'}
+              {reports.length === 0 ? 'No EOD reports yet' : 'No reports match'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
               {reports.length === 0
-                ? 'Every submitted EOD report has been reviewed and acknowledged.'
-                : 'Try adjusting your search keywords or clearing active filters.'}
+                ? 'When your team sends end-of-day reports, they appear here.'
+                : 'Try a different search, or clear the filters.'}
             </p>
           </CardContent>
         </Card>
@@ -342,7 +341,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                   {/* Mood Badge */}
                   <div
                     className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border ${mood.bg} ${mood.text}`}
-                    title={`Self-Reported Mood: ${mood.label}`}
+                    title={`Mood: ${mood.label}`}
                   >
                     <span>{mood.emoji}</span>
                     <span>{mood.label}</span>
@@ -426,7 +425,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 space-y-1">
                       <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                         <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Manager Audit & Remarks:</span>
+                        <span>Feedback:</span>
                       </p>
                       <p className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 italic pl-5">
                         "{report.managerComment}"
@@ -440,7 +439,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                            Supervisor Feedback & Coaching Notes <span className="text-rose-500">*</span>
+                            Your feedback <span className="text-rose-500">*</span>
                           </label>
                           <span className="text-[11px] text-slate-400">
                             {reviewComment.length} / 500
@@ -449,7 +448,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                         <textarea
                           value={reviewComment}
                           onChange={(e) => setReviewComment(e.target.value)}
-                          placeholder="Provide constructive feedback, acknowledge task velocity, or offer guidance on blockers..."
+                          placeholder="What went well, and anything to change or ask for help with…"
                           rows={3}
                           maxLength={500}
                           className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-2xl px-4 py-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition"
@@ -459,7 +458,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                       {/* Quick Template Chips */}
                       <div>
                         <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5">
-                          Quick Presets:
+                          Quick replies:
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {QUICK_FEEDBACK_TEMPLATES.map((tmpl) => (
@@ -495,7 +494,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                         >
                           <Send className="w-3.5 h-3.5" />
                           <span>
-                            {reviewMutation.isPending ? 'Submitting Review...' : 'Submit Audit & Feedback'}
+                            {reviewMutation.isPending ? 'Sending…' : 'Send feedback'}
                           </span>
                         </button>
                       </div>
@@ -514,7 +513,7 @@ export const ManagerEODReviewPage: React.FC = () => {
                         className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition shadow-md shadow-blue-500/20 cursor-pointer"
                       >
                         <MessageSquare className="w-4 h-4" />
-                        <span>Audit & Provide Feedback</span>
+                        <span>Give feedback</span>
                       </button>
                     </div>
                   )}

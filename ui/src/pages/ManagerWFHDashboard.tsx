@@ -91,14 +91,13 @@ export const ManagerWFHDashboard: React.FC = () => {
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* ── Page Header ── */}
       <PageHeader
-        title="Manager Attendance & Requests Hub"
-        description="Monitor real-time team attendance and approve leave, WFH, half-days, comp-off, expenses, missed check-ins and check-out corrections in one place."
+        title="Employee Requests"
+        description="See who is in today, and decide your team's leave, WFH, half days, comp-off, expenses, missed check-ins and check-out corrections in one place."
         breadcrumbs={[
           { label: 'Workspace', href: '/' },
           { label: 'Management' },
-          { label: 'Attendance Hub' },
+          { label: 'Employee Requests' },
         ]}
-        badge={{ label: 'Live Supervisor Sync', variant: 'blue' }}
         actions={
           <button
             type="button"
@@ -106,7 +105,7 @@ export const ManagerWFHDashboard: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-sm"
           >
             <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
-            <span>Refresh Roster</span>
+            <span>Refresh</span>
           </button>
         }
       />
@@ -124,23 +123,23 @@ export const ManagerWFHDashboard: React.FC = () => {
           color="amber"
         />
         <StatCard
-          title="In-Office Today"
-          value={teamStatus ? `${teamStatus.presentCount} Members` : '...'}
-          subtitle="Checked in on site"
+          title="In the office today"
+          value={teamStatus ? teamStatus.presentCount : '...'}
+          subtitle="Checked in at the office"
           icon={Building2}
           color="emerald"
         />
         <StatCard
-          title="Remote / WFH"
-          value={teamStatus ? `${teamStatus.wfhCount} Members` : '...'}
-          subtitle="Approved telecommuting"
+          title="Working from home"
+          value={teamStatus ? teamStatus.wfhCount : '...'}
+          subtitle="Approved for today"
           icon={Home}
           color="blue"
         />
         <StatCard
-          title="Half-Day Passes"
-          value={teamStatus ? `${teamStatus.halfDayCount} Shifts` : '...'}
-          subtitle="Split shift allocations"
+          title="Half day"
+          value={teamStatus ? teamStatus.halfDayCount : '...'}
+          subtitle="Approved for today"
           icon={SunMedium}
           color="purple"
         />
@@ -187,10 +186,7 @@ export const ManagerWFHDashboard: React.FC = () => {
             <PendingCorrectionsPanel />
             <PendingCompOffPanel />
             <PendingExpensesPanel />
-            <section aria-label="WFH and half-day requests" className="space-y-3">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">WFH &amp; half-day requests</h3>
-              <PendingRequestsPanel />
-            </section>
+            <PendingRequestsPanel />
           </div>
         )}
         {tab === 'monthly' && <TeamMonthlyAttendances />}

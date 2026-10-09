@@ -307,7 +307,7 @@ export const sections = [
     body: `
     <h3>Employee Requests — one queue for everything</h3>
     <p><span class="ui">Manager → Employee Requests → Pending Queue</span> holds leave, WFH / half-day requests, check-out corrections,
-    comp-off and expense claims. Add a note and approve or decline. The <b>Monthly</b> tab shows team attendance (with Download Excel).</p>
+    comp-off and expense claims. Each card has a note box with <b>Approve</b> and <b>Decline</b> — one click, no pop-ups. Declining needs a short note so the person knows why (for leave it is optional). The <b>Monthly Matrix</b> tab shows team attendance (with Download Excel).</p>
     <h3>Who decides what</h3>
     <ul>
       <li>A person's requests go to the person they <b>report to</b> — their team lead or manager (see below). People who report to nobody go to every manager.</li>

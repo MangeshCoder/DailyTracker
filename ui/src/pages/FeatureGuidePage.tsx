@@ -43,7 +43,7 @@ const EDITIONS: GuideEdition[] = [
     filename: 'DailyTracker_v2_Feature_Guide.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide.pdf?v=${GUIDE_VERSION}`,
     pages: 21,
-    size: '286 KB',
+    size: '287 KB',
     badge: '21 pages · updated 9 Oct 2026',
     summary: 'Every feature explained in plain words with exact steps — your working day, leave and comp-off, WFH, expenses, payroll, chat, AI Help — plus a section for team leads and managers.',
     features: [
@@ -62,7 +62,7 @@ const EDITIONS: GuideEdition[] = [
     filename: 'DailyTracker_v2_Feature_Guide_Marathi.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide_Marathi.pdf?v=${GUIDE_VERSION}`,
     pages: 21,
-    size: '427 KB',
+    size: '428 KB',
     badge: '२१ पाने · ९ ऑक्टोबर २०२६',
     summary: 'प्रत्येक सुविधा सोप्या शब्दांत, नेमक्या पायऱ्यांसह — कामाचा दिवस, रजा व कॉम्प-ऑफ, WFH, खर्च, पगार, चॅट, AI Help — आणि टीम लीड व मॅनेजरसाठी स्वतंत्र भाग.',
     features: [
