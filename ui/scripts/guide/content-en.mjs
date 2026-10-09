@@ -8,7 +8,7 @@ export const meta = {
   file: 'DailyTracker_v2_Feature_Guide.pdf',
   title: 'DailyTracker v2 — User Guide',
   subtitle: 'How to use every feature — for employees, team leads and managers',
-  updated: 'Updated 1 October 2026',
+  updated: 'Updated 9 October 2026',
   footer: 'DailyTracker v2 · User Guide',
   contents: 'Contents',
   page: 'Page',
@@ -36,6 +36,10 @@ export const sections = [
     body: `
     <table>
       <tr><th>Feature</th><th>What it does</th><th>Where</th></tr>
+      <tr><td>EOD draft written by AI</td><td><b>Auto-Generate Draft</b> now writes your end-of-day report from today's tasks — you read and edit it before sending.</td><td>EOD Report</td></tr>
+      <tr><td>AI team summary</td><td>Managers and team leads get a short summary of the team's week: highlights, blockers and who needs attention.</td><td>Team Dashboard → AI Summary</td></tr>
+      <tr><td>Who you report to</td><td>When approving a new account the manager picks the team lead or manager the person reports to, and can change it later.</td><td>Assign Roles, User Management</td></tr>
+      <tr><td>Team check-up</td><td>Managers see who reports to nobody, to someone who has left, or straight to a manager, and fix it in one click.</td><td>Team Dashboard → User Management</td></tr>
       <tr><td>Missed check-in</td><td>Forgot to check in? Ask to add the day with your times; once approved it counts as present.</td><td>Work Management → My Report</td></tr>
       <tr><td>Phone notifications</td><td>Approvals, reminders and chat messages arrive on your phone or computer even when the app is closed.</td><td>Notifications → Phone notifications</td></tr>
       <tr><td>New look &amp; three designs</td><td>Montcrest logo and a fresh look; pick <b>Montcrest</b>, <b>Dashdark Purple</b> or <b>Original Blue</b> — your choice follows your account.</td><td>Account menu → Design</td></tr>
@@ -156,7 +160,9 @@ export const sections = [
     sub: 'A short summary of your day',
     body: `
     <p>Open <span class="ui">EOD Report</span> and fill in what you did, blockers, tomorrow's plan, what you learned and your mood.
-    Press <span class="ui">Auto-Generate Draft</span> to get a first version written from today's check-in time, hours and tasks — then edit it.</p>
+    Press <span class="ui">Auto-Generate Draft</span> and AI writes a first version from today's tasks, check-in time and hours.
+    It is only a starting point: read it, fix anything that isn't right, then submit. If AI is not switched on for your company,
+    the draft is put together from your tasks instead.</p>
     <p>A reminder comes at <b>5 PM</b> if you checked in but have not sent it. Your manager reads it, rates it and may leave feedback;
     see it under <span class="ui">My EOD Reviews</span>.</p>`,
   },
@@ -304,10 +310,32 @@ export const sections = [
     comp-off and expense claims. Add a note and approve or decline. The <b>Monthly</b> tab shows team attendance (with Download Excel).</p>
     <h3>Who decides what</h3>
     <ul>
-      <li>A person's requests go to their own <b>team lead</b> (or manager); people without one go to every manager.</li>
-      <li>Team leads decide only for their own team. <b>Leave</b> is decided by managers.</li>
+      <li>A person's requests go to the person they <b>report to</b> — their team lead or manager (see below). People who report to nobody go to every manager.</li>
+      <li>Team leads decide WFH, half days, missed check-ins, check-out corrections, comp-off and expenses for their own team. <b>Leave</b> is always decided by a manager.</li>
       <li>Nobody approves their own request, unless there is no one else who could.</li>
     </ul>
+    <h3>Who reports to whom</h3>
+    <ol>
+      <li>On <span class="ui">Manager → Assign Roles</span>, click the role for a new person (Developer or Team Lead).</li>
+      <li>In <b>Reports to</b> choose their team lead or manager — it starts on you. Click <span class="ui">Confirm</span>.</li>
+      <li>To change it later open <span class="ui">Team Dashboard → User Management</span> and pick a new name in the person's
+          <b>Reports to</b> list. It is saved at once and their next requests go to the new person.</li>
+    </ol>
+    <p>Only active managers and team leads can be chosen, and nobody can report to someone who reports to them. Managers don't report to anyone.
+    If a team lead becomes a developer, their people move to that person's own manager.</p>
+    <h3>Team check-up</h3>
+    <p>At the top of <span class="ui">User Management</span> managers see a <b>Team check-up</b>:</p>
+    <ul>
+      <li><b>Needs fixing</b> — people who report to nobody, to someone who has left, or to someone who can't approve (for example a developer).</li>
+      <li><b>Worth a check</b> — developers who report straight to a manager while team leads exist. Before 8 October everyone was linked to
+          the manager who approved them, so some of these may belong in a team lead's team. If they are right, press <span class="ui">These are correct</span>.</li>
+    </ul>
+    <p>Fix anyone by choosing a name in their list. When all is well a green line says everyone reports to an active team lead or manager.</p>
+    <h3>AI team summary</h3>
+    <p>On <span class="ui">Team Dashboard → AI Summary</span> choose <b>Last 7</b>, <b>14</b> or <b>30 days</b> and press
+    <span class="ui">Generate summary</span>. You get an overview, <b>Highlights</b>, <b>Blockers</b> and <b>Needs attention</b>
+    (for example missing EOD reports), then each person's days, hours, tasks, EOD reports and last mood. Team leads see their own team.
+    The label at the top says <b>Written by AI</b>, or <b>Summary from the numbers</b> when AI is not available.</p>
     <h3>Going on leave? Hand over your approvals</h3>
     <p>On Employee Requests use <span class="ui">Hand over</span>: choose a manager or team lead and the dates (up to 90 days).
     For those days they decide your team's requests and get the notifications. A team lead covering for a manager can also decide leave.

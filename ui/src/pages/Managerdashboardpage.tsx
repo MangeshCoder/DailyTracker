@@ -887,7 +887,7 @@ export const ManagerDashboardPage = () => {
                       </span>
                     </div>
                   </div>
-                  {/* who their leave, WFH and EOD reports go to (Managers don't report to anyone) */}
+                  {/* who decides their WFH, expense and other requests (Managers don't report to anyone) */}
                   {user.role !== 'Manager' && user.isActive && (
                     <label className="block mt-3">
                       <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Reports to</span>

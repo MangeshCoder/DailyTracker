@@ -14,7 +14,7 @@ test('the guide page offers both editions and the reader loads the current PDF',
   await fake.navigate('/guide');
 
   await expect(page.getByRole('heading', { name: 'DailyTracker v2 User Guides' })).toBeVisible();
-  await expect(page.getByText('19 pages · updated 1 Oct 2026')).toBeVisible();
+  await expect(page.getByText('21 pages · updated 9 Oct 2026')).toBeVisible();
   const src = await page.locator('iframe').getAttribute('src');
   expect(src).toMatch(/^\/DailyTracker_v2_Feature_Guide\.pdf\?v=\d{4}-\d{2}-\d{2}(\.\d+)?#/);
 

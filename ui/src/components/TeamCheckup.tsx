@@ -109,7 +109,7 @@ export const TeamCheckup = ({ users, leaders, onReportsTo }: Props) => {
         <div className="min-w-0">
           <p className="font-semibold text-slate-900 dark:text-white">Team check-up</p>
           <p className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">
-            Leave, WFH and EOD reports go to the person someone reports to. Fix these so requests reach the right team lead.
+            The person someone reports to decides their WFH, missed check-in, expense and comp-off requests. Fix these so requests reach the right team lead.
           </p>
         </div>
       </div>

@@ -140,7 +140,7 @@ const ConfirmModal = ({
             </span>
           </div>
 
-          {/* Developers and Team Leads report to someone: their leave, WFH and EOD go to that person */}
+          {/* Developers and Team Leads report to someone, who decides their WFH, expense and other requests (leave: managers) */}
           {role !== 'Manager' && leaders.length > 0 && (
             <label className="block">
               <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Reports to</span>
@@ -155,7 +155,7 @@ const ConfirmModal = ({
                 ))}
               </Select>
               <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Their leave, WFH and EOD reports go to this person.
+                This person decides their WFH, expense and other requests. Leave is always decided by a manager.
               </span>
             </label>
           )}

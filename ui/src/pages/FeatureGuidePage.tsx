@@ -42,17 +42,17 @@ const EDITIONS: GuideEdition[] = [
     nativeTitle: 'English Edition',
     filename: 'DailyTracker_v2_Feature_Guide.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide.pdf?v=${GUIDE_VERSION}`,
-    pages: 19,
-    size: '275 KB',
-    badge: '19 pages · updated 1 Oct 2026',
+    pages: 21,
+    size: '286 KB',
+    badge: '21 pages · updated 9 Oct 2026',
     summary: 'Every feature explained in plain words with exact steps — your working day, leave and comp-off, WFH, expenses, payroll, chat, AI Help — plus a section for team leads and managers.',
     features: [
-      "What's new: phone notifications, new look, menu search",
+      "What's new: AI EOD draft, AI team summary, who you report to",
       'Check-in, breaks & forgotten check-out',
       'Leave, comp-off & WFH requests',
       'Expense claims & your payslip',
       'Chat, meetings & AI Help',
-      'Approvals, hand-over & onboarding (managers)',
+      'Approvals, reports-to, team check-up & AI summary (managers)',
     ],
   },
   {
@@ -61,17 +61,17 @@ const EDITIONS: GuideEdition[] = [
     nativeTitle: 'मराठी आवृत्ती (Marathi Edition)',
     filename: 'DailyTracker_v2_Feature_Guide_Marathi.pdf',
     pdfUrl: `/DailyTracker_v2_Feature_Guide_Marathi.pdf?v=${GUIDE_VERSION}`,
-    pages: 19,
-    size: '406 KB',
-    badge: '१९ पाने · १ ऑक्टोबर २०२६',
+    pages: 21,
+    size: '427 KB',
+    badge: '२१ पाने · ९ ऑक्टोबर २०२६',
     summary: 'प्रत्येक सुविधा सोप्या शब्दांत, नेमक्या पायऱ्यांसह — कामाचा दिवस, रजा व कॉम्प-ऑफ, WFH, खर्च, पगार, चॅट, AI Help — आणि टीम लीड व मॅनेजरसाठी स्वतंत्र भाग.',
     features: [
-      'नवीन: फोनवर सूचना, नवीन रूप, मेनूमध्ये शोध',
+      'नवीन: AI EOD मसुदा, AI टीम सारांश, तुम्ही कोणाला रिपोर्ट करता',
       'चेक-इन, ब्रेक आणि चेक-आउट विसरल्यास',
       'रजा, कॉम्प-ऑफ आणि WFH अर्ज',
       'खर्चाचे दावे आणि पे-स्लिप',
       'चॅट, मीटिंग आणि AI Help',
-      'मंजुरी, सोपवणे आणि ऑनबोर्डिंग (मॅनेजर)',
+      'मंजुरी, रिपोर्ट-टू, टीम तपासणी आणि AI सारांश (मॅनेजर)',
     ],
   },
 ];
@@ -186,8 +186,8 @@ export const FeatureGuidePage: React.FC = () => {
       icon: Sparkles,
       title: selectedEdition === 'marathi' ? 'मॅनेजरसाठी' : 'For Managers',
       desc: selectedEdition === 'marathi'
-        ? 'सर्व विनंत्या एकाच ठिकाणी, रजेवर जाताना मंजुरी सोपवणे, नवीन कर्मचाऱ्यांचे ऑनबोर्डिंग'
-        : "One queue for every request, hand over approvals when away, and onboarding checklists for new joiners",
+        ? 'सर्व विनंत्या एकाच ठिकाणी, कोण कोणाला रिपोर्ट करतो व टीम तपासणी, AI टीम सारांश, मंजुरी सोपवणे आणि ऑनबोर्डिंग'
+        : "One queue for every request, who reports to whom with a team check-up, an AI team summary, hand-over and onboarding",
     },
   ];
 
